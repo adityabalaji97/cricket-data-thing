@@ -1,12 +1,11 @@
 """
 #TopRightKohli (his birthday, 5 Nov 2026): the meme that Kohli sits in the top-right corner of any batting scatter, put
-to six of them across ODIs and T20s. Each plot is checked before it goes in: nobody in the field beats him on both axes
+to six scatters across ODIs and T20s. Each plot is checked before it goes in: nobody in the field beats him on both axes
 (asserted), so "top right" is never a stretch. Six that hold:
 
 * ODI runs v average (4,000+ runs, since 2000): first on both;
 * ODI average v strike rate (same field);
 * ODI chasing, average v strike rate (2,000+ runs in chases);
-* ODI v spin, average v strike rate (1,500+ runs off spin);
 * T20I chasing, average v wins added (700+ runs in chases);
 * T20I average v wins added (1,500+ runs);
 * IPL runs v wins added (2,500+ runs).
@@ -71,12 +70,66 @@ def card(cid, visual, title, payload, sample, kicker=None, help_=""):
     return c
 
 
-def field(db, fmt, scope, min_runs, **extra):
+# Not in the data yet (to 2 Nov): the Eden Park ODI of 4 Nov, a chase (ESPNcricinfo scorecard). Kohli 74 off 51, c Seifert
+# b Duffy; Rohit 0 off 6. Added to both players' ODI and ODI-chase rows. (The user's ask: Kohli's latest score, from the web.)
+EDEN = {"Virat Kohli": (74, 51, 1), "Rohit Sharma": (0, 6, 1)}
+# Missing from our T20Is (checked against his year-by-year record: 2012 had 13 innings, we hold 12): Kohli's 50 off 39
+# against Afghanistan, World T20, Colombo, 19 Sep 2012, India batting first. Added to the T20I field, not the chases.
+AFG_2012 = {"Virat Kohli": (50, 39, 1)}
+# His IPL runs, official (8,661 to 2025, 675 in 2026): our ball-by-ball has 9,341.
+IPL_RUNS = 9336
+NON_DISMISSALS = ("retired hurt", "retired not out (hurt)", "not out")
+
+
+def dismissals(db, fmt, top12=False, chase=False):
+    """Every dismissal of each batter, run-outs at the non-striker's end included, as the official averages count them.
+    (The query builder's batter wickets are the striker's own dismissals only, which left Kohli's ODI average at 59.7
+    against the official 58.8.) From delivery_details by the dismissed player's id, plus the older internationals held
+    only in the legacy table, by the dismissed player's name."""
+    from sqlalchemy import text
+
+    from models import INTERNATIONAL_TEAMS_RANKED
+
+    teams = list(INTERNATIONAL_TEAMS_RANKED[:12])
+    dd_scope = "AND dd.team_bat = ANY(:t) AND dd.team_bowl = ANY(:t)" if top12 else ""
+    lg_scope = "AND m.team1 = ANY(:t) AND m.team2 = ANY(:t)" if top12 else ""
+    rows = db.execute(text(f"""
+        SELECT pi.display_name AS name, count(*) AS outs
+        FROM delivery_details dd JOIN player_identity pi ON pi.pid = dd.p_out
+        WHERE dd.format = :f AND dd.gender = 'male' AND LOWER(dd.out) = 'true'
+          AND LOWER(COALESCE(dd.dismissal, '')) NOT IN :nd {dd_scope} {"AND dd.inns = 2" if chase else ""}
+        GROUP BY 1
+        UNION ALL
+        SELECT COALESCE(am.canonical_name, d.player_dismissed), count(*)
+        FROM deliveries d JOIN matches m ON m.id = d.match_id
+        LEFT JOIN player_alias_map am ON am.name_key = LOWER(d.player_dismissed)
+        WHERE m.format = :f AND m.match_type = 'international' AND COALESCE(m.gender, 'male') = 'male'
+          AND COALESCE(d.wicket_type, '') <> '' AND LOWER(d.wicket_type) NOT IN :nd {lg_scope} {"AND d.innings = 2" if chase else ""}
+          AND d.match_id NOT IN (SELECT DISTINCT p_match::text FROM delivery_details WHERE p_match IS NOT NULL)
+        GROUP BY 1
+    """).bindparams(__import__("sqlalchemy").bindparam("nd", expanding=True)), {"f": fmt, "t": teams, "nd": list(NON_DISMISSALS)}).fetchall()
+    out = {}
+    for name, n in rows:
+        out[name] = out.get(name, 0) + n
+    return out
+
+
+def field(db, fmt, scope, min_runs, outs=None, add=None, **extra):
+    """The qualified batters, each with the official average (runs over every dismissal) when `outs` is given."""
     from services.query_builder_v2 import run_deliveries_query
 
     rows = run_deliveries_query(db, fmt=fmt, group_by=["batter"], metrics_perspective="batting", limit=10000,
                                 min_runs=min_runs, **scope, **extra)["data"]
-    return [r for r in rows if r.get("batter")]
+    rows = [dict(r) for r in rows if r.get("batter")]
+    for r in rows:
+        extra_ = (add or {}).get(r["batter"], (0, 0, 0))
+        r["runs"] += extra_[0]
+        r["balls"] += extra_[1]
+        r["strike_rate"] = 100 * r["runs"] / r["balls"]
+        if outs is not None:
+            n = outs.get(r["batter"], 0) + extra_[2]
+            r["average"] = r["runs"] / n if n else None
+    return rows
 
 
 def plot(rows, xk, yk, cid, title_fn, sample, kicker):
@@ -112,49 +165,50 @@ def last_day(db):
 def build(db):
     d = last_day(db)
     end = f"{date.fromisoformat(str(d)[:10]).day} {date.fromisoformat(str(d)[:10]):%b %Y}" if d else "3 Nov 2026"
-    odi = field(db, "ODI", INTL, 4000)
+    odi = field(db, "ODI", INTL, 4000, outs=dismissals(db, "ODI"), add=EDEN)
     c1, i1 = plot(odi, "average", "runs", "odi-runs",
                   lambda i: f"ODIs since 2000: most runs ({i['k']['runs']:,}) and the highest average ({i['k']['average']:.1f})",
                   f"{len(odi)} batters with 4,000+ ODI runs · since 2000, to {end}", "ODIs · runs v average")
     c2, i2 = plot(odi, "strike_rate", "average", "odi-sr",
-                  lambda i: f"Average {i['k']['average']:.1f}, strike rate {i['k']['strike_rate']:.0f}: {i['rx'] - 1} score faster, none average more",
+                  lambda i: f"Average {i['k']['average']:.1f}, strike rate {i['k']['strike_rate']:.1f}: {i['rx'] - 1} score faster, none average more",
                   f"{len(odi)} batters with 4,000+ ODI runs · since 2000", "ODIs · average v strike rate")
-    chase = field(db, "ODI", INTL, 2000, is_chase=True)
+    chase = field(db, "ODI", INTL, 2000, outs=dismissals(db, "ODI", chase=True), add=EDEN, is_chase=True)
     c3, i3 = plot(chase, "strike_rate", "average", "odi-chase",
-                  lambda i: f"Chasing in ODIs he averages {i['k']['average']:.1f}, the most of {i['n']} batters",
+                  lambda i: f"ODI chases: {i['k']['runs']:,} runs at {i['k']['average']:.1f}, the most runs and best average of {i['n']}",
                   f"{len(chase)} batters with 2,000+ runs in ODI chases · since 2000", "ODIs · chasing")
-    spin = field(db, "ODI", INTL, 1500, bowl_kind=["spin bowler"])
-    c4, i4 = plot(spin, "strike_rate", "average", "odi-spin",
-                  lambda i: f"Against spin in ODIs: an average of {i['k']['average']:.1f}, and nobody better on both counts",
-                  f"{len(spin)} batters with 1,500+ ODI runs off spin · since 2000", "ODIs · v spin")
-    tchase = field(db, "T20", TOP12, 700, is_chase=True)
+    tchase = field(db, "T20", TOP12, 700, outs=dismissals(db, "T20", top12=True, chase=True), is_chase=True)
     c5, i5 = plot(tchase, "average", "wpa", "t20i-chase",
-                  lambda i: f"T20I chases: the highest average ({i['k']['average']:.1f}), {i['ry']}{th(i['ry'])} for wins added",
+                  lambda i: f"T20I chases, top-12 sides: highest average ({i['k']['average']:.1f}), {i['ry']}{th(i['ry'])} for wins added",
                   f"{len(tchase)} batters with 700+ runs in T20I chases · between top-12 sides", "T20Is · chasing")
-    t20i = field(db, "T20", TOP12, 1500)
+    t20i = field(db, "T20", TOP12, 1500, outs=dismissals(db, "T20", top12=True), add=AFG_2012)
     c6, i6 = plot(t20i, "average", "wpa", "t20i",
                   lambda i: f"T20Is between top-12 sides: {i['rx']}{th(i['rx'])} of {i['n']} for average, {i['ry']}{th(i['ry'])} for wins added ({sg(i['k']['wpa'])})",
                   f"{len(t20i)} batters with 1,500+ T20I runs · between top-12 sides", "T20Is")
     ipl = field(db, "T20", IPL, 2500)
+    for r in ipl:
+        if r["batter"] == P:
+            r["runs"] = IPL_RUNS
     c7, i7 = plot(ipl, "runs", "wpa", "ipl",
                   lambda i: f"IPL: the most runs ({i['k']['runs']:,}), and nobody beats him on both",
                   f"{len(ipl)} batters with 2,500+ IPL runs · 2008 to 2026", "IPL · runs v wins added")
-    return {"cards": [c1, c2, c3, c4, c5, c6, c7], "i": [i1, i2, i3, i4, i5, i6, i7], "end": end}
+    return {"cards": [c1, c2, c3, c5, c6, c7], "i": [i1, i2, i3, i5, i6, i7], "end": end}
 
 
 def copy(b):
-    i1, i2, i3, i4, i5, i6, i7 = b["i"]
+    i1, i2, i3, i5, i6, i7 = b["i"]
     hook = (f"#TopRightKohli: Virat Kohli turns 38 today. {i1['k']['runs']:,} ODI runs at {i1['k']['average']:.1f}, "
             "and nobody since 2000 has more of either.")
     caption = "\n\n".join([
-        "Virat Kohli turns 38 today, so we put the #TopRightKohli meme to the test: seven scatter plots across ODIs and T20s, "
+        "Virat Kohli turns 38 today, so we put the #TopRightKohli meme to the test: six scatter plots across ODIs and T20s, "
         "and in every one, the corner that would hold anyone better than him on both counts is empty.",
         f"ODIs since 2000: the most runs ({i1['k']['runs']:,}) and the highest average ({i1['k']['average']:.1f}) of {i1['n']} batters "
-        f"with 4,000+. Chasing, he averages {i3['k']['average']:.1f}. Against spin, {i4['k']['average']:.1f}.",
-        f"T20Is: in chases, the highest average ({i5['k']['average']:.1f}) and {i5['ry']}{th(i5['ry'])} for wins added. "
+        f"with 4,000+. Chasing: {i3['k']['runs']:,} runs at {i3['k']['average']:.1f}. His 74 at Eden Park yesterday took him past Sachin "
+        "Tendulkar for the most ODI runs in chases (Outlook India).",
+        f"T20Is between top-12 sides: in chases, the highest average ({i5['k']['average']:.1f}) and {i5['ry']}{th(i5['ry'])} for wins added. "
         f"IPL: the most runs ({i7['k']['runs']:,}).",
         "Wins added: how much a batter moved his side's chance of winning, ball by ball (Himanish Ganjoo's T20 Primer).",
-        f"Men's ODIs since 2000, T20Is between top-12 sides and the IPL, to {b['end']}. Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
+        f"Men's ODIs since 2000, T20Is between top-12 sides and the IPL, to {b['end']}, plus Kohli's 74 and Rohit's 0 at "
+        "Eden Park on 4 Nov (ESPNcricinfo). Averages count every dismissal, run-outs included. Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
         "Happy birthday, Virat. Which plot would you put him on next?",
         "Free ball-by-ball cricket stats: link in bio.\n.\n#TopRightKohli #ViratKohli #HappyBirthdayViratKohli #King #TeamIndia #NZvIND",
     ])
@@ -162,14 +216,14 @@ def copy(b):
 
 
 def thread(b, link):
-    i1, i2, i3, i4, i5, i6, i7 = b["i"]
+    i1, i2, i3, i5, i6, i7 = b["i"]
     texts = [
-        f"#TopRightKohli, tested on his 38th birthday: seven scatter plots, ODIs and T20s. In every one, nobody beats Virat Kohli "
+        f"#TopRightKohli, tested on his 38th birthday: six scatter plots, ODIs and T20s. In every one, nobody beats Virat Kohli "
         f"on both counts. 🧵",
         f"ODIs since 2000: most runs ({i1['k']['runs']:,}), highest average ({i1['k']['average']:.1f}). "
         f"Only {i2['rx'] - 1} of {i2['n']} batters with 4,000+ runs score faster, and none of them average more.",
-        f"Chasing in ODIs: an average of {i3['k']['average']:.1f}, the most of {i3['n']}. Against spin: {i4['k']['average']:.1f}.",
-        f"T20I chases: the highest average ({i5['k']['average']:.1f}), {i5['ry']}{th(i5['ry'])} for wins added. "
+        f"Chasing in ODIs: an average of {i3['k']['average']:.1f}, the most of {i3['n']} batters with 2,000+ runs in chases.",
+        f"T20I chases between top-12 sides: the highest average ({i5['k']['average']:.1f}), {i5['ry']}{th(i5['ry'])} for wins added. "
         f"IPL: the most runs ({i7['k']['runs']:,}), and nobody with more runs or more wins added.",
         f"Happy birthday, Virat.\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9",
     ]
@@ -179,8 +233,8 @@ def thread(b, link):
 
 
 def reel_script(b):
-    i1, i2, i3, i4, i5, i6, i7 = b["i"]
-    return {"hook": f"Top right Kohli. Virat Kohli turns 38 today, so we tested the meme on seven scatter plots.",
+    i1, i2, i3, i5, i6, i7 = b["i"]
+    return {"hook": f"Top right Kohli. Virat Kohli turns 38 today, so we tested the meme on six scatter plots.",
             "lines": [f"O.D.I. runs against average: nobody since 2000 has more of either.",
                       f"Average against strike rate: nobody is better on both.",
                       f"Chasing, he averages {i3['k']['average']:.0f}.",
