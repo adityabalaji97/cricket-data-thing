@@ -251,6 +251,15 @@ def page_key(team: str, fmt: str, period: str, start_date: Optional[date], end_d
     return key
 
 
+#: Short codes old links used for international sides (teams_mapping covers the franchises).
+INTERNATIONAL_CODES = {
+    "IND": "India", "AUS": "Australia", "ENG": "England", "NZ": "New Zealand", "SA": "South Africa", "PAK": "Pakistan",
+    "SL": "Sri Lanka", "BAN": "Bangladesh", "AFG": "Afghanistan", "WI": "West Indies", "ZIM": "Zimbabwe", "IRE": "Ireland",
+    "NED": "Netherlands", "SCO": "Scotland", "UAE": "United Arab Emirates", "NAM": "Namibia", "NEP": "Nepal", "OMA": "Oman",
+    "USA": "United States of America", "CAN": "Canada",
+}
+
+
 def canonical_team(team: str) -> str:
     """A full name for any spelling the site links with ("CSK", "Chennai Super Kings"): the latest full name."""
     from models import teams_mapping
@@ -258,6 +267,8 @@ def canonical_team(team: str) -> str:
     t = (team or "").strip()
     if t in teams_mapping:
         return t
+    if t.upper() in INTERNATIONAL_CODES:
+        return INTERNATIONAL_CODES[t.upper()]
     fulls = [full for full, short in teams_mapping.items() if short.lower() == t.lower()]
     if not fulls:
         return t

@@ -24,7 +24,7 @@ const SKIP_DEFAULTS = { limit: 1000, offset: 0, include_international: false, sh
 const RECENT_KEY = 'hindsight.qb.recent';
 
 /** The URL for a query: its filters (defaults left out), group-by and the question that made it. */
-const toSearch = (filters, groupBy, q, m) => {
+const toSearch = (filters, groupBy, q, m, fmtSlug = null) => {
   const p = new URLSearchParams();
   Object.entries(filters || {}).forEach(([k, v]) => {
     if (v == null || v === '' || (Array.isArray(v) && !v.length)) return;
@@ -34,6 +34,8 @@ const toSearch = (filters, groupBy, q, m) => {
   (groupBy || []).forEach((g) => p.append('group_by', g));
   if (q) p.set('q', q);
   if (m) p.set('m', m);
+  // ODI links carry their format (App.js applies ?fmt=), so a shared ODI answer opens in ODIs.
+  if (fmtSlug && fmtSlug !== 'mens-t20') p.set('fmt', fmtSlug);
   return `?${p.toString()}`;
 };
 
@@ -102,8 +104,9 @@ const QueryPage = ({ isMobile }) => {
   useEffect(() => {
     if (formatParams.format !== 'T20' && formatParams.format !== 'ODI') selectFormat('mens-t20');
   }, [formatParams.format, selectFormat]);
+  const slugFor = (f) => (formats || []).find((x) => x.format === f && (x.gender || 'male') === 'male')?.slug || (f === 'ODI' ? 'mens-odi' : 'mens-t20');
   const setFmt = (f) => {
-    const slug = (formats || []).find((x) => x.format === f && (x.gender || 'male') === 'male')?.slug || (f === 'ODI' ? 'mens-odi' : 'mens-t20');
+    const slug = slugFor(f);
     if (slug !== active?.slug) selectFormat(slug);
   };
 
@@ -115,17 +118,10 @@ const QueryPage = ({ isMobile }) => {
     return () => { cancelled = true; };
   }, [fmt]);
 
-  // Suggestions from the next fixture.
+  // Suggestions about the next fixture, in its format and our data's names (GET /query-suggestions).
   useEffect(() => {
-    fetch(`${config.API_URL}/fixtures/upcoming?count=4`).then((r) => r.json()).then((list) => {
-      const f = (Array.isArray(list) ? list : []).find((x) => x.format === 'T20' || x.format === 'ODI');
-      if (!f) return;
-      const ground = (f.venue || '').split(',')[0];
-      setSuggest({
-        label: `Next · ${f.team1_abbr || f.team1} v ${f.team2_abbr || f.team2} at ${ground}`,
-        items: [`${ground}: pace or spin since 2023`, `${f.team2} batting by phase since 2024`, `${f.team1} bowling at the death since 2024`],
-      });
-    }).catch(() => {});
+    fetch(`${config.API_URL}/query-suggestions`).then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.items?.length) setSuggest(d); }).catch(() => {});
   }, []);
 
   // Run the query whenever the URL holds one.
@@ -156,21 +152,22 @@ const QueryPage = ({ isMobile }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, fmt]);
 
-  const go = useCallback((f, g, q, m = null) => {
-    const search = toSearch(f, g, q, m);
+  const go = useCallback((f, g, q, m = null, f2 = null) => {
+    const search = toSearch(f, g, q, m, slugFor(f2 || fmt));
     navigate({ search }, { replace: false });
     if (q) { saveRecent(q, search); setRecent(readRecent()); }
-  }, [navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, fmt, formats]);
 
   // Plain English to a query; a follow-up sends the current query along as its context.
-  const ask = async (q, mode = 'ask') => {
+  const ask = async (q, mode = 'ask', fmtOverride = null) => {
     const t = (q || '').trim();
     if (!t || parsing) return;
     setParsing(mode);
     setParseError(null);
     track('nl_search', { follow_up: mode === 'follow' });
     try {
-      const body = { query: t, format: fmt };
+      const body = { query: t, format: fmtOverride || fmt };
       if (mode === 'follow') body.context = [question, queryInWords(filters, groupBy)].filter(Boolean).join(' — ');
       const { data } = await axios.post(`${config.API_URL}/nl2query/parse`, body);
       if (!data.success) { setParseError(data.error || "That question didn't parse. Try rephrasing it."); return; }
@@ -181,7 +178,8 @@ const QueryPage = ({ isMobile }) => {
       setFollow('');
       // The measure the question asks about, when it names one ("most wickets"); otherwise the page's default.
       const yAxis = data.recommended_chart?.y_axis;
-      go(merged, data.group_by || [], label, ASKABLE.includes(yAxis) ? yAxis : null);
+      const runFmt = data.format === 'ODI' || data.format === 'T20' ? data.format : (fmtOverride || fmt);
+      go(merged, data.group_by || [], label, ASKABLE.includes(yAxis) ? yAxis : null, runFmt);
     } catch (e) {
       const d = e.response?.data?.detail;
       setParseError(typeof d === 'string' ? d : "That question didn't parse. Try again in a moment.");
@@ -244,7 +242,7 @@ const QueryPage = ({ isMobile }) => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
               <Eyebrow>{suggest.label}</Eyebrow>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {suggest.items.map((s) => <Chip key={s} tone="suggest" onClick={() => { setText(s); ask(s); }}>{s}</Chip>)}
+                {suggest.items.map((s) => <Chip key={s} tone="suggest" onClick={() => { if (suggest.format) setFmt(suggest.format); setText(s); ask(s, 'ask', suggest.format); }}>{s}</Chip>)}
               </Box>
             </Box>
           )}

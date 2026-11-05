@@ -162,6 +162,12 @@ NEW_VENUES = {
     'Shere Bangla National Stadium': 'Shere Bangla National Stadium, Mirpur',
     'Sir Vivian Richards Stadium, North Sound': 'Sir Vivian Richards Stadium, North Sound, Antigua',
     'Sky Stadium': 'Sky Stadium, Wellington',
+    # One ground, four names (WestpacTrust, Westpac, Sky, then Hnry from 2026): Sky Stadium, as the data mostly says.
+    'Hnry Stadium': 'Sky Stadium, Wellington',
+    'Hnry Stadium, Wellington': 'Sky Stadium, Wellington',
+    'Westpac Stadium': 'Sky Stadium, Wellington',
+    'Westpac Stadium, Wellington': 'Sky Stadium, Wellington',
+    'WestpacTrust Stadium, Wellington': 'Sky Stadium, Wellington',
     'Sophia Gardens': 'Sophia Gardens, Cardiff',
     'Sportpark Het Schootsveld': 'Sportpark Het Schootsveld, Deventer',
     'Sportpark Maarschalkerweerd': 'Sportpark Maarschalkerweerd, Utrecht',

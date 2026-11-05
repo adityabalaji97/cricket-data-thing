@@ -38,3 +38,14 @@ test('chips read the query in words, and removing one clears it', () => {
   const n = removeChip(f, ['year'], chips.find((c) => c.key === 'overs'));
   expect(n.filters.over_min).toBeNull();
 });
+
+test('pace v spin at a ground compares runs an over, not wicket counts', () => {
+  const rows = [
+    { bowl_kind: 'pace bowler', balls: 436, runs: 350, wickets: 16 },
+    { bowl_kind: 'spin bowler', balls: 74, runs: 70, wickets: 2 },
+  ];
+  const a = shapeAnswer(rows, { venue: 'Sky Stadium, Wellington' }, ['bowl_kind'], 'wickets');
+  expect(a.type).toBe('bars');
+  expect(a.measure).toBe('economy');
+  expect(a.sentence.map(([t]) => t).join('')).toContain('pace went for 4.82 an over, spin 5.68');
+});

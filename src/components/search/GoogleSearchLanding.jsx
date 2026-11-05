@@ -3,8 +3,7 @@ import {
   Container,
   Box,
   Typography,
-  Button,
-  Paper
+  Button
 } from '@mui/material';
 import CasinoIcon from '@mui/icons-material/Casino';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -12,6 +11,7 @@ import axios from 'axios';
 import SearchBar from './SearchBar';
 import { findExactSearchMatch } from './SearchBar';
 import PlayerSearchResult from './PlayerSearchResult';
+import SearchShortcuts from './SearchShortcuts';
 import { API_BASE_URL } from './searchConfig';
 import playerProfileUrl from '../../utils/playerProfileUrl';
 
@@ -133,7 +133,7 @@ const GoogleSearchLanding = () => {
           </Typography>
         </Box>
         <Typography variant="body1" color="text.secondary">
-          Search players, teams, and venues for T20 cricket analytics
+          Search players, teams and venues
         </Typography>
         {/* Show date filter badge if dates are applied */}
         {dateRangeLabel && (
@@ -191,44 +191,8 @@ const GoogleSearchLanding = () => {
         />
       )}
 
-      {/* Quick Links when no selection */}
-      {!selectedEntity && (
-        <Paper elevation={0} sx={{ p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Quick Links
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, max-content)' }, gap: 1 }}>
-            <Button
-              size="small"
-              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
-              onClick={() => handleSelect({ name: 'Virat Kohli', type: 'player' })}
-            >
-              Virat Kohli
-            </Button>
-            <Button
-              size="small"
-              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
-              onClick={() => handleSelect({ name: 'Jasprit Bumrah', type: 'player' })}
-            >
-              Jasprit Bumrah
-            </Button>
-            <Button
-              size="small"
-              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
-              onClick={() => handleSelect({ name: 'MS Dhoni', type: 'player' })}
-            >
-              MS Dhoni
-            </Button>
-            <Button
-              size="small"
-              sx={{ justifyContent: 'flex-start', minHeight: 36 }}
-              onClick={() => handleSelect({ name: 'Hardik Pandya', type: 'player' })}
-            >
-              Hardik Pandya
-            </Button>
-          </Box>
-        </Paper>
-      )}
+      {/* Recent and popular players, teams and venues when nothing is selected */}
+      {!selectedEntity && <SearchShortcuts />}
     </Container>
   );
 };

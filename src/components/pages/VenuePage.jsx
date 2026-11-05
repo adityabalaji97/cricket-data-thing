@@ -4,6 +4,7 @@ import SportsCricketRoundedIcon from '@mui/icons-material/SportsCricketRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
+import { rememberEntity } from '../../utils/recentEntities';
 import { colors } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import ProfileFilters from '../playerProfile/cards/ProfileFilters';
@@ -150,7 +151,7 @@ const VenuePage = () => {
     navigate({ search: writeSearch({ venue }, next), hash: '' }, { replace: true });
   }, [win, venue, navigate]);
 
-  useEffect(() => { if (venue) document.title = `${venue} · Hindsight`; }, [venue]);
+  useEffect(() => { if (venue) { document.title = `${venue} · Hindsight`; rememberEntity('venue', venue); } }, [venue]);
   const { status, data } = usePageData(venue ? '/venue-page' : null, `venue=${encodeURIComponent(venue || '')}&${windowQuery(win)}`);
 
   const cards = useMemo(() => {

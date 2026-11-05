@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from database import get_session
@@ -214,3 +214,12 @@ def get_player_type(
     except Exception as e:
         logger.error(f"Error in get_player_type: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/popular")
+def popular_searches(response: Response, days: int = Query(7, ge=1, le=30), db: Session = Depends(get_session)):
+    """The most-opened player, team and venue pages over the last few days, counted by people (not crawlers)."""
+    from services.popular_searches import popular
+
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
+    return popular(db, days=days)
