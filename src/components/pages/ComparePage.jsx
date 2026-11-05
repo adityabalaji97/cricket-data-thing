@@ -63,7 +63,10 @@ const FORMATS = {
 };
 const show = (m, v) => (v === null || v === undefined ? '–' : (FORMATS[m.format] || FORMATS.dec1)(v));
 
-/** One measure, both players: their values and ranks, two dots on the pool's spread (better to the right). */
+/**
+ * One measure, both players, on the pool's spread (better to the right). Each value sits by its own dot, in the
+ * player's colour: player 1's above the line, player 2's below, so the two never collide however close the dots are.
+ */
 const PairStrip = ({ m }) => {
   const W = 343; const H = 16;
   const q = m.quantiles || [];
@@ -77,30 +80,38 @@ const PairStrip = ({ m }) => {
     return 6 + (m.lower_is_better ? 1 - t : t) * (W - 12);
   };
   const aBetter = m.a.rank < m.b.rank;
-  const cell = (p, col, better) => (
-    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, justifyContent: 'flex-end', minWidth: 0, whiteSpace: 'nowrap' }}>
-      <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: better ? 700 : 500, fontSize: 15, color: better ? col : colors.textMed }}>
-        {show(m, p.value)}
+  const bBetter = m.b.rank < m.a.rank;
+  // A label centred on its dot, or held inside the card at either end.
+  const tag = (p, col, better, top) => {
+    const pct = (100 * x(p.value)) / W;
+    const shift = pct < 14 ? 'translateX(-6px)' : pct > 86 ? 'translateX(calc(-100% + 6px))' : 'translateX(-50%)';
+    return (
+      <Box sx={{ position: 'absolute', top, left: `${pct}%`, transform: shift, display: 'flex', alignItems: 'baseline', gap: 0.5,
+        whiteSpace: 'nowrap', lineHeight: 1 }}>
+        <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: better ? 700 : 500, fontSize: 15, color: col }}>
+          {show(m, p.value)}
+        </Box>
+        <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo }}>{ordinal(p.rank)}</Box>
       </Box>
-      <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo }}>{ordinal(p.rank)}</Box>
-    </Box>
-  );
+    );
+  };
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px', py: 0.5 }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', columnGap: 1, alignItems: 'baseline' }}>
-        <Box component="span" sx={{ color: colors.textMed, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</Box>
-        {cell(m.a, A_COL, aBetter)}
-        {cell(m.b, B_COL, !aBetter && m.a.rank !== m.b.rank)}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px', py: 0.5 }}>
+      <Box component="span" sx={{ color: colors.textMed, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</Box>
+      <Box sx={{ position: 'relative', height: 54 }}>
+        {tag(m.a, A_COL, aBetter, 0)}
+        {q.length > 0 && (
+          <Box component="svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true"
+            sx={{ position: 'absolute', top: 19, left: 0, width: '100%', height: H }}>
+            <rect x="0" y="7" width={W} height="2" rx="1" fill={colors.surface2} />
+            {q.map((v, i) => <rect key={i} x={x(v) - 0.5} y="4" width="1" height="8" fill={colors.textGhost} opacity="0.8" />)}
+            <rect x={x(m.median) - 0.75} y="0" width="1.5" height={H} fill={colors.textLo} />
+            <circle cx={x(vb)} cy="8" r="5" fill={B_COL} stroke={colors.bg} strokeWidth="2" />
+            <circle cx={x(va)} cy="8" r="5" fill={A_COL} stroke={colors.bg} strokeWidth="2" />
+          </Box>
+        )}
+        {tag(m.b, B_COL, bBetter, 39)}
       </Box>
-      {q.length > 0 && (
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true">
-          <rect x="0" y="7" width={W} height="2" rx="1" fill={colors.surface2} />
-          {q.map((v, i) => <rect key={i} x={x(v) - 0.5} y="4" width="1" height="8" fill={colors.textGhost} opacity="0.8" />)}
-          <rect x={x(m.median) - 0.75} y="0" width="1.5" height={H} fill={colors.textLo} />
-          <circle cx={x(vb)} cy="8" r="5" fill={B_COL} stroke={colors.bg} strokeWidth="2" />
-          <circle cx={x(va)} cy="8" r="5" fill={A_COL} stroke={colors.bg} strokeWidth="2" />
-        </svg>
-      )}
     </Box>
   );
 };
@@ -140,10 +151,16 @@ const PlayersTab = ({ a, b, fmt, setParams, players }) => {
               {shared.length > 1 && <Pills label="Role" items={shared.map((r) => [r, ROLE_NAMES[r]])} value={shown} onChange={setRole} />}
               {sections.length > 1 && <Pills label="Measures" items={sections.map((s) => [s.title, s.title])} value={sec.title} onChange={setSection} />}
             </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', columnGap: 1, fontSize: 12.5, fontWeight: 700 }}>
-              <span />
-              <Box component={Link} to={`/player?name=${encodeURIComponent(a)}`} sx={{ color: A_COL, textAlign: 'right', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{na}</Box>
-              <Box component={Link} to={`/player?name=${encodeURIComponent(b)}`} sx={{ color: B_COL, textAlign: 'right', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nb}</Box>
+            {/* The legend: whose colour is whose (player 1's values sit above each line, player 2's below). */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: 13, fontWeight: 700 }}>
+              {[[a, na, A_COL, 'above'], [b, nb, B_COL, 'below']].map(([full, name, col, where]) => (
+                <Box key={full} component={Link} to={`/player?name=${encodeURIComponent(full)}`}
+                  sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, color: col, textDecoration: 'none', minWidth: 0 }}>
+                  <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: col, flex: 'none' }} />
+                  <Box component="span" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</Box>
+                  <Box component="span" sx={{ fontWeight: 400, fontSize: 11.5, color: colors.textLo }}>{where}</Box>
+                </Box>
+              ))}
             </Box>
             {sec.groups.map((g) => (
               <Box key={g.label || 'all'} sx={{ display: 'flex', flexDirection: 'column' }}>
