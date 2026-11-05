@@ -41,9 +41,25 @@ TEAMS = {
     "PBKS": {"name": "Punjab Kings", "short": "Punjab", "tag": "#PBKS", "big": "Shreyas Iyer"},
     "GT": {"name": "Gujarat Titans", "short": "Gujarat", "tag": "#GT", "big": "Shubman Gill"},
 }
-# This window's trades (Cricinfo / trade tracker, 5 Nov 2026): (player, from, to, salary in crore).
+# This window's trades (Cricinfo / trade tracker, 5 Nov 2026; CSK's announcement, 5 Nov 2026): (player, from, to,
+# salary in crore).
 TRADES = [("Rishabh Pant", "LSG", "DC", 15.0), ("Kuldeep Yadav", "DC", "LSG", 13.5),
-          ("T Natarajan", "DC", "SRH", 5.0), ("Zeeshan Ansari", "SRH", "DC", 0.4)]
+          ("T Natarajan", "DC", "SRH", 5.0), ("Zeeshan Ansari", "SRH", "DC", 0.4),
+          ("Liam Livingstone", "SRH", "CSK", 6.0), ("Jack Edwards", "SRH", "CSK", 3.0),
+          ("Khaleel Ahmed", "CSK", "SRH", 4.8), ("Nathan Ellis", "CSK", "SRH", 2.0)]
+
+
+# The day's trade news, led with in the copy: (team, the date it was announced, source).
+NEWS = {"CSK": ("5 Nov", "Chennai Super Kings' announcement")}
+
+
+COMMON_SURNAMES = {"Ahmed", "Ahmad", "Khan", "Singh", "Sharma", "Kumar", "Yadav", "Patel", "Pandya", "Iyer"}
+
+
+def called(name):
+    """What a tweet calls him: the surname, or the first name where the surname is shared by many (Khaleel)."""
+    w = name.split()
+    return w[0] if len(w) > 1 and w[-1] in COMMON_SURNAMES else w[-1]
 
 
 def sg(v, d=2):
@@ -136,6 +152,35 @@ def build(db, code):
     # An initial and the surname ("U Patel", "N Ahmad"): a surname alone is often two players.
     short = lambda n: n if len(n.split()) < 2 or n.split()[0].isupper() else f"{n.split()[0][0]} {n.split()[-1]}"  # noqa: E731
 
+    # Today's trade, if any: who came and went, with each one's IPL since 2025 (read the same way as the squad's).
+    ins = [p for p in players if p.get("traded_in")]
+    outs = [(n, to, sal) for n, frm, to, sal in TRADES if frm == code]
+    o_bat, o_bowl, *_ = numbers(db, [n for n, _, _ in outs]) if outs else ({}, {})
+
+    def since(name, b, w, one=False):
+        """His IPL since 2025 in words; one=True keeps only the main thing he does (for a tweet)."""
+        bb, wb = (b or {}).get("balls") or 0, (w or {}).get("balls") or 0
+        bits = []
+        if bb >= 30:
+            bits.append((bb, f"{b['runs']} runs at a strike rate of {b['strike_rate']:.0f}"))
+        if wb >= 30:
+            bits.append((wb, f"{w['wickets']} wickets at {6 * w['runs'] / w['balls']:.2f} an over"))
+        if not bits:
+            games = max((b or {}).get("innings_count") or 0, (w or {}).get("innings_count") or 0)
+            return (f"{name}: " + ("yet to play an IPL game" if not games else f"{games} IPL game{'s' if games > 1 else ''}")
+                    + ("" if one else " since 2025"))
+        if one:
+            bits = [max(bits)]
+        return f"{name}: " + " and ".join(t for _, t in bits)
+
+    trade = None
+    if ins and code in NEWS:
+        trade = {"ins": ins, "outs": outs, "to": outs[0][1] if outs else None,
+                 "lines": [since(p["name"], p["bat"], p["bowl"]) + f" ({crore(p['price'])})" for p in ins]
+                 + [since(n, o_bat.get(n), o_bowl.get(n)) for n, _, _ in outs],
+                 "brief": [since(called(p["name"]), p["bat"], p["bowl"], one=True) for p in ins]
+                 + [since(called(n), o_bat.get(n), o_bowl.get(n), one=True) for n, _, _ in outs]}
+
     # 1. Cover: the squad board.
     order = ["Openers", "Middle order", "Finishers", "All-rounders", "Pace", "Spin"]
     groups = [{"label": g.replace("Middle order", "Middle"), "players": [{"name": short(p["name"]), "value": round(p["wpa"], 2)}
@@ -145,7 +190,10 @@ def build(db, code):
     below = sum(1 for p in played if p["wpa"] <= 0)
     lead = card("board", "squad_board", f"{T['short']}'s squad by wins added since the mega auction: {top['name']} leads ({sg(top['wpa'])})",
                 {"colour": colour, "format": "signed2", "groups": groups,
-                 "note": f"Yet to play an IPL ball since 2025: {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:4])}{'…' if len(unplayed) > 4 else ''})" if unplayed else None},
+                 "note": " · ".join(x for x in [
+                     f"Traded in: {', '.join(short(p['name']) for p in ins)}" if trade else "",
+                     f"Yet to play since 2025: {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:3])}{'…' if len(unplayed) > 3 else ''})" if unplayed else "",
+                 ] if x) or None},
                 f"Wins added (T20 Primer), batting and bowling · IPL 2025-26, any side · {len(played)} of {len(players)} played")
 
     # 2. Who carried them.
@@ -199,7 +247,7 @@ def build(db, code):
 
     # 5. Value for money; and the three cases.
     big = next((p for p in played if p["name"] == T["big"]), max(played, key=lambda p: p["price"]))
-    pool = [p for p in played if p is not big]
+    pool = [p for p in played if p is not big and not p.get("traded_in")]  # a player just traded in isn't a retention call
     under = max([p for p in pool if p["wpa"] < 0] or pool, key=lambda p: p["price"])
     bargain = max([p for p in pool if p is not under and p["price"] <= 1.0] or [p for p in pool if p is not under],
                   key=lambda p: p["wpa"])
@@ -269,7 +317,7 @@ def build(db, code):
               kicker="Purse and gaps")
     return {"team": team, "code": code, "colour": colour, "lead": lead, "cards": [c2, c3, c4, c5, c6, c7],
             "players": players, "trio": trio, "under": under, "bargain": bargain, "big": big, "top": top, "below": below,
-            "bill": bill, "freed": freed, "worst": worst, "of": of, "played": played}
+            "bill": bill, "freed": freed, "worst": worst, "of": of, "played": played, "trade": trade}
 
 
 def copy(b):
@@ -278,7 +326,12 @@ def copy(b):
     hook = (f"{u['name']}: {crore(u['price'])}, {sg(u['wpa'])} wins since the mega auction. "
             f"{g['name']}: {crore(g['price'])}, {sg(g['wpa'])}.")
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
-    caption = "\n\n".join([
+    tr = b.get("trade")
+    when, src = NEWS.get(b["code"], ("", ""))
+    news = ([f"News first: {T['short']} have traded {' and '.join(n for n, _, _ in tr['outs'])} to {TEAMS[tr['to']]['short']} for "
+             f"{' and '.join(p['name'] for p in tr['ins'])} ({src}, {when}). In the IPL since 2025: " + "; ".join(tr["lines"]) + "."]
+            if tr else [])
+    caption = "\n\n".join(news + [
         f"{b['team']} have until 17 November to name who they keep for IPL 2027. Here's the case, player by player, from "
         f"every IPL ball since the 2025 mega auction.",
         f"Most wins added in this squad: {b['top']['name']}, {sg(b['top']['wpa'])}. {b['below']} of the {len(b['played'])} who "
@@ -298,9 +351,12 @@ def thread(b, link):
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
+    tr = b.get("trade")
     texts = [
         f"{u['name']} cost {crore(u['price'])} and added {sg(u['wpa'])} wins for {T['short']} since the mega auction. "
         f"{g['name']} cost {crore(g['price'])}: {sg(g['wpa'])}. The retention case, player by player 🧵",
+    ] + ([f"Today's trade: {' and '.join(p['name'] for p in tr['ins'])} in, {' and '.join(n for n, _, _ in tr['outs'])} out. "
+          "Since 2025: " + "; ".join(tr["brief"]) + "."] if tr else []) + [
         f"Most wins added in this squad: {b['top']['name']}, {sg(b['top']['wpa'])}. {b['below']} of {len(b['played'])} added none or less.",
         f"The big name: {big['name']} ({crore(big['price'])}), {sg(big['wpa'])} wins since 2025.",
         f"The gap to fill at the auction: {PH[b['worst'][1]]} {b['worst'][0]}, {b['worst'][2]}th of {b['of']} IPL sides.",
@@ -322,7 +378,8 @@ def reel_script(b):
     u, g, big = b["under"], b["bargain"], b["big"]
     say = lambda p: crore(p["price"]).replace("₹", "")  # noqa: E731
     return {"hook": f"{u['name']} cost {T['short']} {say(u)}. Since the mega auction, he {spoken(u['wpa'])}.",
-            "lines": ["Here's the whole squad, by wins added since 2025.",
+            "lines": ["Here's the whole squad, with today's trade in, by wins added since 2025." if b.get("trade")
+                      else "Here's the whole squad, by wins added since 2025.",
                       f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
                       f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
                       f"{big['name']}, the big name, {spoken(big['wpa'])}.",
