@@ -3,6 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 // axios ships ES modules Jest doesn't transform; the viewer only posts through it on a tap.
 jest.mock('axios', () => ({ post: jest.fn(), get: jest.fn() }));
+// Same for react-router-dom 7 (match rows in visuals link to scorecards); a plain anchor stands in for its Link.
+jest.mock('react-router-dom', () => ({
+  // eslint-disable-next-line jsx-a11y/anchor-has-content
+  Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a>,
+  useNavigate: () => jest.fn(),
+}), { virtual: true });
 
 import StoryViewer from '../StoryViewer';
 import { toStoryCard } from '../visuals';
