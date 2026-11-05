@@ -68,3 +68,21 @@ def query_suggestions(response: Response, db: Session = Depends(get_session)):
 
     response.headers["Cache-Control"] = "public, max-age=600, s-maxage=1800, stale-while-revalidate=86400"
     return suggestions(db)
+
+
+@router.get("/matchup")
+def matchup(
+    response: Response,
+    batter: str = Query(..., description="Batter"),
+    bowler: str = Query(..., description="Bowler"),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    db: Session = Depends(get_session),
+):
+    """Batter v bowler: every ball between them, where it pitched, where he scored, how he got out, against their usual."""
+    from services.matchup import get_matchup
+
+    page = get_matchup(db, batter, bowler, format)
+    if not page.get("balls"):
+        raise HTTPException(status_code=404, detail=f"{batter} and {bowler} haven't met in a {format}")
+    response.headers["Cache-Control"] = CACHE
+    return page
