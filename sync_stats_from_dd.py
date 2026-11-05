@@ -62,7 +62,7 @@ class StatsFromDeliveryDetails:
                    bat as batter, bowl as bowler, p_bat as batter_pid, p_bowl as bowler_pid,
                    team_bat as batting_team, team_bowl as bowling_team,
                    score, batruns, outcome, out, bat_out, dismissal, noball, wide, byes, legbyes,
-                   format, gender
+                   p_out, non_striker, format, gender
             FROM delivery_details
             WHERE p_match = :match_id
             ORDER BY inns, over, ball
@@ -110,7 +110,10 @@ class StatsFromDeliveryDetails:
         
         stats.runs = sum(d['batruns'] or 0 for d in batter_dels)
         stats.balls_faced = len([d for d in batter_dels if not d['wide']])
-        stats.wickets = sum(1 for d in batter_dels if self._batter_dismissed(d))
+        # Out at either end: his own wicket as striker, or a run-out (or retired out) backing up on someone else's ball.
+        ns_outs = [d for d in deliveries if d['innings'] == innings and d['batter'] != batter
+                   and self._nonstriker_dismissed(d, stats.pid)]
+        stats.wickets = sum(1 for d in batter_dels if self._batter_dismissed(d)) + len(ns_outs)
         stats.dots = sum(1 for d in batter_dels if (d['batruns'] or 0) == 0 and not d['wide'])
         stats.ones = sum(1 for d in batter_dels if (d['batruns'] or 0) == 1)
         stats.twos = sum(1 for d in batter_dels if (d['batruns'] or 0) == 2)
@@ -128,7 +131,8 @@ class StatsFromDeliveryDetails:
             balls = len([d for d in phase_dels if not d['wide']])
             setattr(stats, f'{phase}_balls', balls)
             setattr(stats, f'{phase}_dots', sum(1 for d in phase_dels if (d['batruns'] or 0) == 0 and not d['wide']))
-            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if self._batter_dismissed(d)))
+            setattr(stats, f'{phase}_wickets', sum(1 for d in phase_dels if self._batter_dismissed(d))
+                    + sum(1 for d in ns_outs if start <= d['over'] < end))
             setattr(stats, f'{phase}_boundaries', sum(1 for d in phase_dels if (d['batruns'] or 0) in [4, 6]))
             if balls > 0:
                 setattr(stats, f'{phase}_strike_rate', (getattr(stats, f'{phase}_runs') * 100.0) / balls)
@@ -202,6 +206,19 @@ class StatsFromDeliveryDetails:
         `out`, hence the conjunction.
         """
         return cls._truthy(delivery.get('out')) and cls._truthy(delivery.get('bat_out'))
+
+    #: Rows with a dismissal field on which nobody is out (services/metrics/sql_defs.NON_DISMISSALS).
+    NON_DISMISSALS = ('retired not out (hurt)', 'retired hurt', 'not out')
+
+    @classmethod
+    def _nonstriker_dismissed(cls, delivery: Dict, pid) -> bool:
+        """Whether the batter with this id was dismissed at the non-striker's end on this delivery (someone else's
+        ball). `p_out` names the dismissed player on every non-striker dismissal in both feeds (measured 5 Nov 2026:
+        T20 4,815 of 4,815, ODI 1,752 of 1,754); without an id there's nothing reliable to match on, so no.
+        services/nonstriker_outs.py does the same for the query builder."""
+        return (pid is not None and delivery.get('p_out') == pid and cls._truthy(delivery.get('out'))
+                and not cls._truthy(delivery.get('bat_out'))
+                and str(delivery.get('dismissal') or '').strip().lower() not in cls.NON_DISMISSALS)
 
     @staticmethod
     def _stamp_format(stats, deliveries: List[Dict]) -> None:

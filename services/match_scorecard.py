@@ -400,13 +400,13 @@ def _legacy_batting_rows(match_id: str, db: Session) -> Dict[int, List[Dict[str,
         text(
             f"""
             WITH outs AS (
-                SELECT DISTINCT ON (innings, batter)
-                    innings, batter, wicket_type
+                -- Keyed on the player dismissed, not the striker: a batter run out backing up is out, not "not out".
+                SELECT DISTINCT ON (innings, COALESCE(NULLIF(player_dismissed, ''), batter))
+                    innings, COALESCE(NULLIF(player_dismissed, ''), batter) AS batter, wicket_type
                 FROM deliveries
                 WHERE match_id = :match_id
                   AND wicket_type IS NOT NULL AND wicket_type != ''
-                  AND (player_dismissed IS NULL OR player_dismissed = '' OR player_dismissed = batter)
-                ORDER BY innings, batter, over DESC, ball DESC
+                ORDER BY innings, COALESCE(NULLIF(player_dismissed, ''), batter), over DESC, ball DESC
             )
             SELECT
                 d.innings,

@@ -12,6 +12,7 @@ import re
 from typing import List, Optional, Dict, Any, Tuple, Set
 from datetime import date
 from models import teams_mapping, INTERNATIONAL_TEAMS_RANKED
+from services import nonstriker_outs
 from services.delivery_data_service import get_venue_aliases
 from services.shot_families import family_case_sql as shot_family_case_sql
 from services.competition_aliases import canonical_sql as competition_canonical_sql
@@ -2435,6 +2436,23 @@ def query_deliveries_service(
 
         has_batter_filters = bool(batters) or bool(players)
         data_sources = []
+
+        # A batter's dismissals at the non-striker's end (services/nonstriker_outs.py): added to batting rows grouped
+        # by the innings rather than the ball, so an average counts every dismissal, as the official one does.
+        ns_perspective = sql_defs.perspective_for(group_by, has_batter_filters)
+        if metrics_perspective == "bowling" and "batter" not in (group_by or []):
+            ns_perspective = sql_defs.BOWLER
+        ns_on = nonstriker_outs.applies(
+            group_by, ns_perspective,
+            ball_filters=dict(bowlers=bowlers, bat_hand=bat_hand, bowl_style=bowl_style, bowl_kind=bowl_kind,
+                              crease_combo=crease_combo, line=line, length=length, shot=shot,
+                              control=control is not None, wagon_zone=wagon_zone, dismissal=dismissal,
+                              exclude_bowlers=exclude_bowlers),
+            dimension_filters=dimension_filters,
+            partnership=bool(partnership_players) or bool({"partnership", "non_striker"} & set(group_by or [])),
+            cumulative=ball_aggregation == "cumulative",
+        )
+        ns_players = list(batters or players or [])
         
         # =====================================================================
         # QUERY NEW TABLE (delivery_details) - 2015+
@@ -2550,6 +2568,24 @@ def query_deliveries_service(
                         "2015 onward were merged with pre-2015 data; narrow the filters for exact totals."
                     )
                 new_total_innings = result.get("metadata", {}).get("total_innings_in_query", new_total_innings)
+                if ns_on and new_results:
+                    ns_where, ns_params = build_where_clause(
+                        venue=venue, start_date=new_start, end_date=new_end, leagues=leagues, teams=teams,
+                        batting_teams=batting_teams, bowling_teams=bowling_teams, players=[], batters=[], bowlers=[],
+                        bat_hand=None, bowl_style=[], bowl_kind=[], crease_combo=[], line=[], length=[], shot=[],
+                        control=None, wagon_zone=[], dismissal=[], innings=innings, over_min=over_min,
+                        over_max=over_max, match_outcome=match_outcome, is_chase=is_chase,
+                        chase_outcome=chase_outcome, toss_decision=toss_decision,
+                        include_international=include_international, top_teams=top_teams, group_by=group_by,
+                        base_params={}, db=db, day_or_night=day_or_night, fmt=fmt, gender=gender,
+                        match_ids=match_ids, exclude_batters=[], exclude_bowlers=[], partnership_players=[],
+                    )
+                    nonstriker_outs.add_to_rows(new_results, nonstriker_outs.new_counts(
+                        db, ns_where, ns_params, group_by, get_grouping_columns_map(fmt, gender), join_new_matches,
+                        _player_ids(ns_players, db) if ns_players else None,
+                        _name_prefilter(ns_players, db) if ns_players else None,
+                        _name_prefilter(exclude_batters, db) if exclude_batters else None,
+                    ), group_by)
             
             # An open start (no floor, see analyze_query_requirements) is "every match up to".
             span = f"{new_start.year}-{new_end.year}" if new_start.year > 1971 else f"all to {new_end.year}"
@@ -2628,6 +2664,22 @@ def query_deliveries_service(
                 )
                 legacy_total_count = len(legacy_results)
                 legacy_total_innings = sum(int(r.get("innings_count") or 0) for r in legacy_results)
+                if ns_on and legacy_results:
+                    ns_lwhere, ns_lparams = build_legacy_where_clause(
+                        venue=venue, start_date=legacy_start, end_date=legacy_end, leagues=leagues, teams=teams,
+                        batting_teams=batting_teams, bowling_teams=bowling_teams, players=[], batters=[], bowlers=[],
+                        bowl_style=[], bowl_kind=[], crease_combo=[], dismissal=[], innings=innings,
+                        over_min=over_min, over_max=over_max, match_outcome=match_outcome, is_chase=is_chase,
+                        chase_outcome=chase_outcome, toss_decision=toss_decision,
+                        include_international=include_international, top_teams=top_teams, group_by=group_by,
+                        base_params={}, db=db, day_or_night=day_or_night, match_ids=match_ids, exclude_batters=[],
+                        exclude_bowlers=[], partnership_players=[],
+                    )
+                    nonstriker_outs.add_to_rows(legacy_results, nonstriker_outs.legacy_counts(
+                        db, ns_lwhere, ns_lparams, group_by, get_legacy_grouping_columns_map(),
+                        get_all_player_variants([n for n in ns_players if not _SIDE_SUFFIX.search(n)], db) if ns_players else None,
+                        get_all_player_variants(exclude_batters, db) if exclude_batters else None,
+                    ), group_by)
             
             data_sources.append(f"deliveries ({legacy_start.year}-{legacy_end.year})")
         
@@ -2754,6 +2806,12 @@ def query_deliveries_service(
                     "data_source": data_source_label,
                     "warnings": delivery_warnings,
                     "ball_aggregation": ball_aggregation,
+                    **({"dismissals": (
+                        "Every dismissal, run-outs at the non-striker's end included (as official averages count)."
+                        if ns_on else
+                        "The striker's own dismissals: this view is by the ball (its bowler, line, length, shot...), "
+                        "so a run-out at the other end isn't counted."
+                    )} if ns_perspective == sql_defs.BATTER else {}),
                     "recommended_chart": recommend_chart_for_group_by(group_by, ball_aggregation),
                     "note": "Grouped data with cricket aggregations" + (" (merged from multiple sources)" if len(data_sources) > 1 else "")
                 }

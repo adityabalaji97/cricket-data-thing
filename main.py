@@ -1302,15 +1302,24 @@ def get_venue_stats(
                         {competition_filter}
                         {day_or_night_filter}
                         AND m.format = :fmt AND m.gender = :gender
+                ),
+                -- Run out (or retired out) backing up, on someone else's ball: a dismissal too (services/nonstriker_outs.py).
+                ns_outs AS (
+                    SELECT o.p_out AS pid, COUNT(*) AS n
+                    FROM delivery_details o JOIN match_filter mf ON o.p_match = mf.id
+                    WHERE o.format = :fmt AND o.gender = :gender AND LOWER(o.out) = 'true'
+                      AND LOWER(COALESCE(o.bat_out, '')) = 'false'
+                      AND LOWER(COALESCE(o.dismissal, '')) NOT IN ('retired not out (hurt)', 'retired hurt', 'not out')
+                    GROUP BY o.p_out
                 )
                 SELECT
                     dd.bat as name,
                     string_agg(DISTINCT COALESCE(tm.abbreviated_name, dd.team_bat), '/') as batting_team,
                     COUNT(DISTINCT dd.p_match) as innings,
                     {_VENUE_BAT.runs_sum} as total_runs,
-                    CAST({_VENUE_BAT.runs_sum}::float / NULLIF({_VENUE_BAT.wickets_sum}, 0) AS DECIMAL(10,2)) as average,
+                    CAST({_VENUE_BAT.runs_sum}::float / NULLIF({_VENUE_BAT.wickets_sum} + COALESCE((SELECT n FROM ns_outs WHERE ns_outs.pid = MAX(dd.p_bat)), 0), 0) AS DECIMAL(10,2)) as average,
                     CAST(({_VENUE_BAT.runs_sum}::float * 100 / NULLIF({_VENUE_BAT.balls_sum}, 0)) AS DECIMAL(10,2)) as strike_rate,
-                    CAST({_VENUE_BAT.balls_sum}::float / NULLIF({_VENUE_BAT.wickets_sum}, 0) AS DECIMAL(10,2)) as balls_per_dismissal
+                    CAST({_VENUE_BAT.balls_sum}::float / NULLIF({_VENUE_BAT.wickets_sum} + COALESCE((SELECT n FROM ns_outs WHERE ns_outs.pid = MAX(dd.p_bat)), 0), 0) AS DECIMAL(10,2)) as balls_per_dismissal
                 FROM (SELECT * FROM delivery_details WHERE format = :fmt AND gender = :gender) dd
                 JOIN match_filter mf ON dd.p_match = mf.id
                 LEFT JOIN team_mapping tm ON dd.team_bat = tm.full_name
