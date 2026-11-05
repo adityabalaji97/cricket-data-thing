@@ -109,8 +109,12 @@ const MIRROR = { 1: 7, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 8 };
 // Clockwise from the top for a left-hander (off side on the right); a right-hander's field is its mirror image.
 const ANGLE_LHB = { Behind: 0, Point: 45, Cover: 90, 'Long off': 135, 'Long on': 180, Midwicket: 225, 'Square leg': 270, 'Fine leg': 315 };
 
-/** Share of runs by area: wedge length is the share, the most productive area in lime. */
-export const ScoringAreasCard = ({ player, zones, hand, strikeRate }) => {
+/**
+ * The scoring wheel: share of runs by area, wedge length is the share, the most productive area in lime, the rest blue
+ * where faster than his overall strike rate and red where slower. zones: [{zone 1-8, runs, strike_rate}]. Shared by the
+ * profile's card and the query builder's answer for a by-scoring-zone question.
+ */
+export const ScoringWheel = ({ zones, hand, strikeRate }) => {
   const total = zones.reduce((a, z) => a + z.runs, 0);
   if (!total) return null;
   const left = hand === 'LHB';
@@ -119,7 +123,7 @@ export const ScoringAreasCard = ({ player, zones, hand, strikeRate }) => {
   const max = top.share;
   const c = 150; const R = 104;
   return (
-    <ProfileCard id="scoring" title="Where he scores" player={player} note={`Share of runs by area (${left ? 'left' : 'right'}-handed)`}>
+    <>
       <Box component="svg" viewBox="-24 0 348 300" role="img" sx={{ width: '100%' }}
         aria-label={areas.map((a) => `${a.label} ${Math.round(a.share * 100)}%`).join(', ')}>
         <circle cx={c} cy={c} r={R + 6} fill="#12301c" stroke="rgba(255,255,255,0.22)" />
@@ -133,7 +137,9 @@ export const ScoringAreasCard = ({ player, zones, hand, strikeRate }) => {
           return (
             <g key={a.label}>
               <path d={`M${c},${c} L${c + r * Math.cos(a1)},${c + r * Math.sin(a1)} A${r},${r} 0 0 1 ${c + r * Math.cos(a2)},${c + r * Math.sin(a2)} Z`}
-                fill={fill} fillOpacity={a === top ? 1 : 0.75} />
+                fill={fill} fillOpacity={a === top ? 1 : 0.75}>
+                <title>{`${a.label}: ${Math.round(a.share * 100)}% of runs, strike rate ${Math.round(a.sr ?? 0)}`}</title>
+              </path>
               <text x={lx} y={ly} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textMed }}>{a.label}</text>
               <text x={lx} y={ly + 13} textAnchor="middle" style={{ ...mono, fontSize: 10.5, fill: colors.textHi }}>{`${Math.round(a.share * 100)}%`}</text>
             </g>
@@ -141,7 +147,17 @@ export const ScoringAreasCard = ({ player, zones, hand, strikeRate }) => {
         })}
         <rect x={c - 3} y={c - 9} width="6" height="18" rx="2" fill="#c9b27c" />
       </Box>
-      <Legend items={[['Most runs', LIME], [`Faster than his ${Math.round(strikeRate)}`, BLUE], ['Slower', RED]]} />
+      <Legend items={[['Most runs', LIME], [`Faster than ${Math.round(strikeRate)}`, BLUE], ['Slower', RED]]} />
+    </>
+  );
+};
+
+/** Where he scores: the scoring wheel on the profile. */
+export const ScoringAreasCard = ({ player, zones, hand, strikeRate }) => {
+  if (!zones.reduce((a, z) => a + z.runs, 0)) return null;
+  return (
+    <ProfileCard id="scoring" title="Where he scores" player={player} note={`Share of runs by area (${hand === 'LHB' ? 'left' : 'right'}-handed)`}>
+      <ScoringWheel zones={zones} hand={hand} strikeRate={strikeRate} />
     </ProfileCard>
   );
 };

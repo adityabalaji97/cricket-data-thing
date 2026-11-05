@@ -73,7 +73,9 @@ export const queryChips = (filters, groupBy) => {
   list('bowl_kind'); list('bowl_style', (v) => `v ${v}`); list('line'); list('length'); list('shot'); list('shot_family', (v) => SHOT(v));
   list('wagon_zone'); list('dismissal', (v) => `out ${String(v).toLowerCase()}`);
   if (f.bat_hand) out.push({ key: 'bat_hand', label: valueWords('bat_hand', f.bat_hand) });
-  if (f.over_min != null || f.over_max != null) {
+  // A whole innings (overs 1-20 or 1-50) says nothing: no chip.
+  const wholeInnings = (f.over_min == null || Number(f.over_min) === 0) && (f.over_max == null || [19, 49].includes(Number(f.over_max)));
+  if ((f.over_min != null || f.over_max != null) && !wholeInnings) {
     const a = f.over_min != null ? Number(f.over_min) + 1 : 1; const b = f.over_max != null ? Number(f.over_max) + 1 : null;
     out.push({ key: 'overs', label: b ? `overs ${a}-${b}` : `from over ${a}` });
   }
