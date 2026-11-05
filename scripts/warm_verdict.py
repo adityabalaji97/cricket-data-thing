@@ -55,6 +55,7 @@ def main() -> int:
     from services.player_cards import get_cards
     from services.player_verdict import _peer_pool, _split_pool, default_window, get_summary, scope_params
     from scripts.warm_previews import site_team
+    from services.player_compare import _compare_pool
 
     db = next(get_session())
     t0 = time.time()
@@ -72,6 +73,9 @@ def main() -> int:
                                      [p["name"] for p in pool["players"]])
                 if splits:
                     log.info("splits %s %s %s: %d", fmt, period, role, len(splits["splits"]))
+                # The Compare page's overall measures, from the same window and players.
+                _compare_pool(db, fmt, role, {"start_date": start, "end_date": end}, scope_params(fmt, "strong"),
+                              [p["name"] for p in pool["players"]])
 
     teams = app.get_teams(db=db)
     now = datetime.now(timezone.utc)

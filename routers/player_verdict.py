@@ -67,3 +67,25 @@ def player_cards(
         raise HTTPException(status_code=404, detail=f"No {format} data for {player_name} in this window")
     response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
     return cards
+
+
+@router.get("/player-compare")
+def player_compare(
+    response: Response,
+    a: str = Query(..., description="First player"),
+    b: str = Query(..., description="Second player"),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    period: Literal["recent", "career"] = Query(default="recent"),
+    scope: Literal["strong", "all"] = Query(default="strong"),
+    db: Session = Depends(get_session),
+):
+    """Two players on every ranked measure (overall, by phase, by opponent) against the same pool: the Compare page."""
+    from services.player_compare import get_compare
+    from services.player_verdict import PoolsCold
+
+    try:
+        out = get_compare(db, a, b, format, period, scope)
+    except PoolsCold:
+        raise HTTPException(status_code=503, detail="Career pools are still being built; try again shortly", headers={"Retry-After": "30"})
+    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    return out
