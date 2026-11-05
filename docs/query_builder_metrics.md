@@ -11,7 +11,7 @@ A row's `balls` follow the row's perspective (`services/metrics/sql_defs.py`):
 
 | Perspective | When | Balls | Runs | Wickets |
 |---|---|---|---|---|
-| batter | grouped by batter, or a batters filter | every ball except wides (no-balls are faced) | runs off the bat | the batter's own dismissals |
+| batter | grouped by batter, or a batters filter | every ball except wides (no-balls are faced) | runs off the bat | every dismissal of the batter, run-outs at the non-striker's end included, when the rows are by innings context (year, venue, phase, team...); his dismissals as striker only when the query is by the ball (bowler, line, length, shot, zone, hand...). `metadata.dismissals` says which. services/nonstriker_outs.py |
 | bowler | grouped by bowler (no batter) | legal balls (no wides, no no-balls) | runs minus byes and leg-byes | bowler's wickets |
 | team | anything else, partnerships included | legal balls | every run, extras included | every real dismissal, run-outs included |
 

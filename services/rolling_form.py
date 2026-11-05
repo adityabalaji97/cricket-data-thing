@@ -508,8 +508,15 @@ def _fetch_batting_timeline_dd(
             {_BAT.balls_sum} AS balls_faced,
             SUM(CASE WHEN COALESCE(dd.batruns, 0) = 4 THEN 1 ELSE 0 END) AS fours,
             SUM(CASE WHEN COALESCE(dd.batruns, 0) = 6 THEN 1 ELSE 0 END) AS sixes,
-            -- The striker's own dismissal: a non-striker run out on his ball is not his.
-            {_BAT.wickets_sum} AS dismissals
+            -- Out at either end: his own wicket as striker (a non-striker run out on his ball is not his), or run out
+            -- backing up on someone else's ball (services/nonstriker_outs.py), else that innings showed as not out.
+            {_BAT.wickets_sum} + (
+                SELECT COUNT(*) FROM delivery_details o
+                WHERE o.p_match = dd.p_match AND o.inns = dd.inns
+                  AND LOWER(o.out) = 'true' AND LOWER(COALESCE(o.bat_out, '')) = 'false'
+                  AND LOWER(COALESCE(o.dismissal, '')) NOT IN ('retired not out (hurt)', 'retired hurt', 'not out')
+                  AND o.p_out IN (SELECT pid FROM player_identity WHERE display_name = ANY(:player_variants))
+            ) AS dismissals
         FROM delivery_details dd
         JOIN matches m ON m.id = dd.p_match
         WHERE dd.bat = ANY(:player_variants)

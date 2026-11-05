@@ -183,7 +183,10 @@ class StatsProcessor:
         # Calculate basic stats
         stats.runs = sum(d.runs_off_bat for d in batter_deliveries)
         stats.balls_faced = len(batter_deliveries)
-        stats.wickets = sum(1 for d in batter_deliveries if d.player_dismissed == d.batter)
+        # Out at either end: his own wicket as striker, or run out (or retired out) backing up on someone else's ball.
+        ns_outs = [d for d in innings_deliveries if d.batter != batter and d.player_dismissed == batter
+                   and (d.wicket_type or '').lower() not in ('retired hurt', 'retired not out (hurt)', 'not out')]
+        stats.wickets = sum(1 for d in batter_deliveries if d.player_dismissed == d.batter) + len(ns_outs)
         stats.dots = sum(1 for d in batter_deliveries if d.runs_off_bat == 0)
         stats.ones = sum(1 for d in batter_deliveries if d.runs_off_bat == 1)
         stats.twos = sum(1 for d in batter_deliveries if d.runs_off_bat == 2)
@@ -203,7 +206,8 @@ class StatsProcessor:
         stats.pp_runs = sum(d.runs_off_bat for d in pp_deliveries)
         stats.pp_balls = len(pp_deliveries)
         stats.pp_dots = sum(1 for d in pp_deliveries if d.runs_off_bat == 0)
-        stats.pp_wickets = sum(1 for d in pp_deliveries if d.player_dismissed == d.batter)
+        stats.pp_wickets = (sum(1 for d in pp_deliveries if d.player_dismissed == d.batter)
+                             + sum(1 for d in ns_outs if d.over < 6))
         stats.pp_boundaries = sum(1 for d in pp_deliveries if d.runs_off_bat in [4, 6])
         if stats.pp_balls > 0:
             stats.pp_strike_rate = (stats.pp_runs * 100.0) / stats.pp_balls
@@ -212,7 +216,8 @@ class StatsProcessor:
         stats.middle_runs = sum(d.runs_off_bat for d in middle_deliveries)
         stats.middle_balls = len(middle_deliveries)
         stats.middle_dots = sum(1 for d in middle_deliveries if d.runs_off_bat == 0)
-        stats.middle_wickets = sum(1 for d in middle_deliveries if d.player_dismissed == d.batter)
+        stats.middle_wickets = (sum(1 for d in middle_deliveries if d.player_dismissed == d.batter)
+                             + sum(1 for d in ns_outs if 6 <= d.over < 15))
         stats.middle_boundaries = sum(1 for d in middle_deliveries if d.runs_off_bat in [4, 6])
         if stats.middle_balls > 0:
             stats.middle_strike_rate = (stats.middle_runs * 100.0) / stats.middle_balls
@@ -221,7 +226,8 @@ class StatsProcessor:
         stats.death_runs = sum(d.runs_off_bat for d in death_deliveries)
         stats.death_balls = len(death_deliveries)
         stats.death_dots = sum(1 for d in death_deliveries if d.runs_off_bat == 0)
-        stats.death_wickets = sum(1 for d in death_deliveries if d.player_dismissed == d.batter)
+        stats.death_wickets = (sum(1 for d in death_deliveries if d.player_dismissed == d.batter)
+                             + sum(1 for d in ns_outs if d.over >= 15))
         stats.death_boundaries = sum(1 for d in death_deliveries if d.runs_off_bat in [4, 6])
         if stats.death_balls > 0:
             stats.death_strike_rate = (stats.death_runs * 100.0) / stats.death_balls
