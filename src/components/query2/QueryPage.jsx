@@ -201,7 +201,22 @@ const QueryPage = ({ isMobile }) => {
   }, [nlParam]);
 
   const chips = queryChips(filters, groupBy);
-  const answer = useMemo(() => (run.status === 'ready' ? shapeAnswer(run.data?.data, filters, groupBy, measure) : null), [run, filters, groupBy, measure]);
+  // A scoring wheel needs the batter's hand to draw the field the right way round: for one named batter, ask the
+  // query builder (one row by batting hand).
+  const [hand, setHand] = useState(null);
+  const oneBatter = (filters.batters || []).length === 1 ? filters.batters[0] : null;
+  const wantsHand = groupBy.includes('wagon_zone') && oneBatter;
+  useEffect(() => {
+    setHand(null);
+    if (!wantsHand) return;
+    const p = new URLSearchParams({ format: fmt, batters: oneBatter, group_by: 'bat_hand' });
+    axios.get(`${config.API_URL}/query/deliveries?${p}`)
+      .then((r) => {
+        const rows = (r.data?.data || []).filter((x) => x.bat_hand === 'LHB' || x.bat_hand === 'RHB').sort((a, b) => b.balls - a.balls);
+        if (rows[0]) setHand(rows[0].bat_hand);
+      }).catch(() => {});
+  }, [wantsHand, oneBatter, fmt]);
+  const answer = useMemo(() => (run.status === 'ready' ? shapeAnswer(run.data?.data, filters, groupBy, measure, hand) : null), [run, filters, groupBy, measure, hand]);
   const groupKey = groupBy.join(',');
 
   return (

@@ -5,6 +5,7 @@ import { colors, fonts } from '../../theme/hindsightDark';
 import { POST_VISUALS } from '../story/postVisuals';
 import GraphicMaker from '../GraphicMaker';
 import QueryResults from '../QueryResults';
+import { ScoringWheel } from '../playerProfile/cards/RoleCards';
 import { fmtValue, MEASURES } from './answerShape';
 
 // The answer (QUERY_BUILDER_PLAN.md Q2): one sentence that reads the result, the picture that fits its shape, then
@@ -112,6 +113,7 @@ const AnswerCard = ({ answer, results, filters, groupBy, apiQueryString, isMobil
           <Visual payload={answer.chart.payload} />
         </Box>
       )}
+      {answer.type === 'zones' && <ScoringWheel zones={answer.zones} hand={answer.hand} strikeRate={answer.overallSr} />}
       {answer.type === 'single' && answer.tiles && <Tiles r={answer.tiles} measure={answer.measure} />}
       {answer.type === 'ranked' && <Ranked rows={answer.rows} lowerBetter={lowerBetter} />}
       {answer.type !== 'ranked' && answer.rows?.length > 0 && <Rows rows={answer.rows} />}

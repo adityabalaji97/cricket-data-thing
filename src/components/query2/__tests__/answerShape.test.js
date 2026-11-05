@@ -49,3 +49,17 @@ test('pace v spin at a ground compares runs an over, not wicket counts', () => {
   expect(a.measure).toBe('economy');
   expect(a.sentence.map(([t]) => t).join('')).toContain('pace went for 4.82 an over, spin 5.68');
 });
+
+test('scoring zones are a wheel by share of runs, zone 0 left off, overs 1-50 not a chip', () => {
+  const rows = [
+    { wagon_zone: 6, balls: 311, runs: 300, strike_rate: 96 },
+    { wagon_zone: 3, balls: 274, runs: 320, strike_rate: 117 },
+    { wagon_zone: 1, balls: 45, runs: 99, strike_rate: 220 },
+    { wagon_zone: 0, balls: 121, runs: 0, strike_rate: 0 },
+  ];
+  const a = shapeAnswer(rows, { batters: ['Shubman Gill'] }, ['wagon_zone'], null, 'RHB');
+  expect(a.type).toBe('zones');
+  expect(a.zones.map((z) => z.zone)).toEqual([6, 3, 1]);
+  expect(a.sentence.map(([t]) => t).join('')).toContain('most runs through midwicket');
+  expect(queryChips({ over_min: 0, over_max: 49 }, []).map((c) => c.key)).not.toContain('overs');
+});

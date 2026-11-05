@@ -1,4 +1,4 @@
-import { GROUP_WORDS, LENGTH_WORDS, LINE_WORDS, valueWords } from './qbWords';
+import { GROUP_WORDS, LENGTH_WORDS, LINE_WORDS, ZONE_WORDS, valueWords } from './qbWords';
 
 // Reads a query's result the way a person would (QUERY_BUILDER_PLAN.md Q2): which measure the question is about,
 // which picture fits the result's shape, the one sentence that answers it, and the rows to list under the chart.
@@ -83,7 +83,7 @@ const subjectOf = (filters) => {
  */
 export const ASKABLE = ['wickets', 'economy', 'strike_rate', 'average', 'dot_percentage', 'boundary_percentage'];
 
-export const shapeAnswer = (data, filters, groupBy, measure = null) => {
+export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null) => {
   // A group with one value across every row (by batter when the question names one batter) says nothing: drop it.
   const g0 = groupBy || [];
   const g = g0.length > 1 ? g0.filter((k) => new Set((data || []).map((r) => r[k])).size > 1) : g0;
@@ -183,7 +183,31 @@ export const shapeAnswer = (data, filters, groupBy, measure = null) => {
     };
   }
 
-  // A few categories (phase, pace or spin, scoring zone, length...): bars.
+  // Scoring zones: the scoring wheel, by share of runs. Zone 0 (no zone recorded, mostly dots) is left off the wheel
+  // but counts towards the overall strike rate the wedges are coloured against.
+  if (g.length === 1 && g[0] === 'wagon_zone') {
+    const MIRROR = { 1: 7, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 8 };
+    const zones = all.filter((r) => Number(r.wagon_zone) >= 1 && Number(r.wagon_zone) <= 8)
+      .map((r) => ({ zone: Number(r.wagon_zone), runs: Number(r.runs || 0), balls: r.balls, strike_rate: Number(r.strike_rate || 0) }));
+    const runs = zones.reduce((t, z) => t + z.runs, 0);
+    if (runs > 0) {
+      const sr = (100 * all.reduce((t, r) => t + Number(r.runs || 0), 0)) / Math.max(1, all.reduce((t, r) => t + r.balls, 0));
+      const name = (z) => ZONE_WORDS[hand === 'LHB' ? MIRROR[z.zone] : z.zone];
+      const byShare = [...zones].sort((a, b) => b.runs - a.runs);
+      const fast = zones.filter((z) => z.balls >= 20).sort((a, b) => b.strike_rate - a.strike_rate)[0];
+      const share = (z) => `${Math.round((100 * z.runs) / runs)}%`;
+      const sentence = [S(`${subject ? `${subject}: ` : ''}most runs through `), S(`${name(byShare[0]).toLowerCase()} (${share(byShare[0])})`, true),
+        S(byShare[1] ? `, then ${name(byShare[1]).toLowerCase()} (${share(byShare[1])})` : ''),
+        S(fast && fast !== byShare[0] ? `; fastest through ${name(fast).toLowerCase()}, strike rate ${Math.round(fast.strike_rate)}.` : '.')];
+      return {
+        type: 'zones', measure: 'strike_rate', sentence, zones, hand, overallSr: sr,
+        rows: byShare.slice(0, 4).map((z) => ({ label: name(z), detail: `${z.balls} balls · SR ${Math.round(z.strike_rate)}`, value: share(z) })),
+        note: `Share of runs by area${hand ? ` (${hand === 'LHB' ? 'left' : 'right'}-handed)` : ''} · ${hand ? '' : 'as each batter sees the field · '}zone not recorded left off`,
+      };
+    }
+  }
+
+  // A few categories (phase, pace or spin, length...): bars.
   if (g.length === 1 && all.length <= 12) {
     const order = { powerplay: 0, middle: 1, death: 2 };
     const rows = [...all].sort((a, b) => (g[0] === 'phase' ? (order[a.phase] ?? 9) - (order[b.phase] ?? 9) : b.balls - a.balls));
