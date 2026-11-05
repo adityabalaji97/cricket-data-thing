@@ -6,16 +6,17 @@ Batter v bowler for the Compare page: every ball between two players, with pictu
   that kind of bowling (pace or spin), the bowler against that hand of batter;
 * where the bowler pitched it to him (line and length), where he scored off him (wagon zones), how he got out, and
   year by year.
-Eight grouped queries, too slow for one request cold (Heroku cuts at 30 s), so it builds in the background like the
-venue and team pages (services/page_builds) and is cached for the day.
+Eight small grouped queries, each filtered to one or two players: about half a second together on production (timed
+from a dyno, 5 Nov 2026), so it builds inside the request and is cached for the day. (From a laptop the same build takes
+~50 s of network round trips to the database: not a guide to production.)
 """
 from __future__ import annotations
 
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from services.page_builds import get_or_build
 from services.player_verdict import _num, _query
+from services.query_cache import cached_run
 
 MATCHUP_VERSION = "m1"
 START = date(2005, 1, 1)
@@ -100,7 +101,7 @@ def build_matchup(db, batter: str, bowler: str, fmt: str = "T20") -> Dict[str, A
     }
 
 
-def get_matchup(db, batter: str, bowler: str, fmt: str = "T20", wait: bool = False) -> Dict[str, Any]:
+def get_matchup(db, batter: str, bowler: str, fmt: str = "T20") -> Dict[str, Any]:
     key = {"kind": "matchup", "v": MATCHUP_VERSION, "batter": batter.strip().lower(), "bowler": bowler.strip().lower(),
            "fmt": fmt, "day": date.today()}
-    return get_or_build(db, key, lambda s: build_matchup(s, batter, bowler, fmt), wait=wait)
+    return cached_run(db, key, lambda: build_matchup(db, batter, bowler, fmt))

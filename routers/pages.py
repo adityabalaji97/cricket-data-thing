@@ -80,12 +80,8 @@ def matchup(
 ):
     """Batter v bowler: every ball between them, where it pitched, where he scored, how he got out, against their usual."""
     from services.matchup import get_matchup
-    from services.page_builds import PageBuilding
 
-    try:
-        page = get_matchup(db, batter, bowler, format)
-    except PageBuilding:
-        raise HTTPException(status_code=503, detail="Building this matchup; try again in a few seconds", headers=BUSY)
+    page = get_matchup(db, batter, bowler, format)
     if not page.get("balls"):
         raise HTTPException(status_code=404, detail=f"{batter} and {bowler} haven't met in a {format}")
     response.headers["Cache-Control"] = CACHE
