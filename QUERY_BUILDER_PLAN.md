@@ -76,7 +76,7 @@ Status: **draft for the user's sign-off** (5 Nov 2026). Mockups with real querie
 
 | # | Chunk | Status |
 |---|---|---|
-| Q0 | Mockups with real questions (Kohli v spin since 2023; IPL 2026 death bowlers by economy; Bumrah line and length) for sign-off | [ ] |
+| Q0 | Mockups with real questions (Kohli v spin since 2023; IPL 2026 death bowlers by economy; Bumrah line and length) for sign-off | [~] 5 Nov 2026: https://claude.ai/artifact/Ghw26ZwdmG6U5gkbxjjUC6 (scratchpad build_qb_mock.py) |
 | Q1 | Shell: question bar first, format pill defaulting to the site's format, suggestion and recent chips; old filter panel behind "Add filter" | [ ] |
 | Q2 | The answer: summary sentence from the result, chart chosen by group-by (post visuals), compact ranked rows, "All columns" table | [ ] |
 | Q3 | Query chips and the filter bottom sheet (five groups, plain labels, search) | [ ] |
@@ -84,10 +84,8 @@ Status: **draft for the user's sign-off** (5 Nov 2026). Mockups with real querie
 | Q5 | Share: graphic from the answer card plus link; /graphics kept for its gallery | [ ] |
 | Q6 | Remove unused components; 390px one-line check on 6 queries; regression goldens for /query/deliveries unchanged | [ ] |
 
-## Open questions
+## Decisions (user, 5 Nov 2026)
 
-1. Should the results open on the **chart first** (proposed) or the rows first?
-2. Should the plain-English bar be the only entry, with filters only behind "Add filter" (proposed), or should the
-   filters stay visible on desktop?
-3. Is the follow-up box (Q4) in scope now, or later? It needs a change to the plain-English parser (passing the
-   current query as context).
+* **Results:** chart first, then the rows.
+* **Filters:** behind "Add filter" everywhere, desktop included. The question bar and chips are the only entry.
+* **Follow-up box:** built in this plan (Q4). The plain-English parser takes the current query as context.
