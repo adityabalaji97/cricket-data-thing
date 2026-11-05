@@ -15,18 +15,16 @@ import CloseIcon from '@mui/icons-material/Close';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import VenueNotes from './components/VenueNotes';
 import PreviewFilters from './components/preview/PreviewFilters';
-import MatchupsTab from './components/MatchupsTab';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
 import UnifiedPlayerProfile from './components/UnifiedPlayerProfile';
-import BatterComparison from './components/BatterComparison';
 import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
 import TeamPage from './components/pages/TeamPage';
 import VenuePage from './components/pages/VenuePage';
-import TeamComparison from './components/TeamComparison';
-import DoppelgangerLeaderboard from './components/DoppelgangerLeaderboard';
+import ComparePage from './components/pages/ComparePage';
+import GamesPage from './components/pages/GamesPage';
+import VenuesPage from './components/pages/VenuesPage';
 import IPLPredictions from './components/IPLPredictions';
-import GlobalT20Rankings from './components/GlobalT20Rankings';
 import WrappedPage from './components/wrapped/WrappedPage';
 import { GoogleSearchLanding, SearchBar } from './components/search';
 import GuessInningsGame from './components/games/GuessInningsGame';
@@ -715,16 +713,20 @@ const AppContent = () => {
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/player" element={<MensT20Scope><UnifiedPlayerProfile isMobile={isMobile} /></MensT20Scope>} />
+        <Route path="/player" element={<UnifiedPlayerProfile isMobile={isMobile} />} />
         <Route path="/bowler" element={<BowlerRedirect />} />
-        <Route path="/comparison" element={<MensT20Scope><BatterComparison /></MensT20Scope>} />
-        <Route path="/matchups" element={<MensT20Scope><MatchupsTab isMobile={isMobile} /></MensT20Scope>} />
+        {/* The menu overhaul (5 Nov 2026): retired pages redirect to what replaced them. */}
+        <Route path="/comparison" element={<Navigate to="/compare" replace />} />
+        <Route path="/matchups" element={<Navigate to="/compare?tab=matchup" replace />} />
+        <Route path="/compare" element={<ComparePage />} />
+        <Route path="/games" element={<GamesPage />} />
+        <Route path="/venues" element={<VenuesPage />} />
         <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
         <Route path="/team" element={<TeamPage />} />
-        <Route path="/team-comparison" element={<MensT20Scope><TeamComparison /></MensT20Scope>} />
-        <Route path="/doppelgangers" element={<MensT20Scope><DoppelgangerLeaderboard /></MensT20Scope>} />
+        <Route path="/team-comparison" element={<Navigate to="/team" replace />} />
+        <Route path="/doppelgangers" element={<Navigate to="/player" replace />} />
         <Route path="/ipl-predictions" element={<MensT20Scope><IPLPredictions /></MensT20Scope>} />
-        <Route path="/rankings" element={<MensT20Scope><GlobalT20Rankings /></MensT20Scope>} />
+        <Route path="/rankings" element={<Navigate to="/player" replace />} />
         <Route path="/games/guess-innings" element={<MensT20Scope><GuessInningsGame isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame /></MensT20Scope>} />
         <Route path="/games/call-it" element={<MensT20Scope><CallItGame /></MensT20Scope>} />

@@ -1203,7 +1203,7 @@ const playedToday = (game) => {
   }
 };
 
-const TodaysGamesSection = () => {
+export const TodaysGamesSection = () => {
   const number = dailyNumber();
   const games = [
     { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Did they win it?' },

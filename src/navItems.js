@@ -12,39 +12,22 @@
  * one ODI preview greyed out most of the More sheet.)
  */
 
+// The menu overhaul (5 Nov 2026): 19 entries down to 8, by use over the previous 60 days. Rankings, Doppelgangers,
+// Batter Comparison, Matchups and Team Comparison went (their routes redirect; Compare replaces the comparisons);
+// Make a Graphic is reached from the query builder; IPL Predictions and the Fantasy Planner are off the menu until the
+// IPL; 2025 Wrapped is off until the next one. Their URLs still work.
 export const NAV_ITEMS = [
   { path: '/', label: 'Home', title: 'Home', group: 'primary', short: 'Home' },
   { path: '/search', label: 'Search', title: 'Search', group: 'primary', short: 'Search' },
   { path: '/venue', label: 'Match Preview', title: 'Match Preview', group: 'primary', short: 'Preview' },
-  { path: '/player', label: 'Player Profile', title: 'Player Profile', t20Only: true, group: 'explore' },
-  { path: '/comparison', label: 'Batter Comparison', title: 'Batter Comparison', t20Only: true, group: 'compare' },
-  { path: '/matchups', label: 'Matchups', title: 'Matchups', t20Only: true, group: 'compare' },
   { path: '/query', label: 'Query Builder', title: 'Query Builder', group: 'primary', short: 'Query' },
-  { path: '/graphics', label: 'Make a Graphic', title: 'Make a Graphic', group: 'explore' },
+  { path: '/player', label: 'Players', title: 'Player Profile', group: 'explore' },
+  { path: '/team', label: 'Teams', title: 'Team', group: 'explore' },
+  { path: '/venues', label: 'Venues', title: 'Venues', group: 'explore' },
   { path: '/scorecards', label: 'Scorecards', title: 'Scorecards', group: 'explore' },
   { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },
-  { path: '/team', label: 'Teams', title: 'Team', group: 'explore' },
-  { path: '/team-comparison', label: 'Team Comparison', title: 'Team Comparison', t20Only: true, group: 'compare' },
-  { path: '/doppelgangers', label: 'Doppelgangers', title: 'Doppelgangers', t20Only: true, group: 'compare' },
-  { path: '/ipl-predictions', label: 'IPL Predictions', title: 'IPL Predictions', t20Only: true, group: 'play' },
-  { path: '/rankings', label: 'Global Rankings', title: 'Global Rankings', t20Only: true, group: 'explore' },
-  { path: '/games/call-it', label: '📈 Call It (daily)', title: 'Call It', t20Only: true, group: 'play' },
-  { path: '/games/higher-lower', label: '⬆️ Higher or Lower (daily)', title: 'Higher or Lower', t20Only: true, group: 'play' },
-  {
-    path: '/games/guess-innings',
-    label: '🎯 Guess the Innings (daily)',
-    title: 'Guess the Innings',
-    t20Only: true,
-    group: 'play',
-  },
-  {
-    path: '/games/player-journeys',
-    label: '🛤️ Player Journeys (daily)',
-    title: 'Player Journeys',
-    t20Only: true,
-    group: 'play',
-  },
-  { path: '/fantasy-planner', label: 'Fantasy Planner', title: 'Fantasy Planner', t20Only: true, group: 'play' },
+  { path: '/compare', label: 'Compare', title: 'Compare', group: 'compare' },
+  { path: '/games', label: 'Daily games', title: 'Daily games', group: 'play' },
 ];
 
 /**
@@ -54,7 +37,7 @@ export const NAV_ITEMS = [
  */
 export const PRIMARY_NAV_PATHS = ['/', '/search', '/venue', '/query'];
 // Shown in the desktop menu's Main group right after the bottom-bar pages, without becoming a tab.
-export const MAIN_MENU_EXTRA = ['/graphics'];
+export const MAIN_MENU_EXTRA = [];
 
 export const MORE_NAV_GROUPS = [
   { key: 'explore', label: 'Explore' },
@@ -63,13 +46,17 @@ export const MORE_NAV_GROUPS = [
 ];
 
 /** Linked from the More sheet but not a nav item of their own. */
-export const MORE_EXTRA_LINKS = [
-  { path: '/wrapped/2025', label: '2025 Wrapped', group: 'play' },
-  { path: '/credits', label: 'Credits & Acknowledgements', group: null },
-];
+export const MORE_EXTRA_LINKS = [];  // Credits sit in the site footer
 
 /** Pages reachable but absent from the nav, so they still get a heading. */
 const UNLISTED_TITLES = [
+  { match: (path) => path === '/graphics', title: 'Make a Graphic' },
+  { match: (path) => path === '/ipl-predictions', title: 'IPL Predictions' },
+  { match: (path) => path === '/fantasy-planner', title: 'Fantasy Planner' },
+  { match: (path) => path === '/games/call-it', title: 'Call It' },
+  { match: (path) => path === '/games/higher-lower', title: 'Higher or Lower' },
+  { match: (path) => path === '/games/guess-innings', title: 'Guess the Innings' },
+  { match: (path) => path === '/games/player-journeys', title: 'Player Journeys' },
   { match: (path) => path === '/credits', title: 'Credits & Acknowledgements' },
   { match: (path) => path.startsWith('/scorecard'), title: 'Match Scorecard' },
   { match: (path) => path.startsWith('/wrapped'), title: '2025 Wrapped' },
