@@ -1560,6 +1560,112 @@ const ZonePair = ({ payload }) => {
   );
 };
 
+/**
+ * A squad as a board (the IPL retention series): players under their roles, each chip shaded by a value (wins added),
+ * from the team's colour at the best to grey at or below zero, the value written on the chip.
+ * payload: {colour, format, groups:[{label, players:[{name, value, sub?}]}], legend?:[strong, weak]}
+ */
+const SquadBoard = ({ payload }) => {
+  const all = payload.groups.flatMap((g) => g.players.map((p) => p.value ?? 0));
+  const max = Math.max(...all, 0.01);
+  const shade = (v) => (v == null || v <= 0 ? 0 : Math.min(1, v / max));
+  // Compact: the role label beside its row, so a 25-man squad fits the cover.
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.6, justifyContent: 'center' }}>
+      {payload.groups.filter((g) => g.players.length).map((g) => (
+        <Box key={g.label} sx={{ display: 'grid', gridTemplateColumns: '62px minmax(0, 1fr)', columnGap: 0.75, alignItems: 'start' }}>
+          <Typography sx={{ ...mono, fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo, pt: '4px', lineHeight: 1.2 }}>{g.label}</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {g.players.map((p) => {
+              const t = shade(p.value);
+              const ink = t > 0.55 ? (payload.ink || '#0b0d12') : null;
+              return (
+                <Box key={p.name} sx={{ display: 'inline-flex', alignItems: 'baseline', gap: 0.5, borderRadius: '6px', px: 0.7, py: 0.2,
+                  border: `1px solid ${t > 0 ? payload.colour : colors.borderStrong}`,
+                  bgcolor: t > 0 ? `${payload.colour}${Math.round(40 + t * 175).toString(16).padStart(2, '0')}` : 'transparent' }}>
+                  <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: ink || colors.textHi, whiteSpace: 'nowrap' }}>{p.name}</Typography>
+                  <Typography component="span" sx={{ ...mono, fontSize: 10, color: ink || (p.value > 0 ? colors.textHi : colors.textLo) }}>
+                    {p.value == null ? '' : fmt(p.value, payload.format || 'signed2')}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      ))}
+      {payload.note && <Typography sx={{ fontSize: 11, color: colors.textLo }}>{payload.note}</Typography>}
+    </Box>
+  );
+};
+
+/**
+ * Rows by columns, each cell a value shaded by how good it is (lime good, red bad, around `mid`), with an optional
+ * small line under it; empty cells stay blank. Bowlers by phase, a side's phase ranks.
+ * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?}|null]}], format, higher_better, mid, legend?:[good, bad]}
+ */
+const GridHeat = ({ payload }) => {
+  const vals = payload.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c.value));
+  const mid = payload.mid ?? 0;
+  const spread = Math.max(...vals.map((v) => Math.abs(v - mid)), 0.01);
+  const tone = (v) => {
+    const d = ((v - mid) / spread) * (payload.higher_better === false ? -1 : 1);
+    return { col: d >= 0 ? colors.accent : colors.red, a: 0.15 + Math.min(1, Math.abs(d)) * 0.6 };
+  };
+  const cols = payload.cols.length;
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'end' }}>
+        <span />
+        {payload.cols.map((c) => <Typography key={c} sx={{ ...mono, fontSize: 10.5, color: colors.textLo, textAlign: 'center' }}>{c}</Typography>)}
+      </Box>
+      {payload.rows.map((r) => (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'stretch' }}>
+          <Box sx={{ minWidth: 0, alignSelf: 'center' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</Typography>
+            {r.sub && <Typography sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{r.sub}</Typography>}
+          </Box>
+          {r.cells.map((c, i) => {
+            if (!c) return <Box key={i} sx={{ borderRadius: '6px', bgcolor: 'rgba(255,255,255,0.03)' }} />;
+            const t = tone(c.value);
+            return (
+              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(t.a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: 0.5 }}>
+                <Typography sx={{ ...mono, fontSize: 13, fontWeight: 700, color: colors.textHi }}>{c.text ?? fmt(c.value, payload.format)}</Typography>
+                {c.sub && <Typography sx={{ ...mono, fontSize: 9.5, color: colors.textMed }}>{c.sub}</Typography>}
+              </Box>
+            );
+          })}
+        </Box>
+      ))}
+      {payload.legend && <Legend items={[[payload.legend[0], colors.accent], [payload.legend[1], colors.red]]} />}
+    </Box>
+  );
+};
+
+/**
+ * The case for and against (the IPL retention series): a few players, each with what he costs, the number for keeping
+ * him and the number against. No verdict: the reader decides.
+ * payload: {colour, cases:[{tag, name, price, for, against}]}
+ */
+const CaseBoard = ({ payload }) => (
+  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center' }}>
+    {payload.cases.map((c) => (
+      <Box key={c.name} sx={{ border: `1px solid ${colors.borderStrong}`, borderLeft: `4px solid ${payload.colour}`, borderRadius: '10px', px: 1.25, py: 0.9 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+          <Typography sx={{ ...mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{c.tag}</Typography>
+          <Typography sx={{ ...mono, fontSize: 11.5, color: colors.textMed, ml: 'auto' }}>{c.price}</Typography>
+        </Box>
+        <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2 }}>{c.name}</Typography>
+        <Typography sx={{ fontSize: 12.5, color: colors.textHi, mt: 0.3 }}>
+          <Box component="span" sx={{ color: colors.accent, fontWeight: 700 }}>For </Box>{c.for}
+        </Typography>
+        <Typography sx={{ fontSize: 12.5, color: colors.textHi }}>
+          <Box component="span" sx={{ color: colors.red, fontWeight: 700 }}>Against </Box>{c.against}
+        </Typography>
+      </Box>
+    ))}
+  </Box>
+);
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -1588,4 +1694,7 @@ export const POST_VISUALS = {
   game_timeline: GameTimeline,
   bid_trail: BidTrail,
   zone_pair: ZonePair,
+  squad_board: SquadBoard,
+  grid_heat: GridHeat,
+  case_board: CaseBoard,
 };
