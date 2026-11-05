@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Autocomplete, Box, TextField } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
@@ -63,12 +63,55 @@ const FORMATS = {
 };
 const show = (m, v) => (v === null || v === undefined ? '–' : (FORMATS[m.format] || FORMATS.dec1)(v));
 
+// Label widths, measured in the fonts they render in, so the two values can be laid out without touching.
+let measureCtx = null;
+const textWidth = (text, font) => {
+  if (typeof document === 'undefined') return text.length * 8;
+  measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
+};
+
+/** The strip's width in px, kept current (labels are laid out in px). */
+const useWidth = () => {
+  const ref = useRef(null);
+  const [w, setW] = useState(343);
+  useEffect(() => {
+    if (!ref.current || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
+};
+
 /**
- * One measure, both players, on the pool's spread (better to the right). Each value sits by its own dot, in the
- * player's colour: player 1's above the line, player 2's below, so the two never collide however close the dots are.
+ * Where the two labels go on their shared line: centred on their dots when there's room; when they'd touch, parted
+ * outwards (the left one ending at its dot, the right one starting at its dot); always inside the card.
+ * xs, ws: the dots' x and the labels' widths, left dot first. Returns each label's left edge.
+ */
+export const placeLabels = ([x1, x2], [w1, w2], width, gap = 10, pad = 2) => {
+  const clamp = (l, w) => Math.max(0, Math.min(width - w, l));
+  let l1 = clamp(x1 - w1 / 2, w1);
+  let l2 = clamp(x2 - w2 / 2, w2);
+  if (l1 + w1 + gap <= l2) return [l1, l2];
+  l1 = clamp(x1 + pad - w1, w1);
+  l2 = clamp(x2 - pad, w2);
+  if (l1 + w1 + gap > l2) {
+    // Still touching (the dots sit together near an edge): pack them side by side, as near their dots as fits.
+    l1 = Math.max(0, Math.min(l1, width - w1 - gap - w2));
+    l2 = l1 + w1 + gap;
+  }
+  return [l1, l2];
+};
+
+/**
+ * One measure, both players, on the pool's spread (better to the right). Both values sit on one line above it, each
+ * by its own dot and in its player's colour, so the row reads (and screenshots) at a glance.
  */
 const PairStrip = ({ m }) => {
   const W = 343; const H = 16;
+  const [ref, cw] = useWidth();
   const q = m.quantiles || [];
   const va = m.a.value; const vb = m.b.value;
   const at = (f) => q[Math.min(q.length - 1, Math.max(0, Math.round(f * (q.length - 1))))];
@@ -81,28 +124,34 @@ const PairStrip = ({ m }) => {
   };
   const aBetter = m.a.rank < m.b.rank;
   const bBetter = m.b.rank < m.a.rank;
-  // A label centred on its dot, or held inside the card at either end.
-  const tag = (p, col, better, top) => {
-    const pct = (100 * x(p.value)) / W;
-    const shift = pct < 14 ? 'translateX(-6px)' : pct > 86 ? 'translateX(calc(-100% + 6px))' : 'translateX(-50%)';
-    return (
-      <Box sx={{ position: 'absolute', top, left: `${pct}%`, transform: shift, display: 'flex', alignItems: 'baseline', gap: 0.5,
-        whiteSpace: 'nowrap', lineHeight: 1 }}>
-        <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: better ? 700 : 500, fontSize: 15, color: col }}>
-          {show(m, p.value)}
-        </Box>
-        <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo }}>{ordinal(p.rank)}</Box>
-      </Box>
-    );
-  };
+  const labels = [
+    { p: m.a, col: A_COL, better: aBetter, x: (x(va) / W) * cw },
+    { p: m.b, col: B_COL, better: bBetter, x: (x(vb) / W) * cw },
+  ].map((l) => ({
+    ...l,
+    w: textWidth(show(m, l.p.value), `${l.better ? 700 : 500} 15px ${fonts.display}`) + 4
+      + textWidth(ordinal(l.p.rank), `10px ${fonts.mono}`) + 2,
+  }));
+  // Left dot first (a tie keeps player 1 on the left).
+  const ordered = labels[1].x < labels[0].x ? [labels[1], labels[0]] : labels;
+  const [l1, l2] = placeLabels(ordered.map((l) => l.x), ordered.map((l) => l.w), cw);
+  ordered[0].left = l1; ordered[1].left = l2;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px', py: 0.5 }}>
       <Box component="span" sx={{ color: colors.textMed, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</Box>
-      <Box sx={{ position: 'relative', height: 54 }}>
-        {tag(m.a, A_COL, aBetter, 0)}
+      <Box ref={ref} sx={{ position: 'relative', height: 38 }}>
+        {labels.map((l) => (
+          <Box key={l.col} sx={{ position: 'absolute', top: 0, left: l.left, display: 'flex', alignItems: 'baseline', gap: 0.5,
+            whiteSpace: 'nowrap', lineHeight: 1 }}>
+            <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: l.better ? 700 : 500, fontSize: 15, color: l.col }}>
+              {show(m, l.p.value)}
+            </Box>
+            <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo }}>{ordinal(l.p.rank)}</Box>
+          </Box>
+        ))}
         {q.length > 0 && (
           <Box component="svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true"
-            sx={{ position: 'absolute', top: 19, left: 0, width: '100%', height: H }}>
+            sx={{ position: 'absolute', top: 21, left: 0, width: '100%', height: H }}>
             <rect x="0" y="7" width={W} height="2" rx="1" fill={colors.surface2} />
             {q.map((v, i) => <rect key={i} x={x(v) - 0.5} y="4" width="1" height="8" fill={colors.textGhost} opacity="0.8" />)}
             <rect x={x(m.median) - 0.75} y="0" width="1.5" height={H} fill={colors.textLo} />
@@ -110,7 +159,6 @@ const PairStrip = ({ m }) => {
             <circle cx={x(va)} cy="8" r="5" fill={A_COL} stroke={colors.bg} strokeWidth="2" />
           </Box>
         )}
-        {tag(m.b, B_COL, bBetter, 39)}
       </Box>
     </Box>
   );
@@ -151,14 +199,13 @@ const PlayersTab = ({ a, b, fmt, setParams, players }) => {
               {shared.length > 1 && <Pills label="Role" items={shared.map((r) => [r, ROLE_NAMES[r]])} value={shown} onChange={setRole} />}
               {sections.length > 1 && <Pills label="Measures" items={sections.map((s) => [s.title, s.title])} value={sec.title} onChange={setSection} />}
             </Box>
-            {/* The legend: whose colour is whose (player 1's values sit above each line, player 2's below). */}
+            {/* The legend: whose colour is whose (each value sits by its dot, in its player's colour). */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: 13, fontWeight: 700 }}>
-              {[[a, na, A_COL, 'above'], [b, nb, B_COL, 'below']].map(([full, name, col, where]) => (
+              {[[a, na, A_COL], [b, nb, B_COL]].map(([full, name, col]) => (
                 <Box key={full} component={Link} to={`/player?name=${encodeURIComponent(full)}`}
                   sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, color: col, textDecoration: 'none', minWidth: 0 }}>
                   <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: col, flex: 'none' }} />
                   <Box component="span" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</Box>
-                  <Box component="span" sx={{ fontWeight: 400, fontSize: 11.5, color: colors.textLo }}>{where}</Box>
                 </Box>
               ))}
             </Box>
