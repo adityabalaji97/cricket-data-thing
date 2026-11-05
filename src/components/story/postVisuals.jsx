@@ -1131,10 +1131,14 @@ const MetricLines = ({ payload }) => {
   const xs = series.flatMap((s) => s.points.map((p) => p.x)); const ys = series.flatMap((s) => s.points.map((p) => p.y));
   const xa = Math.min(...xs); const xb = Math.max(...xs);
   const top = Math.max(...ys) * 1.08;
+  // y.zero === false (the query builder): the axis starts near the lowest value, so a strike rate moving from 113 to
+  // 134 reads as a change, not a flat line. Posts keep a zero baseline.
+  const lo0 = Y.zero === false ? Math.min(...ys) * 0.9 : 0;
+  const step = [1, 2, 5, 10, 20, 25, 50].find((s) => (top - lo0) / s <= 4) || 100;
+  const lo = Y.zero === false ? Math.floor(lo0 / step) * step : 0;
   const sx = (v) => L + ((v - xa) / (xb - xa || 1)) * (W - L - R);
-  const sy = (v) => B - (v / top) * (B - T);
-  const step = [1, 2, 5, 10, 20, 25, 50].find((s) => top / s <= 4) || 100;
-  const grid = []; for (let v = 0; v <= top; v += step) grid.push(v);
+  const sy = (v) => B - ((v - lo) / (top - lo)) * (B - T);
+  const grid = []; for (let v = lo; v <= top; v += step) grid.push(v);
   const others = SERIES.filter((c) => c !== colors.accent);
   let k = 0;
   const tone = series.map((s) => (s.highlight ? colors.accent : others[k++ % others.length]));
