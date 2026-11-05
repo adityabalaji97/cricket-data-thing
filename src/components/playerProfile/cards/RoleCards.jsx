@@ -110,8 +110,8 @@ const MIRROR = { 1: 7, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 8 };
 const ANGLE_LHB = { Behind: 0, Point: 45, Cover: 90, 'Long off': 135, 'Long on': 180, Midwicket: 225, 'Square leg': 270, 'Fine leg': 315 };
 
 /**
- * The scoring wheel: share of runs by area, wedge length is the share, the most productive area in lime, the rest blue
- * where faster than his overall strike rate and red where slower. zones: [{zone 1-8, runs, strike_rate}]. Shared by the
+ * The scoring wheel: share of runs by area, wedge length is the share; every wedge blue where faster than his overall
+ * strike rate and red where slower. zones: [{zone 1-8, runs, strike_rate}]. Shared by the
  * profile's card and the query builder's answer for a by-scoring-zone question.
  */
 export const ScoringWheel = ({ zones, hand, strikeRate }) => {
@@ -132,12 +132,14 @@ export const ScoringWheel = ({ zones, hand, strikeRate }) => {
           const rad = ((deg - 90) * Math.PI) / 180;
           const r = 22 + (a.share / max) * (R - 22);
           const a1 = rad - (20 * Math.PI) / 180; const a2 = rad + (20 * Math.PI) / 180;
-          const fill = a === top ? LIME : (a.sr ?? 0) >= strikeRate ? BLUE : RED;
+          // Colour is strike rate only, every slice: the slice's length already shows its share of runs (user,
+          // 5 Nov 2026), so the biggest isn't singled out.
+          const fill = (a.sr ?? 0) >= strikeRate ? BLUE : RED;
           const lx = c + (R + 26) * Math.cos(rad); const ly = c + (R + 26) * Math.sin(rad);
           return (
             <g key={a.label}>
               <path d={`M${c},${c} L${c + r * Math.cos(a1)},${c + r * Math.sin(a1)} A${r},${r} 0 0 1 ${c + r * Math.cos(a2)},${c + r * Math.sin(a2)} Z`}
-                fill={fill} fillOpacity={a === top ? 1 : 0.75}>
+                fill={fill} fillOpacity={0.85}>
                 <title>{`${a.label}: ${Math.round(a.share * 100)}% of runs, strike rate ${Math.round(a.sr ?? 0)}`}</title>
               </path>
               <text x={lx} y={ly} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textMed }}>{a.label}</text>
@@ -147,7 +149,7 @@ export const ScoringWheel = ({ zones, hand, strikeRate }) => {
         })}
         <rect x={c - 3} y={c - 9} width="6" height="18" rx="2" fill="#c9b27c" />
       </Box>
-      <Legend items={[['Most runs', LIME], [`Faster than ${Math.round(strikeRate)}`, BLUE], ['Slower', RED]]} />
+      <Legend items={[[`Faster than his ${Math.round(strikeRate)}`, BLUE], ['Slower', RED]]} />
     </>
   );
 };
