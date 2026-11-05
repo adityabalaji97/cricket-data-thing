@@ -18,9 +18,9 @@ import PreviewFilters from './components/preview/PreviewFilters';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
 import UnifiedPlayerProfile from './components/UnifiedPlayerProfile';
-import QueryBuilder from './components/QueryBuilder'; // Import the new QueryBuilder component
 import TeamPage from './components/pages/TeamPage';
 import VenuePage from './components/pages/VenuePage';
+import QueryPage from './components/query2/QueryPage';
 import ComparePage from './components/pages/ComparePage';
 import GamesPage from './components/pages/GamesPage';
 import VenuesPage from './components/pages/VenuesPage';
@@ -721,7 +721,7 @@ const AppContent = () => {
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/games" element={<GamesPage />} />
         <Route path="/venues" element={<VenuesPage />} />
-        <Route path="/query" element={<QueryBuilder isMobile={isMobile} />} />
+        <Route path="/query" element={<QueryPage isMobile={isMobile} />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/team-comparison" element={<Navigate to="/team" replace />} />
         <Route path="/doppelgangers" element={<Navigate to="/player" replace />} />

@@ -47,6 +47,9 @@ class NLQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500, description="Natural language cricket query")
     # The page's format: a question that names none is about it (and gets its phase overs).
     format: Optional[Literal["T20", "ODI", "TEST", "ALL"]] = None
+    # A follow-up ("...and in the powerplay?"): the query it refines, in words. The two are read as one question, so
+    # the answer is the whole refined query, not just the change (QUERY_BUILDER_PLAN.md Q4).
+    context: Optional[str] = Field(default=None, max_length=600)
 
 
 class NLQueryFilters(BaseModel):
@@ -142,6 +145,15 @@ class ExampleQuery(BaseModel):
     category: str
 
 
+def follow_up_question(context: Optional[str], query: str) -> str:
+    """One question from a follow-up and the query it refines: "Kohli v spin since 2023, by year. Follow-up, keeping
+    everything above unless it says otherwise: and in the powerplay?"."""
+    context = (context or "").strip()
+    if not context:
+        return query
+    return f"{context}. Follow-up, keeping everything above unless it says otherwise: {query.strip()}"
+
+
 @router.post("/parse", response_model=NLQueryResponse)
 def parse_query(
     request: NLQueryRequest,
@@ -154,13 +166,14 @@ def parse_query(
     _check_rate_limit(client_ip)
 
     started_at = time.time()
-    result = parse_nl_query(request.query, db=db, fmt=request.format)
+    question = follow_up_question(request.context, request.query)
+    result = parse_nl_query(question, db=db, fmt=request.format)
     execution_time_ms = int((time.time() - started_at) * 1000)
     log_ref = new_log_ref() if result.get("success") else None
 
     background_tasks.add_task(
         log_nl_query_event_background,
-        query_text=request.query,
+        query_text=question,
         parse_result=result,
         ip_address=client_ip,
         execution_time_ms=execution_time_ms,
