@@ -6,10 +6,11 @@ import { colors, fonts } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import { ordinal, signed } from '../playerProfile/verdict/verdictFormat';
 import { Eyebrow, PageFooter, PageSkeleton, usePageData } from '../pageKit/pageKit';
+import MatchupView, { matchupQuery } from './MatchupView';
 
 // Compare (the menu overhaul, 5 Nov 2026): one page in place of Batter Comparison, Matchups, Team Comparison and the
 // Doppelgangers leaderboard. Two players side by side on every ranked measure from /player-compare (overall, by phase,
-// by opponent; same pool, same window, so both dots sit on one spread), or a batter against a bowler from the query builder.
+// by opponent; same pool, same window, so both dots sit on one spread), or a batter against a bowler from /matchup (MatchupView).
 
 const A_COL = colors.accent;
 const B_COL = '#5b9bf0';
@@ -163,68 +164,19 @@ const PlayersTab = ({ a, b, fmt, setParams, players }) => {
   );
 };
 
-const Stat = ({ label, value }) => (
-  <Box sx={{ border: `1px solid ${colors.borderStrong}`, borderRadius: '12px', px: 1.25, py: 1, minWidth: 0 }}>
-    <Box sx={{ fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo, whiteSpace: 'nowrap' }}>{label}</Box>
-    <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 21 }}>{value}</Box>
-  </Box>
-);
-
 const MatchupTab = ({ bat, bowl, fmt, setParams, players }) => {
-  const [state, setState] = useState({ status: 'idle', data: null });
-  useEffect(() => {
-    if (!bat || !bowl) { setState({ status: 'idle', data: null }); return undefined; }
-    let cancelled = false;
-    setState({ status: 'loading', data: null });
-    const q = new URLSearchParams({ format: fmt, batters: bat, bowlers: bowl });
-    const one = fetch(`${config.API_URL}/query/deliveries?${q}&group_by=batter`).then((r) => r.json());
-    const years = fetch(`${config.API_URL}/query/deliveries?${q}&group_by=year`).then((r) => r.json());
-    Promise.all([one, years]).then(([o, y]) => {
-      if (cancelled) return;
-      const row = (o.data || [])[0];
-      setState(row ? { status: 'ready', data: { row, years: (y.data || []).sort((p, r) => p.year - r.year) } } : { status: 'empty', data: null });
-    }).catch(() => { if (!cancelled) setState({ status: 'error', data: null }); });
-    return () => { cancelled = true; };
-  }, [bat, bowl, fmt]);
-  const qb = bat && bowl ? `/query?batters=${encodeURIComponent(bat)}&bowlers=${encodeURIComponent(bowl)}&group_by=line&group_by=length` : null;
-  const r = state.data?.row;
+  const m = usePageData(bat && bowl ? '/matchup' : null, `batter=${encodeURIComponent(bat || '')}&bowler=${encodeURIComponent(bowl || '')}&format=${fmt}`);
   return (
     <>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <Picker label="Batter" value={bat} onChange={(v) => setParams({ bat: v || '' })} options={players} colour={A_COL} />
         <Picker label="Bowler" value={bowl} onChange={(v) => setParams({ bowl: v || '' })} options={players} colour={B_COL} />
       </Box>
-      {state.status === 'idle' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>Pick a batter and a bowler: every ball between them.</Box>}
-      {state.status === 'loading' && <PageSkeleton />}
-      {state.status === 'empty' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>{`They haven't met in a ${fmt} in the data.`}</Box>}
-      {state.status === 'error' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>This couldn't load just now. Try again shortly.</Box>}
-      {state.status === 'ready' && (
-        <ProfileCard id="matchup" title={`${shortName(bat)} v ${shortName(bowl)}`} player={`${bat} v ${bowl}`}
-          note={`${fmt}s, every ball they've met`}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1 }}>
-            <Stat label="Runs (balls)" value={`${r.runs} (${r.balls})`} />
-            <Stat label="Outs" value={r.wickets} />
-            <Stat label="Strike rate" value={Math.round(r.strike_rate)} />
-            <Stat label="Dots" value={`${Math.round(r.dot_percentage)}%`} />
-            <Stat label="Boundaries" value={`${Math.round(r.boundary_percentage)}%`} />
-            <Stat label="False shots" value={r.control_percentage != null ? `${Math.round(100 - r.control_percentage)}%` : '–'} />
-          </Box>
-          {state.data.years.length > 1 && (
-            <Box sx={{ mt: 0.5 }}>
-              <Eyebrow>By year · runs (balls), outs</Eyebrow>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', mt: 0.5, fontSize: 12.5, color: colors.textMed }}>
-                {state.data.years.map((y) => (
-                  <Box key={y.year} component="span" sx={{ whiteSpace: 'nowrap' }}>
-                    <Box component="span" sx={{ fontFamily: fonts.mono, color: colors.textLo }}>{`'${String(y.year).slice(2)} `}</Box>
-                    {`${y.runs} (${y.balls})${y.wickets ? `, ${y.wickets} out` : ''}`}
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-          )}
-          <Box component={Link} to={qb} sx={{ color: colors.accent, fontSize: 13.5, textDecoration: 'none', mt: 0.5 }}>By line and length in the query builder →</Box>
-        </ProfileCard>
-      )}
+      {(!bat || !bowl) && <Box sx={{ color: colors.textLo, fontSize: 14 }}>Pick a batter and a bowler: every ball between them.</Box>}
+      {bat && bowl && (m.status === 'loading' || m.status === 'building') && <PageSkeleton note={m.status === 'building' ? 'Gathering every ball between them…' : null} />}
+      {bat && bowl && m.status === 'empty' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>{`They haven't met in a ${fmt} in the data.`}</Box>}
+      {bat && bowl && m.status === 'error' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>This couldn't load just now. Try again shortly.</Box>}
+      {m.status === 'ready' && <MatchupView d={m.data} A={A_COL} B={B_COL} />}
     </>
   );
 };
@@ -253,7 +205,7 @@ const ComparePage = () => {
       {tab === 'players'
         ? <PlayersTab a={q.get('a')} b={q.get('b')} fmt={fmt} setParams={setParams} players={players} />
         : <MatchupTab bat={q.get('bat')} bowl={q.get('bowl')} fmt={fmt} setParams={setParams} players={players} />}
-      <PageFooter queryLink="/query" />
+      <PageFooter queryLink={tab === 'matchup' && q.get('bat') && q.get('bowl') ? matchupQuery(q.get('bat'), q.get('bowl')) : '/query'} />
     </Box>
   );
 };

@@ -111,10 +111,10 @@ const ANGLE_LHB = { Behind: 0, Point: 45, Cover: 90, 'Long off': 135, 'Long on':
 
 /**
  * The scoring wheel: share of runs by area, wedge length is the share; every wedge blue where faster than his overall
- * strike rate and red where slower. zones: [{zone 1-8, runs, strike_rate}]. Shared by the
+ * strike rate and red where slower (or the colours given). zones: [{zone 1-8, runs, strike_rate}]. Shared by the
  * profile's card and the query builder's answer for a by-scoring-zone question.
  */
-export const ScoringWheel = ({ zones, hand, strikeRate }) => {
+export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = RED }) => {
   const total = zones.reduce((a, z) => a + z.runs, 0);
   if (!total) return null;
   const left = hand === 'LHB';
@@ -134,7 +134,7 @@ export const ScoringWheel = ({ zones, hand, strikeRate }) => {
           const a1 = rad - (20 * Math.PI) / 180; const a2 = rad + (20 * Math.PI) / 180;
           // Colour is strike rate only, every slice: the slice's length already shows its share of runs (user,
           // 5 Nov 2026), so the biggest isn't singled out.
-          const fill = (a.sr ?? 0) >= strikeRate ? BLUE : RED;
+          const fill = (a.sr ?? 0) >= strikeRate ? faster : slower;
           const lx = c + (R + 26) * Math.cos(rad); const ly = c + (R + 26) * Math.sin(rad);
           return (
             <g key={a.label}>
@@ -149,7 +149,7 @@ export const ScoringWheel = ({ zones, hand, strikeRate }) => {
         })}
         <rect x={c - 3} y={c - 9} width="6" height="18" rx="2" fill="#c9b27c" />
       </Box>
-      <Legend items={[[`Faster than his ${Math.round(strikeRate)}`, BLUE], ['Slower', RED]]} />
+      <Legend items={[[`Faster than his ${Math.round(strikeRate)}`, faster], ['Slower', slower]]} />
     </>
   );
 };
