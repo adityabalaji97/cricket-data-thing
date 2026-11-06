@@ -6,7 +6,10 @@ One IPL franchise a day, one consistent carousel each, until the retention deadl
 - **Deadline:** Tuesday 17 Nov 2026 (moved from 15 Nov; the India v NZ ODIs end that day).
 - **Retentions:** no cap on how many players a team keeps.
 - **Auction:** 16 Dec, Goa.
-- **Trades so far:** Pant (LSG to DC) for Kuldeep (DC to LSG), and Natarajan (DC to SRH) for Zeeshan Ansari.
+- **Trades so far:**
+  - Pant (LSG to DC) for Kuldeep (DC to LSG).
+  - Natarajan (DC to SRH) for Zeeshan Ansari.
+  - 5 Nov (CSK announcement): Liam Livingstone (₹6 cr) and Jack Edwards (₹3 cr) from SRH to CSK, for Khaleel Ahmed (₹4.8 cr) and Nathan Ellis (₹2 cr). The CSK post leads with it; the SRH post (10 Nov) gets it too (`NEWS` in the builder).
 
 **Sources:** [Cricinfo](https://www.cricinfo.com/story/ipl-2027-retention-deadline-moved-to-november-17-1561149), [trade tracker](https://www.cricketnews.com/en/cricket/news/ipl-2027-trade-tracker-list-all-player-cash-deals-ipl-2027-mini-auction/6076978c3e37359b873c2e4a).
 
