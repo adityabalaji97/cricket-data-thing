@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 
 SITE = "https://hindsightcricket.com"
 START, END = date(2025, 1, 1), date(2026, 10, 31)
+TEMPLATE_START = date(2024, 1, 1)   # the template slide reads each player's last three IPL seasons
 IPL = {"fmt": "T20", "include_international": False, "leagues": ["IPL"], "start_date": START, "end_date": END, "limit": 1000}
 SQUADS = ROOT / "data/auction_raw/ipl/2026/completed_all_players.csv"
 PALETTE = json.loads((ROOT / "src/utils/teamPalette.json").read_text())["teams"]
@@ -293,31 +294,49 @@ def build(db, code):
     c6 = card("cases", "case_board", f"Three calls for {T['short']}: {short(big['name'])}, {short(under['name'])} and {short(bargain['name'])}",
               {"colour": colour, "cases": cases}, "IPL 2025-26, any side · prices: 2026 squad", kicker="The case for and against")
 
-    # 7. Purse and gaps: wage bill, what the three free, the side's phases against the other IPL sides.
-    from services.team_page import phases
+    # 7. Against the winners' template (TEAM_TEMPLATE_PLAN.md): each role filled by the squad's busiest players in it,
+    # on their IPL 2024-26 at any side, placed among IPL sides since 2023 against where playoff sides sit.
+    from services.squad_grade import grade, load_template, squad_players
 
-    scope = {"kind": "league", "filters": {"fmt": "T20", "include_international": False, "leagues": ["IPL"], "start_date": START, "end_date": END}}
-    ph = phases(db, team, scope)["phases"]
+    tmpl = load_template("IPL")
+    g = grade(squad_players(db, "IPL", names, TEMPLATE_START, END), tmpl["benchmarks"], tmpl["weights"])
     bill = sum(p["price"] for p in players)
     freed = under["price"] + (big["price"] if big["wpa"] <= 0 else 0)
-    cells7 = []
-    for kind_, lab in (("bat", "Batting"), ("bowl", "Bowling")):
-        cells7.append({"name": lab, "cells": [{"value": ph[k][kind_]["of"] + 1 - ph[k][kind_]["rank"],
-                                                "text": f"{ph[k][kind_]['rank']}{'st' if ph[k][kind_]['rank'] == 1 else 'nd' if ph[k][kind_]['rank'] == 2 else 'rd' if ph[k][kind_]['rank'] == 3 else 'th'}",
-                                                "sub": (sg(ph[k]['bat']['raa_per_100'], 1) + " v par" if kind_ == "bat" else f"{ph[k]['bowl']['economy']:.2f} an over")}
-                                               for k in ("powerplay", "middle", "death")]})
-    flat = [(lab, k, ph[k][kd]["rank"]) for kd, lab in (("bat", "batting"), ("bowl", "bowling")) for k in ("powerplay", "middle", "death")]
-    worst = max(flat, key=lambda x: x[2])
-    of = ph["powerplay"]["bat"]["of"]
-    c7 = card("gaps", "grid_heat",
-              f"Squad cost ₹{bill:.1f} crore. The gap: {PH[worst[1]]} {worst[0]}, {worst[2]}th of {of} IPL sides",
-              {"cols": ["Powerplay", "Middle", "Death"], "rows": cells7, "format": "int", "higher_better": True, "mid": (of + 1) / 2,
-               "legend": ["Top half of the IPL", "Bottom half"]},
-              "Rank among IPL sides, 2025-26 · bat: v par per 100 · bowl: runs an over",
-              kicker="Purse and gaps")
+    num = {"average": lambda v: f"{v:.1f}", "strike_rate": lambda v: f"{v:.0f}", "wickets_per_24": lambda v: f"{v:.2f}",
+           "economy": lambda v: f"{v:.2f}", "regular_bowlers": lambda v: f"{v:.0f}"}
+    unit = {"average": "avg", "strike_rate": "SR", "wickets_per_24": "wkts/4 ov", "economy": "an over", "regular_bowlers": "bowlers"}
+    rows7 = []
+    for r in g["roles"]:
+        f = num[r["measure"]]
+        held = (f"{len(r['holders'])} with a season's worth of overs since 2024" if r["key"] == "depth"
+                else ", ".join(short(h) for h in r["holders"]) or "nobody in the squad has done it")
+        rows7.append({"label": r["label"], "holders": held, "place": round(r["place"]), "playoff_place": round(r["playoff_place"]),
+                      "status": r["status"],
+                      "value_text": f"{f(r['value']) if r['value'] is not None else '–'} {unit[r['measure']]} · playoff {f(r['playoff_level'])}"})
+    gaps = sorted([r for r in g["roles"] if r["status"] != "playoff level"], key=lambda r: (r["status"] != "gap", -r["weight"]))
+    top_gap = gaps[0] if gaps else None
+    c7 = card("template", "template_board",
+              f"{g['at_level']} of {g['of']} roles at playoff-side level" + (f". The biggest gap: {SAY[top_gap['key']]}" if top_gap else ""),
+              {"colour": colour, "rows": rows7, "scale_label": "Place among IPL sides, 2023-26"},
+              "IPL 2024-26 at any side · recent seasons first · v playoff sides 2023-26",
+              kicker="Against the winners' template")
     return {"team": team, "code": code, "colour": colour, "lead": lead, "cards": [c2, c3, c4, c5, c6, c7],
             "players": players, "trio": trio, "under": under, "bargain": bargain, "big": big, "top": top, "below": below,
-            "bill": bill, "freed": freed, "worst": worst, "of": of, "played": played, "trade": trade}
+            "bill": bill, "freed": freed, "played": played, "trade": trade, "grade": g, "gaps": gaps}
+
+
+# A role as copy says it.
+SAY = {"openers": "openers", "top": "the 3-4s", "finishers": "the 5-7 finishers", "pp_pace": "powerplay pace",
+       "mid_spin": "middle-overs spin", "death_pace": "death pace", "depth": "bowling depth"}
+
+
+def gap_text(r):
+    """A template gap in words: 'death pace (11.79 an over; playoff sides 9.85)'."""
+    f = {"average": "{:.1f}", "strike_rate": "{:.0f}", "wickets_per_24": "{:.2f}", "economy": "{:.2f}", "regular_bowlers": "{:.0f}"}[r["measure"]]
+    unit = {"average": "average", "strike_rate": "strike rate", "wickets_per_24": "wickets per 4 overs", "economy": "an over",
+            "regular_bowlers": "regular bowlers"}[r["measure"]]
+    v = "nobody in the role" if r["value"] is None else (f.format(r["value"]) + (f" {unit}" if unit == "an over" else f" {unit}"))
+    return f"{SAY[r['key']]} ({v}; playoff sides {f.format(r['playoff_level'])})"
 
 
 def copy(b):
@@ -338,7 +357,10 @@ def copy(b):
         f"played added none or less.",
         f"The big price: {u['name']} ({crore(u['price'])}), {sg(u['wpa'])} wins. The bargain: {g['name']} ({crore(g['price'])}), "
         f"{sg(g['wpa'])}. The big name: {big['name']} ({crore(big['price'])}), {sg(big['wpa'])}.",
-        f"The gap to fill at the auction: {PH[b['worst'][1]]} {b['worst'][0]}, {b['worst'][2]}th of {b['of']} IPL sides since 2025.",
+        f"Against the winners' template (what IPL playoff sides have had since 2023, role by role, on each player's IPL "
+        f"2024-26 at any side): {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
+        + (f" Short of playoff level, biggest first: " + "; ".join(gap_text(r) for r in b["gaps"][:3]) + "." if b["gaps"] else "")
+        + f" Squad cost: ₹{b['bill']:.1f} crore.",
         "Wins added, runs above par and Impact: T20 Primer method. IPL 2025-26, counting each player's record at any side. "
         "Prices: 2026 squad (Cricbuzz). Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
         "Who would you keep?",
@@ -359,7 +381,8 @@ def thread(b, link):
           "Since 2025: " + "; ".join(tr["brief"]) + "."] if tr else []) + [
         f"Most wins added in this squad: {b['top']['name']}, {sg(b['top']['wpa'])}. {b['below']} of {len(b['played'])} added none or less.",
         f"The big name: {big['name']} ({crore(big['price'])}), {sg(big['wpa'])} wins since 2025.",
-        f"The gap to fill at the auction: {PH[b['worst'][1]]} {b['worst'][0]}, {b['worst'][2]}th of {b['of']} IPL sides.",
+        f"Against what playoff sides have had since 2023: {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
+        + (f" Furthest short: {gap_text(b['gaps'][0])}." if b["gaps"] else ""),
         f"Who would you keep?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9",
     ]
     from services.ig_x import hand_thread
@@ -383,7 +406,8 @@ def reel_script(b):
                       f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
                       f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
                       f"{big['name']}, the big name, {spoken(big['wpa'])}.",
-                      f"And the gap to fill: the {('middle overs' if b['worst'][1] == 'middle' else b['worst'][1])} {b['worst'][0]}."]}
+                      (f"Against playoff sides, the biggest gap: {SAY[b['gaps'][0]['key']]}."
+                       if b["gaps"] else "Against playoff sides, every role is at their level.")]}
 
 
 def slides_of(b, hook):

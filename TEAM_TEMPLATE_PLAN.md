@@ -89,7 +89,16 @@ template (T3) before any page or post is built on it.
 - [x] T1 player-season roles: IPL, 3,400 player-seasons
 - [x] T2 clusters: batting and bowling separately, 6 each; they map onto the familiar labels, plus 2 splits
 - [x] T3 template: IPL, all seasons and the Impact Player era; see `TEAM_TEMPLATE_IPL_FINDINGS.md`
-- [ ] T4 grading squads: waiting on the user's three answers at the end of the findings
+- [x] T4 grading squads (6 Nov 2026), in the retention posts' slide 7 ("Against the winners' template"):
+  - **Graded roles (7):** openers (average), 3-4 (strike rate, 3 holders), 5-7 (strike rate, 3), powerplay pace
+    (wickets), middle-overs spin (wickets), death pace (economy), bowling depth (regular bowlers).
+  - **Holders:** each player's IPL 2024-26 at any side. Recent seasons count more (2026 ×4, 2025 ×2, 2024 ×1). One
+    batting role per player (Samson is an opener only). Bowlers can hold several slots.
+  - **Benchmark:** IPL team-seasons 2023-26 worked out the same way. Pinned in `services/pinned/team_template_IPL.json`
+    (`scripts/build_team_template.py`).
+  - **Weights:** how consistently each role separated playoff sides across 19 seasons.
+  - **User checks on CSK:** the 3-4 should include Mhatre and Urvil, so recency and one-role-per-batter were added;
+    Hosein joins Noor in middle-overs spin.
 
 ## Open questions (for T3)
 
