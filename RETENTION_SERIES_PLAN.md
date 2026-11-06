@@ -13,21 +13,25 @@ One IPL franchise a day, one consistent carousel each, until the retention deadl
 
 **Sources:** [Cricinfo](https://www.cricinfo.com/story/ipl-2027-retention-deadline-moved-to-november-17-1561149), [trade tracker](https://www.cricketnews.com/en/cricket/news/ipl-2027-trade-tracker-list-all-player-cash-deals-ipl-2027-mini-auction/6076978c3e37359b873c2e4a).
 
-## Schedule (biggest teams on the busiest days, Friday and Saturday)
+## Schedule (rescheduled 6 Nov: the big four go the weekend before the deadline)
 
 | Date | Team | Why that day |
 |---|---|---|
-| Fri 6 Nov | CSK | Big four |
-| Sat 7 Nov | MI | Big four |
-| Sun 8 Nov | DC | Both trades of the window (Pant back, Kuldeep and Natarajan out) |
-| Mon 9 Nov | LSG | The other side of the Pant–Kuldeep trade |
-| Tue 10 Nov | SRH | Natarajan in |
-| Wed 11 Nov | RR | News-led: re-checked the day before |
-| Thu 12 Nov | PBKS | News-led |
-| Fri 13 Nov | RCB | Big four |
-| Sat 14 Nov | KKR | Big four |
-| Sun 15 Nov | GT | News-led |
-| Tue 17 Nov | Retention lists | Spare: what each team actually kept, against our cases |
+| Fri 6 Nov | SRH | The most settled squad after the window's trades (Natarajan in; Khaleel and Ellis for Livingstone and Edwards) |
+| Sat 7 Nov | DC | Both their trades done (Pant back; Kuldeep and Natarajan out) |
+| Sun 8 Nov | LSG | The other side of the Pant–Kuldeep trade |
+| Mon 9 Nov | RR | |
+| Tue 10 Nov | PBKS | |
+| Wed 11 Nov | GT | |
+| Thu 12 Nov | Spare | For news (a trade, a reported release) |
+| Fri 13 Nov | CSK | Big four |
+| Sat 14 Nov | MI | Big four |
+| Sun 15 Nov | RCB | Big four |
+| Mon 16 Nov | KKR | Big four |
+| Tue 17 Nov | Retention lists | What each team actually kept, against our cases |
+
+**Before each post:** the user checks the template slide's role holders, since they check them by eye. Rebuild a
+team's post the day before it goes out, so the latest trades are in.
 
 The order of the six news-led days is re-checked each morning against the news (trades, reported releases).
 
