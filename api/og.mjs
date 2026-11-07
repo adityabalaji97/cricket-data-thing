@@ -119,6 +119,35 @@ function playerCard(card) {
   return frame(card.kicker, card.headline, h('div', { flexDirection: 'column' }, stats, bars));
 }
 
+// A team page as a link preview: the side's colour, its record and rating, where it ranks by phase (bat and ball), and
+// its best batter and wicket-taker.
+function teamCard(card) {
+  const accent = card.colour || C.lime;
+  const ORD = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
+  const tone = (r) => (!r ? C.low : r.rank <= Math.ceil(r.of / 3) ? C.lime : r.rank > r.of - Math.ceil(r.of / 3) ? C.red : C.mid);
+  const cell = (r) => h('div', { width: 150, justifyContent: 'center', fontSize: 34, fontWeight: 700, color: tone(r) }, r ? ORD(r.rank) : '–');
+  const of = card.phases.find((x) => x.bat || x.bowl);
+  const grid = h('div', { flexDirection: 'column', gap: 10 },
+    h('div', { gap: 0 }, h('div', { width: 130 }),
+      card.phases.map((x) => h('div', { width: 150, justifyContent: 'center', color: C.low, fontSize: 22 }, x.label))),
+    ['bat', 'bowl'].map((k) => h('div', { alignItems: 'center' },
+      h('div', { width: 130, color: C.mid, fontSize: 24 }, k === 'bat' ? 'Batting' : 'Bowling'),
+      card.phases.map((x) => cell(x[k])))),
+    h('div', { color: C.low, fontSize: 20, marginTop: 4 }, `Rank by phase, of ${(of?.bat || of?.bowl)?.of || ''} sides`));
+  const best = h('div', { flexDirection: 'column', gap: 12, marginLeft: 'auto', width: 430 },
+    card.best.map((b) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px 20px' },
+      h('div', { color: C.low, fontSize: 20 }, b.role),
+      h('div', { fontSize: 30, fontWeight: 700 }, b.name),
+      h('div', { color: C.mid, fontSize: 22 }, b.value))));
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'sans-serif', borderTop: `12px solid ${accent}` },
+    h('div', { justifyContent: 'space-between', alignItems: 'center' },
+      h('div', { color: C.lime, fontSize: 24, letterSpacing: 4, fontWeight: 700 }, 'HINDSIGHT'),
+      h('div', { color: C.low, fontSize: 22 }, card.kicker)),
+    h('div', { fontSize: card.headline.length > 22 ? 56 : 64, fontWeight: 700, marginTop: 18, lineHeight: 1.05, color: accent }, card.headline),
+    h('div', { color: C.mid, fontSize: 30, marginTop: 10 }, card.sub),
+    h('div', { marginTop: 'auto', alignItems: 'flex-end' }, grid, best));
+}
+
 function homeCard(card) {
   const tiles = h('div', { flexWrap: 'wrap', gap: 14, marginTop: 24, width: card.latest ? 620 : 1080 },
     card.features.map(([name, what]) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 20px', width: card.latest ? 300 : 520 },
@@ -158,6 +187,7 @@ export default async function handler(req, res) {
   const element = summary?.kind === 'scorecard' ? scorecardCard(card)
     : summary?.kind === 'home' ? homeCard(card)
     : summary?.kind === 'player' ? playerCard(card)
+    : summary?.kind === 'team' ? teamCard(card)
       : textCard(card);
 
   const image = new ImageResponse(element, { width: 1200, height: 630 });

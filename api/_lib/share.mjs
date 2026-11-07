@@ -5,6 +5,8 @@
 // and the data its preview image draws. Every fetch is time-boxed; on any failure the page falls
 // back to the site-wide card rather than failing the unfurl.
 
+import { readFileSync } from 'node:fs';
+
 export const API_BASE = process.env.HINDSIGHT_API_BASE || 'https://cricket-data-thing-672dfbacf476.herokuapp.com';
 export const SITE_URL = (process.env.SITE_URL || 'https://hindsightcricket.com').replace(/\/$/, '');
 export const SITE_NAME = 'Hindsight';
@@ -143,6 +145,60 @@ async function playerSummary(name) {
         { label: `WPA ${latest.year}`, value: signed(latest.wpa, 2) },
       ],
       bars: rows.slice(0, 8).reverse().map((r) => ({ label: String(r.year).slice(2), value: r.impact || 0 })),
+    },
+  };
+}
+
+// Team colours (src/utils/teamPalette.json, shared with the app), made readable on the dark card: the primary if it
+// has 3:1 contrast on the background, else the secondary (GT's navy gives way to its gold), else none.
+let palette = null;
+function teamColour(team) {
+  try {
+    palette = palette || JSON.parse(readFileSync(new URL('../../src/utils/teamPalette.json', import.meta.url), 'utf8'));
+  } catch {
+    return null;
+  }
+  const t = palette.teams?.[team] || palette.teams?.[palette.aliases?.[team]];
+  if (!t) return null;
+  const lum = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const contrast = (hex) => (lum(hex) + 0.05) / (lum('#0a0c11') + 0.05);
+  return [t.primary, t.secondary].find((c) => /^#[0-9a-f]{6}$/i.test(c || '') && contrast(c) >= 3) || null;
+}
+
+// The team page (GET /team-page): record, rating rank among its competition's sides, phase ranks, best batter and bowler.
+async function teamSummary(team) {
+  const p = await getJSON(`/team-page?team=${encodeURIComponent(team)}`, 8000);
+  if (!p || !p.played) {
+    return { kind: 'text', title: `${team}: T20 team profile | ${SITE_NAME}`, description: DEFAULT_DESCRIPTION, card: { kicker: 'Team', headline: team } };
+  }
+  const comp = p.scope?.competition || 'T20';
+  const since = String(p.window.start_date).slice(0, 4);
+  const sides = p.scope?.label || 'sides';
+  const rating = p.rating?.rank ? `rated ${ORD(p.rating.rank)} of ${p.rating.of} ${sides}` : null;
+  const bat = [...(p.top?.bat || [])].sort((a, b) => (b.raa || 0) - (a.raa || 0))[0];
+  const bowl = [...(p.top?.bowl || [])].sort((a, b) => (b.wickets || 0) - (a.wickets || 0))[0];
+  const PH = { powerplay: 'Powerplay', middle: 'Middle', death: 'Death' };
+  const phases = Object.entries(PH).filter(([k]) => p.phases?.[k]).map(([k, label]) => ({
+    label,
+    bat: p.phases[k].bat ? { rank: p.phases[k].bat.rank, of: p.phases[k].bat.of } : null,
+    bowl: p.phases[k].bowl ? { rank: p.phases[k].bowl.rank, of: p.phases[k].bowl.of } : null,
+  }));
+  const record = `Won ${p.won} of ${p.played}`;
+  const best = [bat ? `${bat.name} ${signed(bat.raa, 0)} runs above par` : null,
+    bowl ? `${bowl.name} ${bowl.wickets} wickets at ${bowl.economy.toFixed(2)} an over` : null].filter(Boolean);
+  return {
+    kind: 'team',
+    title: `${p.team}: ${comp} since ${since}, ${record.toLowerCase()} | ${SITE_NAME}`,
+    description: `${p.team} in the ${comp} since ${since}: ${record.toLowerCase()}${rating ? `, ${rating}` : ''}. `
+      + `${phases.map((x) => `${x.label}: batting ${ORD(x.bat?.rank)}, bowling ${ORD(x.bowl?.rank)} of ${x.bat?.of || x.bowl?.of}`).join('. ')}. ${best.join('. ')}.`,
+    card: {
+      kicker: `${comp} · since ${since}`, headline: p.team, colour: teamColour(p.team),
+      sub: [record, rating].filter(Boolean).join(' · '), phases,
+      best: [bat ? { role: 'Top batter', name: bat.name, value: `${signed(bat.raa, 0)} runs above par` } : null,
+        bowl ? { role: 'Top wicket-taker', name: bowl.name, value: `${bowl.wickets} wkts · ${bowl.economy.toFixed(2)} an over` } : null].filter(Boolean),
     },
   };
 }
@@ -304,6 +360,7 @@ export async function summarize(pathname, search) {
   const scorecard = pathname.match(/^\/scorecard\/([^/]+)/);
   if (scorecard) return scorecardSummary(decodeURIComponent(scorecard[1]));
   if (pathname.startsWith('/player') && params.get('name')) return playerSummary(params.get('name'));
+  if (/^\/team\/?$/.test(pathname) && params.get('team')) return teamSummary(params.get('team'));
   if (pathname.startsWith('/venue')) return venueSummary(params);
   if (pathname.startsWith('/query')) return querySummary(params);
   const note = pathname.match(/^\/notes\/([a-z0-9-]+)\/?$/);
