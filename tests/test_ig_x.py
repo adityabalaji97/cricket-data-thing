@@ -123,3 +123,11 @@ def test_the_first_tweet_carries_the_lead_chart_and_the_hook():
     assert "🧵" in thread[0]["text"] and f"1/{len(s) - 1}" in thread[0]["text"]
     assert [t["slide"] for t in thread[1:]] == list(range(3, len(s) + 1))
     assert all(weight(t["text"]) <= LIMIT for t in thread)
+
+
+def test_hand_thread_attaches_the_slide_each_tweet_is_written_about():
+    from services.ig_x import hand_thread
+
+    th = hand_thread([(1, "Cover"), (3, "Batting"), (None, "No image"), "Fourth"], "#IPL2027 #IPL")
+    assert [t["slide"] for t in th] == [1, 3, None, 4]
+    assert all(t["text"].endswith("#CricketTwitter") for t in th)
