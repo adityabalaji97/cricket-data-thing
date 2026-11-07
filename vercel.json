@@ -91,7 +91,7 @@
       "dest": "/api/meta.mjs?__path=/"
     },
     {
-      "src": "/(scorecard/[^/]+|scorecards|player|venue|query|rankings|links|games/[^/]+|notes(?:/[^/]+)?|g/[^/]+)",
+      "src": "/(scorecard/[^/]+|scorecards|player|team|venue|query|rankings|links|games/[^/]+|notes(?:/[^/]+)?|g/[^/]+)",
       "has": [
         {
           "type": "header",
@@ -109,6 +109,9 @@
   "functions": {
     "api/img.mjs": {
       "includeFiles": "api/_lib/fonts/**"
+    },
+    "api/og.mjs": {
+      "includeFiles": "{api/_lib/fonts/**,src/utils/teamPalette.json}"
     },
     "api/embed.mjs": {
       "includeFiles": "mcp_server/widget.html"

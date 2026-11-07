@@ -4,7 +4,21 @@
 // a link is shared. The previous site-wide og:image was an SVG, which those apps do not render,
 // so shared links had no image at all. Built with @vercel/og (Satori + resvg) in the Node runtime.
 import { ImageResponse } from '@vercel/og';
+import { readFileSync } from 'node:fs';
 import { summarize } from './_lib/share.mjs';
+
+// The site's typefaces (src/theme/hindsightDark.js; SIL OFL, api/_lib/fonts/OFL.txt): Barlow for text, Barlow Semi
+// Condensed Bold for headlines, IBM Plex Mono for numbers and kickers. Satori's default font matched none of it.
+const font = (name) => readFileSync(new URL(`./_lib/fonts/${name}`, import.meta.url));
+const FONTS = [
+  { name: 'Barlow', data: font('Barlow-Regular.ttf'), weight: 400, style: 'normal' },
+  { name: 'Barlow', data: font('Barlow-SemiBold.ttf'), weight: 600, style: 'normal' },
+  { name: 'Barlow Semi Condensed', data: font('BarlowSemiCondensed-Bold.ttf'), weight: 700, style: 'normal' },
+  { name: 'IBM Plex Mono', data: font('IBMPlexMono-Regular.ttf'), weight: 400, style: 'normal' },
+  { name: 'IBM Plex Mono', data: font('IBMPlexMono-Medium.ttf'), weight: 500, style: 'normal' },
+];
+const DISPLAY = 'Barlow Semi Condensed';
+const MONO = 'IBM Plex Mono';
 
 const C = { bg: '#0a0c11', surface: '#14171e', text: '#f3f4f6', mid: '#c3c8d0', low: '#9aa1ac', lime: '#b6f24a', red: '#e5484d', border: 'rgba(255,255,255,0.12)' };
 
@@ -14,14 +28,17 @@ const h = (type, style, ...children) => ({
   props: { style: { display: 'flex', ...style }, children: children.flat().filter((c) => c !== null && c !== undefined && c !== false) },
 });
 
+// The site's header: the brand, and the page's kicker in mono capitals (as the profile cards and the carousel set it).
+const top = (kicker, size = 22) => h('div', { justifyContent: 'space-between', alignItems: 'center' },
+  h('div', { color: C.lime, fontSize: size + 2, letterSpacing: 5, fontWeight: 600 }, 'HINDSIGHT'),
+  h('div', { color: C.low, fontSize: size - 2, letterSpacing: 3, fontFamily: MONO }, String(kicker || '').toUpperCase()));
+
 const signed = (v, d = 1) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}`;
 
 function frame(kicker, headline, body) {
-  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '52px 60px', fontFamily: 'sans-serif' },
-    h('div', { justifyContent: 'space-between', alignItems: 'center' },
-      h('div', { color: C.lime, fontSize: 26, letterSpacing: 4, fontWeight: 700 }, 'HINDSIGHT'),
-      h('div', { color: C.low, fontSize: 24 }, kicker || '')),
-    h('div', { fontSize: headline && headline.length > 42 ? 50 : 60, fontWeight: 700, marginTop: 34, lineHeight: 1.1 }, headline || ''),
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '52px 60px', fontFamily: 'Barlow' },
+    top(kicker, 24),
+    h('div', { fontFamily: DISPLAY, fontSize: headline && headline.length > 42 ? 56 : 68, fontWeight: 700, marginTop: 34, lineHeight: 1.1 }, headline || ''),
     body,
     h('div', { marginTop: 'auto', color: C.low, fontSize: 22 }, 'Ball-by-ball T20 analytics · Impact · win probability'));
 }
@@ -45,14 +62,14 @@ function sparkline(points, width, height) {
 function scorecardCard(card) {
   const scores = h('div', { flexDirection: 'column', marginTop: 28, gap: 10 },
     card.lines.map((line) => h('div', { alignItems: 'baseline', gap: 18, fontSize: 40 },
-      h('div', { width: 160, color: C.mid, fontWeight: 700 }, line.team),
-      h('div', { fontWeight: 700 }, line.score),
-      h('div', { color: C.low, fontSize: 28 }, `(${line.overs})`))));
+      h('div', { width: 160, color: C.mid, fontWeight: 600 }, line.team),
+      h('div', { fontFamily: MONO, fontWeight: 500 }, line.score),
+      h('div', { color: C.low, fontSize: 26, fontFamily: MONO }, `(${line.overs})`))));
   const impact = card.impact
     ? h('div', { flexDirection: 'column', marginLeft: 'auto', alignItems: 'flex-end', gap: 12 },
-      h('div', { color: C.low, fontSize: 22 }, 'WIN PROBABILITY · IMPACT'),
+      h('div', { color: C.lime, fontSize: 18, letterSpacing: 3, fontFamily: MONO }, 'WIN PROBABILITY · IMPACT'),
       sparkline(card.wp?.points, 420, 120),
-      h('div', { gap: 22, fontSize: 30, fontWeight: 700 },
+      h('div', { gap: 22, fontSize: 28, fontFamily: MONO, fontWeight: 500 },
         card.impact.map((i) => h('div', { color: i.value >= 0 ? C.lime : C.red }, `${i.team} ${signed(i.value)}`))))
     : null;
   const story = card.story
@@ -70,9 +87,9 @@ function verdictCard(card) {
   const half = 150;
   const seasonRows = years.length
     ? h('div', { flexDirection: 'column', gap: 10, width: 560 },
-      h('div', { color: C.low, fontSize: 20, letterSpacing: 2 }, 'WINS ADDED BY SEASON'),
+      h('div', { color: C.lime, fontSize: 18, letterSpacing: 3, fontFamily: MONO }, 'WINS ADDED BY SEASON'),
       years.map((yr) => h('div', { alignItems: 'center', gap: 12 },
-        h('div', { width: 70, fontSize: 24, color: C.mid, fontWeight: 700 }, String(yr)),
+        h('div', { width: 70, fontSize: 22, color: C.mid, fontFamily: MONO }, String(yr)),
         h('div', { flexDirection: 'column', gap: 4 },
           card.seasons.map((s) => {
             const r = s.rows.find((x) => x.year === yr);
@@ -82,7 +99,7 @@ function verdictCard(card) {
               h('div', { width: half, justifyContent: 'flex-end' }, v < 0 ? h('div', { width: w, height: 14, background: ROLE[s.role].colour, borderRadius: 4 }) : null),
               h('div', { width: 2, height: 18, background: 'rgba(255,255,255,0.3)' }),
               h('div', { width: half }, v >= 0 ? h('div', { width: w, height: 14, background: ROLE[s.role].colour, borderRadius: 4 }) : null),
-              h('div', { fontSize: 20, color: C.mid, marginLeft: 8 }, `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}`));
+              h('div', { fontSize: 19, color: C.mid, marginLeft: 8, fontFamily: MONO }, `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}`));
           })))))
     : null;
   const ranks = h('div', { flexDirection: 'column', gap: 12, marginLeft: 'auto', width: 440 },
@@ -90,14 +107,12 @@ function verdictCard(card) {
       h('div', { alignItems: 'center', gap: 10 },
         h('div', { width: 12, height: 12, borderRadius: 3, background: ROLE[m.role].colour }),
         h('div', { fontSize: 24, color: C.mid }, m.label)),
-      h('div', { fontSize: 30, fontWeight: 700, color: m.top ? C.lime : C.mid }, m.rank))));
-  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'sans-serif' },
-    h('div', { justifyContent: 'space-between', alignItems: 'center' },
-      h('div', { color: C.lime, fontSize: 24, letterSpacing: 4, fontWeight: 700 }, 'HINDSIGHT'),
-      h('div', { color: C.low, fontSize: 22 }, card.scope)),
-    h('div', { fontSize: 58, fontWeight: 700, marginTop: 22, lineHeight: 1.05 }, card.headline),
+      h('div', { fontSize: 26, fontFamily: MONO, fontWeight: 500, color: m.top ? C.lime : C.mid }, m.rank))));
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
+    top(card.scope),
+    h('div', { fontFamily: DISPLAY, fontSize: 64, fontWeight: 700, marginTop: 22, lineHeight: 1.05 }, card.headline),
     h('div', { color: C.low, fontSize: 24, marginTop: 6 }, card.kicker),
-    card.verdict ? h('div', { fontSize: 34, fontWeight: 700, marginTop: 20, lineHeight: 1.2, color: C.text }, card.verdict) : null,
+    card.verdict ? h('div', { fontFamily: DISPLAY, fontSize: 38, fontWeight: 700, marginTop: 20, lineHeight: 1.2, color: C.text }, card.verdict) : null,
     h('div', { marginTop: 'auto', alignItems: 'flex-end' }, seasonRows, ranks));
 }
 
@@ -106,7 +121,7 @@ function playerCard(card) {
   const stats = h('div', { gap: 22, marginTop: 30 },
     (card.stats || []).map((s) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '18px 24px', minWidth: 230 },
       h('div', { color: C.low, fontSize: 22 }, s.label),
-      h('div', { fontSize: 46, fontWeight: 700, color: String(s.value).startsWith('−') ? C.red : C.lime }, s.value))));
+      h('div', { fontSize: 44, fontFamily: MONO, fontWeight: 500, color: String(s.value).startsWith('−') ? C.red : C.lime }, s.value))));
   const bars = card.bars?.length
     ? (() => {
       const max = Math.max(1, ...card.bars.map((b) => Math.abs(b.value)));
@@ -119,19 +134,46 @@ function playerCard(card) {
   return frame(card.kicker, card.headline, h('div', { flexDirection: 'column' }, stats, bars));
 }
 
+// A team page as a link preview: the side's colour, its record and rating, where it ranks by phase (bat and ball), and
+// its best batter and wicket-taker.
+function teamCard(card) {
+  const accent = card.colour || C.lime;
+  const ORD = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
+  const tone = (r) => (!r ? C.low : r.rank <= Math.ceil(r.of / 3) ? C.lime : r.rank > r.of - Math.ceil(r.of / 3) ? C.red : C.mid);
+  const cell = (r) => h('div', { width: 150, justifyContent: 'center', fontSize: 32, fontFamily: MONO, fontWeight: 500, color: tone(r) }, r ? ORD(r.rank) : '–');
+  const of = card.phases.find((x) => x.bat || x.bowl);
+  const grid = h('div', { flexDirection: 'column', gap: 10 },
+    h('div', { gap: 0 }, h('div', { width: 130 }),
+      card.phases.map((x) => h('div', { width: 150, justifyContent: 'center', color: C.low, fontSize: 22 }, x.label))),
+    ['bat', 'bowl'].map((k) => h('div', { alignItems: 'center' },
+      h('div', { width: 130, color: C.mid, fontSize: 24 }, k === 'bat' ? 'Batting' : 'Bowling'),
+      card.phases.map((x) => cell(x[k])))),
+    h('div', { color: C.low, fontSize: 20, marginTop: 4 }, `Rank by phase, of ${(of?.bat || of?.bowl)?.of || ''} sides`));
+  const best = h('div', { flexDirection: 'column', gap: 12, marginLeft: 'auto', width: 430 },
+    card.best.map((b) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px 20px' },
+      h('div', { color: C.low, fontSize: 20 }, b.role),
+      h('div', { fontSize: 30, fontWeight: 600 }, b.name),
+      h('div', { color: C.mid, fontSize: 22 }, b.value))));
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow', borderTop: `12px solid ${accent}` },
+    top(card.kicker),
+    h('div', { fontFamily: DISPLAY, fontSize: card.headline.length > 22 ? 62 : 72, fontWeight: 700, marginTop: 18, lineHeight: 1.05, color: accent }, card.headline),
+    h('div', { color: C.mid, fontSize: 30, marginTop: 10 }, card.sub),
+    h('div', { marginTop: 'auto', alignItems: 'flex-end' }, grid, best));
+}
+
 function homeCard(card) {
   const tiles = h('div', { flexWrap: 'wrap', gap: 14, marginTop: 24, width: card.latest ? 620 : 1080 },
     card.features.map(([name, what]) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 20px', width: card.latest ? 300 : 520 },
-      h('div', { fontSize: 26, fontWeight: 700 }, name),
+      h('div', { fontSize: 26, fontWeight: 600 }, name),
       h('div', { fontSize: 20, color: C.low, marginTop: 4 }, what))));
   const latest = card.latest
     ? h('div', { flexDirection: 'column', marginLeft: 'auto', width: 380, background: C.surface, border: `2px solid ${C.lime}`, borderRadius: 20, padding: '20px 26px', marginTop: 24 },
-      h('div', { color: C.lime, fontSize: 20, letterSpacing: 2, fontWeight: 700 }, 'LATEST MATCH'),
+      h('div', { color: C.lime, fontSize: 18, letterSpacing: 3, fontFamily: MONO }, 'LATEST MATCH'),
       h('div', { color: C.mid, fontSize: 22, marginTop: 8 }, card.latest.result),
-      h('div', { fontSize: 34, fontWeight: 700, marginTop: 16 }, card.latest.player),
+      h('div', { fontFamily: DISPLAY, fontSize: 38, fontWeight: 700, marginTop: 16 }, card.latest.player),
       h('div', { color: C.mid, fontSize: 26, marginTop: 2 }, card.latest.figure),
       h('div', { alignItems: 'baseline', gap: 10, marginTop: 14 },
-        h('div', { fontSize: 54, fontWeight: 700, color: C.lime }, card.latest.impact),
+        h('div', { fontSize: 50, fontFamily: MONO, fontWeight: 500, color: C.lime }, card.latest.impact),
         h('div', { fontSize: 22, color: C.low }, 'runs of Impact')))
     : null;
   return frame('hindsightcricket.com', card.headline, h('div', { flexDirection: 'column' },
@@ -158,9 +200,10 @@ export default async function handler(req, res) {
   const element = summary?.kind === 'scorecard' ? scorecardCard(card)
     : summary?.kind === 'home' ? homeCard(card)
     : summary?.kind === 'player' ? playerCard(card)
+    : summary?.kind === 'team' ? teamCard(card)
       : textCard(card);
 
-  const image = new ImageResponse(element, { width: 1200, height: 630 });
+  const image = new ImageResponse(element, { width: 1200, height: 630, fonts: FONTS });
   const png = Buffer.from(await image.arrayBuffer());
   res.setHeader('Content-Type', 'image/png');
   // Finished matches never change; players and pages change slowly.
