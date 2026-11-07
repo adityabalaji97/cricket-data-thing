@@ -52,8 +52,8 @@ matters" line for this reason). A model of the field built from where he hits th
 
 | # | Chunk | Output |
 |---|---|---|
-| F0 | **Data check.** How angle and outcome look for a few batters; how much changes by phase and bowler type; whether angle alone separates players (Rohit, Livingstone, Pooran, Kohli). | A notebook-style script and a findings note |
-| F1 | **The field solver.** Candidates, reach, rules, objective; a standard-field baseline. Unit tests: the rules are never broken, and a batter who only hits square gets a square field. | `services/field_model.py` |
+| F0 | [x] 7 Nov 2026, see `FIELD_COVERAGE_F0.md`. **Data check.** How angle and outcome look for a few batters; how much changes by phase and bowler type; whether angle alone separates players (Rohit, Livingstone, Pooran, Kohli). | A notebook-style script and a findings note |
+| F1 | **The field solver** (per F0: shrink a batter's cut profile to the average batter of his hand, k≈200 balls; flag only moves that beat the noise floor; 150+ balls a cut). Candidates, reach, rules, objective; a standard-field baseline. Unit tests: the rules are never broken, and a batter who only hits square gets a square field. | `services/field_model.py` |
 | F2 | **Prototype.** Rohit and Livingstone, by phase × pace/spin. Their suggested fields, as post cards and on a mockup card, to the user for a sense check (does it look like a field a captain would set?). | Cards; the user decides if it ships |
 | F3 | **Profile card.** "A field for him" in the batter's scouting group, phase and bowling from the wheel's gear; a bowler's version against right- and left-handers. Revamp rules: one picture, one-line note naming the cut and "a model, not his actual fields". | A profile card |
 | F4 | **Posts.** A scouting-post card ("the field for Livingstone at the death"). | `articles/scouting` |
