@@ -17,7 +17,7 @@ upgrading cards we already have instead of duplicating them.
 | # | Card | Status | What |
 |---|---|---|---|
 | 1 | Against each bowling type | **upgrade** | Each type's strike rate, plus % against his own ("−36% v his 145"). Retitled "Who to bowl to him". |
-| 2 | Where to bowl (pace) | **new** | Pitch map against pace: his strike rate in each line and length against his strike rate v pace. 20+ balls a cell. |
+| 2 | Where to bowl to him | **new**; spin added 7 Nov 2026 | Pitch map: his strike rate in each line and length against his strike rate v that kind. A Pace / Spin switch (kept apart: a spinner's good length is a different ball); one bowling type (right- or left-arm pace; off-spin, leg-spin, left-arm orthodox, left-arm wrist spin) behind the filter. 20+ balls a cell. |
 | 3 | Where he scores | **upgrade** | The existing wheel, plus one line: against pace short of full, his share of boundary runs square on the leg side against the average batter of his hand, and **the fielder who matters**. |
 | 4 | How he scores | **new** | His main scoring shots, share of runs against the average batter of his hand (the slog share). |
 
