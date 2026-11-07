@@ -1666,6 +1666,41 @@ const CaseBoard = ({ payload }) => (
   </Box>
 );
 
+/**
+ * A squad against the winners' template (TEAM_TEMPLATE_PLAN.md): one row per role, its holders, and where their number
+ * would place among IPL sides (0-100) against the tick where playoff sides average. The dot's colour is the verdict:
+ * lime at playoff level, amber short of it, red a gap.
+ * payload: {colour, rows:[{label, holders, place, playoff_place, status, value_text}], scale_label}
+ */
+const STATUS_COLOUR = { short: '#e0a43a' };
+const TemplateBoard = ({ payload }) => {
+  // Verdict colours are semantic, not the team's: lime at playoff level (CSK's yellow would read as amber).
+  const statusColour = (s) => (s === 'playoff level' ? colors.accent : s === 'short' ? STATUS_COLOUR.short : colors.red);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.55 }}>
+      {payload.rows.map((r) => (
+        <Box key={r.label}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, lineHeight: 1.15 }}>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.label}</Typography>
+            <Typography sx={{ ...mono, fontSize: 9.5, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: 10, color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.value_text}</Typography>
+          </Box>
+          <Box sx={{ position: 'relative', height: 11, mt: '2px' }}>
+            <Box sx={{ position: 'absolute', left: 0, right: 0, top: 4.5, height: 2, borderRadius: 1, bgcolor: colors.borderStrong }} />
+            <Box sx={{ position: 'absolute', left: `${r.playoff_place}%`, top: 0, width: 2, height: 11, ml: '-1px', bgcolor: colors.textMed }} />
+            <Box sx={{ position: 'absolute', left: `${Math.max(1.5, Math.min(98.5, r.place))}%`, top: 0.5, width: 10, height: 10, ml: '-5px', borderRadius: '50%',
+              bgcolor: statusColour(r.status), border: `1.5px solid ${colors.bg}` }} />
+          </Box>
+          {r.holders && <Typography sx={{ fontSize: 10, color: colors.textLo, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.holders}</Typography>}
+        </Box>
+      ))}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', ...mono, fontSize: 9, color: colors.textFaint }}>
+        <span>{payload.scale_label || 'Place among IPL sides since 2023'}</span><span>│ playoff sides</span>
+      </Box>
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
   recap_text: RecapText,
   score_race: ScoreRace,
@@ -1697,4 +1732,5 @@ export const POST_VISUALS = {
   squad_board: SquadBoard,
   grid_heat: GridHeat,
   case_board: CaseBoard,
+  template_board: TemplateBoard,
 };

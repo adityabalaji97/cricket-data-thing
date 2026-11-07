@@ -6,25 +6,32 @@ One IPL franchise a day, one consistent carousel each, until the retention deadl
 - **Deadline:** Tuesday 17 Nov 2026 (moved from 15 Nov; the India v NZ ODIs end that day).
 - **Retentions:** no cap on how many players a team keeps.
 - **Auction:** 16 Dec, Goa.
-- **Trades so far:** Pant (LSG to DC) for Kuldeep (DC to LSG), and Natarajan (DC to SRH) for Zeeshan Ansari.
+- **Trades so far:**
+  - Pant (LSG to DC) for Kuldeep (DC to LSG).
+  - Natarajan (DC to SRH) for Zeeshan Ansari.
+  - 5 Nov (CSK announcement): Liam Livingstone (₹6 cr) and Jack Edwards (₹3 cr) from SRH to CSK, for Khaleel Ahmed (₹4.8 cr) and Nathan Ellis (₹2 cr). The CSK post leads with it; the SRH post (10 Nov) gets it too (`NEWS` in the builder).
 
 **Sources:** [Cricinfo](https://www.cricinfo.com/story/ipl-2027-retention-deadline-moved-to-november-17-1561149), [trade tracker](https://www.cricketnews.com/en/cricket/news/ipl-2027-trade-tracker-list-all-player-cash-deals-ipl-2027-mini-auction/6076978c3e37359b873c2e4a).
 
-## Schedule (biggest teams on the busiest days, Friday and Saturday)
+## Schedule (rescheduled 6 Nov: the big four go the weekend before the deadline)
 
 | Date | Team | Why that day |
 |---|---|---|
-| Fri 6 Nov | CSK | Big four |
-| Sat 7 Nov | MI | Big four |
-| Sun 8 Nov | DC | Both trades of the window (Pant back, Kuldeep and Natarajan out) |
-| Mon 9 Nov | LSG | The other side of the Pant–Kuldeep trade |
-| Tue 10 Nov | SRH | Natarajan in |
-| Wed 11 Nov | RR | News-led: re-checked the day before |
-| Thu 12 Nov | PBKS | News-led |
-| Fri 13 Nov | RCB | Big four |
-| Sat 14 Nov | KKR | Big four |
-| Sun 15 Nov | GT | News-led |
-| Tue 17 Nov | Retention lists | Spare: what each team actually kept, against our cases |
+| Fri 6 Nov | SRH | The most settled squad after the window's trades (Natarajan in; Khaleel and Ellis for Livingstone and Edwards) |
+| Sat 7 Nov | GT | Swapped in for DC: a settled squad (only a reported CSK interest in Sai Kishore) |
+| Sun 8 Nov | LSG | The other side of the Pant–Kuldeep trade |
+| Mon 9 Nov | RR | |
+| Tue 10 Nov | PBKS | |
+| Wed 11 Nov | Spare | |
+| Thu 12 Nov | DC | Held: Axar (captain), Ashutosh and Rizvi in reported CSK talks (unconfirmed, 6 Nov). Axar is the big name |
+| Fri 13 Nov | CSK | Big four |
+| Sat 14 Nov | MI | Big four |
+| Sun 15 Nov | RCB | Big four |
+| Mon 16 Nov | KKR | Big four |
+| Tue 17 Nov | Retention lists | What each team actually kept, against our cases |
+
+**Before each post:** the user checks the template slide's role holders, since they check them by eye. Rebuild a
+team's post the day before it goes out, so the latest trades are in.
 
 The order of the six news-led days is re-checked each morning against the news (trades, reported releases).
 
