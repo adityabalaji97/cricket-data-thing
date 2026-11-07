@@ -110,6 +110,9 @@
     "api/img.mjs": {
       "includeFiles": "api/_lib/fonts/**"
     },
+    "api/og.mjs": {
+      "includeFiles": "{api/_lib/fonts/**,src/utils/teamPalette.json}"
+    },
     "api/embed.mjs": {
       "includeFiles": "mcp_server/widget.html"
     },
