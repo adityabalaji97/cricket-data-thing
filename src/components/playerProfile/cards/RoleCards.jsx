@@ -114,7 +114,7 @@ const ANGLE_LHB = { Behind: 0, Point: 45, Cover: 90, 'Long off': 135, 'Long on':
  * strike rate and red where slower (or the colours given). zones: [{zone 1-8, runs, strike_rate}]. Shared by the
  * profile's card and the query builder's answer for a by-scoring-zone question.
  */
-export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = RED }) => {
+export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = RED, catches, outline, labels }) => {
   const total = zones.reduce((a, z) => a + z.runs, 0);
   if (!total) return null;
   const left = hand === 'LHB';
@@ -147,28 +147,42 @@ export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = 
             </g>
           );
         })}
+        {/* The zone the scouting line points to (the fielder who matters), outlined on the wheel itself. */}
+        {outline && (() => {
+          const lab = ZONES_RHB[left ? MIRROR[outline] : outline];
+          const deg = left ? ANGLE_LHB[lab] : (360 - ANGLE_LHB[lab]) % 360;
+          const rad = ((deg - 90) * Math.PI) / 180; const r = R + 6;
+          const a1 = rad - (22.5 * Math.PI) / 180; const a2 = rad + (22.5 * Math.PI) / 180;
+          return <path d={`M${c},${c} L${c + r * Math.cos(a1)},${c + r * Math.sin(a1)} A${r},${r} 0 0 1 ${c + r * Math.cos(a2)},${c + r * Math.sin(a2)} Z`}
+            fill="none" stroke={colors.textHi} strokeWidth="2" strokeDasharray="4 3" />;
+        })()}
+        {/* Catches: where he was caught (or, for a bowler, where his catches were taken), on the feed's 0-363 grid, a
+            fixed view of the ground as the wheel draws it; the boundary is about 181 from the middle. */}
+        {(catches?.points || []).map((p, i) => {
+          const k = (R + 6) / 181;
+          const dx = (p.x - 181) * k; const dy = (p.y - 181) * k;
+          const d = Math.hypot(dx, dy); const lim = R + 4;
+          const s = d > lim ? lim / d : 1;
+          return <circle key={i} cx={c + dx * s} cy={c + dy * s} r={2.6 + Math.min(2, (p.n - 1) * 0.8)} fill="#ffffff"
+            fillOpacity="0.9" stroke={colors.bg} strokeWidth="1" />;
+        })}
         <rect x={c - 3} y={c - 9} width="6" height="18" rx="2" fill="#c9b27c" />
       </Box>
-      <Legend items={[[`Faster than his ${Math.round(strikeRate)}`, faster], ['Slower', slower]]} />
+      <Legend items={[[labels?.[0] || `Faster than his ${Math.round(strikeRate)}`, faster], [labels?.[1] || 'Slower', slower],
+        ...(catches?.points?.length ? [[`Caught · ${catches.plotted} of ${catches.total}`, '#ffffff']] : [])]} />
     </>
   );
 };
 
 /** Where he scores: the scoring wheel on the profile. */
-export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary }) => {
+export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, catches }) => {
   if (!zones.reduce((a, z) => a + z.runs, 0)) return null;
+  const left = hand === 'LHB';
+  const key = boundary ? ZONES_RHB[left ? MIRROR[boundary.key_zone] : boundary.key_zone].toLowerCase() : null;
   return (
-    <ProfileCard id="scoring" title="Where he scores" player={player} note={`Share of runs by area (${hand === 'LHB' ? 'left' : 'right'}-handed)`}>
-      <ScoringWheel zones={zones} hand={hand} strikeRate={strikeRate} />
-      {boundary && (
-        <Box sx={{ fontSize: 13, color: colors.textMed, lineHeight: 1.45, borderTop: `1px solid ${colors.border}`, pt: 1 }}>
-          {`Against pace short of full, ${boundary.leg_square}% of his boundary runs go square on the leg side `}
-          {`(${boundary.leg_square_avg}% for the average ${hand === 'LHB' ? 'left' : 'right'}-hander). `}
-          <Box component="span" sx={{ color: colors.textHi, fontWeight: 600 }}>
-            {`The fielder who matters: ${ZONES_RHB[hand === 'LHB' ? MIRROR[boundary.key_zone] : boundary.key_zone].toLowerCase()}, ${boundary.key_share}% of them.`}
-          </Box>
-        </Box>
-      )}
+    <ProfileCard id="scoring" title="Where he scores" player={player}
+      note={boundary ? `Outlined: the fielder who matters v pace, ${key} · ${boundary.key_share}%` : `Share of runs by area (${left ? 'left' : 'right'}-handed)`}>
+      <ScoringWheel zones={zones} hand={hand} strikeRate={strikeRate} catches={catches} outline={boundary?.key_zone} />
     </ProfileCard>
   );
 };
@@ -380,6 +394,34 @@ export const HandsCard = ({ player, hands }) => {
   );
 };
 
+/** Where batters score off him, one hand at a time (a switch), with his catches on the same wheel: wedge size the
+ * share of runs, colour faster or slower than batters of that hand go off him, dots where the catches were taken. */
+export const BowlerWheelCard = ({ player, byHand, catchesByHand }) => {
+  const hands = ['RHB', 'LHB'].filter((h) => byHand?.[h]);
+  const [pick, setPick] = useState(null);
+  if (!hands.length) return null;
+  const h = hands.includes(pick) ? pick : hands[0];
+  const d = byHand[h];
+  return (
+    <ProfileCard id="scoring-against" title="Where batters score off him" player={player}
+      note={`Share of runs by area · ${h === 'LHB' ? 'left' : 'right'}-handers`}>
+      {hands.length > 1 && (
+        <Box role="tablist" aria-label="Batter's hand" sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+          {hands.map((x) => (
+            <Box key={x} component="button" type="button" role="tab" aria-selected={x === h} onClick={() => setPick(x)}
+              sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
+                bgcolor: x === h ? colors.accent : 'transparent', color: x === h ? colors.bg : colors.textMed }}>
+              {x === 'RHB' ? 'Right-handers' : 'Left-handers'}
+            </Box>
+          ))}
+        </Box>
+      )}
+      <ScoringWheel zones={d.zones} hand={h} strikeRate={d.strike_rate} catches={catchesByHand?.[h]}
+        labels={[`Faster than ${Math.round(d.strike_rate)} off him`, 'Slower']} />
+    </ProfileCard>
+  );
+};
+
 /** What works against him: batters' strike rate with each shot against him, against their strike rate off him, with
  * balls per wicket beside it (a shot that scores fast and gets you out every 8 balls isn't simply "working"). */
 export const ShotsAgainstCard = ({ player, rows, srAgainst }) => {
@@ -423,7 +465,7 @@ export const RoleCardSet = ({ role, player, data, hand }) => {
         <GroupHead>How to bowl to him</GroupHead>
         <FamiliesCard player={player} families={data.families} strikeRate={data.strike_rate} />
         <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} />
-        {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} />}
+        {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} />}
         <ShotMixCard player={player} mix={data.shot_mix} hand={h} />
         <OutsCard player={player} rows={data.dismissals} />
       </>
@@ -433,6 +475,7 @@ export const RoleCardSet = ({ role, player, data, hand }) => {
     <>
       <GroupHead>How to bat against him</GroupHead>
       <PitchCard player={player} cells={data.cells} economy={data.economy} />
+      <BowlerWheelCard player={player} byHand={data.zones_by_hand} catchesByHand={data.catches_by_hand} />
       <ShotsAgainstCard player={player} rows={data.shots_against} srAgainst={data.strike_rate_against} />
       <PhaseCard player={player} phases={data.phases} />
       <HandsCard player={player} hands={data.hands} />

@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from services.player_verdict import ROLE_MIN_BALLS, default_window, scope_params
 from services.query_cache import cached_run
 
-CARDS_VERSION = "c2"  # c2: the scouting cards (PROFILE_SCOUTING_PLAN.md)
+CARDS_VERSION = "c3"  # c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels
 START_BALLS = 30          # the start card runs to the 30th ball of an innings
 FAMILY_MIN_BALLS = 40     # a bowling family with fewer balls is left off
 CELL_MIN_BALLS = 15       # a pitch-map cell with fewer balls is left blank
@@ -183,7 +183,27 @@ def scouting_batting(db, fmt: str, who: Dict[str, Any], base: Dict[str, Any]) ->
         top = sorted((k for k in shares if k not in NOT_SCORING), key=lambda k: -shares[k])[:6]
         shots = {"rows": [{"family": k, "share": round(shares[k], 1), "average": round(avg["shots"].get(k, 0), 1)} for k in top],
                  "runs": tagged}
-    return {"hand": hand, "pace_sr": pace_sr, "pace_cells": pace_cells, "boundary": boundary, "shot_mix": shots}
+    return {"hand": hand, "pace_sr": pace_sr, "pace_cells": pace_cells, "boundary": boundary, "shot_mix": shots,
+            "catches": catch_points(db, fmt, who)}
+
+
+def catch_points(db, fmt: str, who: Dict[str, Any], by_hand: bool = False):
+    """Where the catches were taken, on the feed's grid (a fixed view of the ground, as the scoring wheel draws it), and
+    how many catches there were in all: about half carry a position (58% in 2022, 43% in 2025-26). by_hand: per batter's
+    hand, for a bowler (his wheel has a right-/left-hander switch)."""
+    group = (["bat_hand"] if by_hand else []) + ["wagon_x", "wagon_y"]
+    rows = _q(db, fmt, group_by=group, dismissal=["caught"], **who)
+
+    def pack(rs):
+        pts = [{"x": int(r["wagon_x"]), "y": int(r["wagon_y"]), "n": int(r.get("wickets") or 0)}
+               for r in rs if r.get("wagon_x") is not None and (r.get("wickets") or 0) > 0
+               and not (int(r["wagon_x"]) == 0 and int(r["wagon_y"]) == 0)]
+        total = sum(int(r.get("wickets") or 0) for r in rs)
+        return {"points": pts, "plotted": sum(p["n"] for p in pts), "total": total}
+
+    if not by_hand:
+        return pack(rows)
+    return {h: pack([r for r in rows if r.get("bat_hand") == h]) for h in ("RHB", "LHB")}
 
 
 # ---- bowling ------------------------------------------------------------------------------------------------------
@@ -223,9 +243,21 @@ def bowling_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
                       "vs_all": round(100 * (r.get("runs") or 0) / r["balls"] - sr_off, 1)}
                      for r in _q(db, fmt, group_by=["shot_family"], **who)
                      if r.get("shot_family") and r["shot_family"] not in NOT_SCORING and (r.get("balls") or 0) >= SHOT_FAMILY_MIN]
+    # Where batters score off him, by their hand (his wheel has a switch), with his catches on it.
+    zones_by_hand = {}
+    for h in ("RHB", "LHB"):
+        zr = [{"zone": int(r["wagon_zone"]), "runs": r.get("runs") or 0, "balls": r.get("balls") or 0,
+               "strike_rate": _n(r.get("strike_rate"))}
+              for r in _q(db, fmt, group_by=["wagon_zone"], bat_hand=h, **who)
+              if r.get("wagon_zone") and 1 <= int(r["wagon_zone"]) <= 8]
+        hb = sum(z["balls"] for z in zr)
+        if hb >= 120:
+            zones_by_hand[h] = {"zones": zr, "strike_rate": round(100 * sum(z["runs"] for z in zr) / hb, 1) if hb else None}
     return {
         "balls": me.get("balls"), "economy": round(_econ(me), 2),
         "strike_rate_against": round(sr_off, 1),
+        "zones_by_hand": zones_by_hand,
+        "catches_by_hand": catch_points(db, fmt, who, by_hand=True),
         "shots_against": sorted(shots_against, key=lambda r: -r["vs_all"]),
         "cells": cells,
         "phases": sorted(phases, key=lambda r: ["powerplay", "middle", "death"].index(r["phase"])
