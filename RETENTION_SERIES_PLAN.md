@@ -18,12 +18,12 @@ One IPL franchise a day, one consistent carousel each, until the retention deadl
 | Date | Team | Why that day |
 |---|---|---|
 | Fri 6 Nov | SRH | The most settled squad after the window's trades (Natarajan in; Khaleel and Ellis for Livingstone and Edwards) |
-| Sat 7 Nov | DC | Both their trades done (Pant back; Kuldeep and Natarajan out) |
+| Sat 7 Nov | GT | Swapped in for DC: a settled squad (only a reported CSK interest in Sai Kishore) |
 | Sun 8 Nov | LSG | The other side of the Pant–Kuldeep trade |
 | Mon 9 Nov | RR | |
 | Tue 10 Nov | PBKS | |
-| Wed 11 Nov | GT | |
-| Thu 12 Nov | Spare | For news (a trade, a reported release) |
+| Wed 11 Nov | Spare | |
+| Thu 12 Nov | DC | Held: Axar (captain), Ashutosh and Rizvi in reported CSK talks (unconfirmed, 6 Nov). Axar is the big name |
 | Fri 13 Nov | CSK | Big four |
 | Sat 14 Nov | MI | Big four |
 | Sun 15 Nov | RCB | Big four |

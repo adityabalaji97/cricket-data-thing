@@ -35,8 +35,9 @@ TEAMS = {
     "MI": {"name": "Mumbai Indians", "short": "Mumbai", "tag": "#MumbaiIndians", "big": "Rohit Sharma"},
     "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli"},
     "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Andre Russell"},
-    "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Rishabh Pant"},
-    "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Kuldeep Yadav"},
+    # A player just traded in isn't a retention call, so a side's big name is one it already had (Pant, Kuldeep moved).
+    "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel"},  # captain
+    "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Nicholas Pooran"},
     "SRH": {"name": "Sunrisers Hyderabad", "short": "Hyderabad", "tag": "#SRH", "big": "Pat Cummins"},
     "RR": {"name": "Rajasthan Royals", "short": "Rajasthan", "tag": "#RR", "big": "Yashasvi Jaiswal"},
     "PBKS": {"name": "Punjab Kings", "short": "Punjab", "tag": "#PBKS", "big": "Shreyas Iyer"},
@@ -95,15 +96,49 @@ def price_cr(s):
     return 0.0
 
 
-def squad(code):
+def resolve(db, name):
+    """The name the ball-by-ball knows a squad player by. The auction file's spelling can be one the alias groups only
+    reach in two hops ("Ravisrinivasan Sai Kishore" -> "R Sai Kishore" -> "Sai Kishore"), and a query on the first
+    spelling finds no balls, which left GT's spinner off every slide."""
+    if db is None:
+        return name
+    from sqlalchemy import text
+
+    from services.player_aliases import expand_name_group
+
+    names = set(expand_name_group([name], db))
+    names |= set(expand_name_group(sorted(names), db))
+    known = db.execute(text("SELECT display_name FROM player_identity WHERE display_name = ANY(:n)"), {"n": sorted(names)}).scalars().all()
+    if name in known:
+        return name
+    # Two hops through initials can reach a different player ("Smaran Ravichandran" -> "S Ravichandran" ->
+    # "Sabaorish Ravichandran"), so a match must be the same name spelt another way: every word of the shorter name
+    # close to a word of the other (Mohammed/Mohammad Shami, Sai Kishore in Ravisrinivasan Sai Kishore).
+    from difflib import SequenceMatcher
+
+    def same(a, b):
+        wa, wb = a.lower().split(), b.lower().split()
+        short_, long_ = (wa, wb) if len(wa) <= len(wb) else (wb, wa)
+        return all(max(SequenceMatcher(None, w, x).ratio() for x in long_) >= 0.75 for w in short_)
+
+    fits = sorted(k for k in known if same(name, k))
+    return fits[0] if len(fits) == 1 else name
+
+
+def squad(code, db=None):
     rows = [r for r in csv.DictReader(open(SQUADS)) if r["auctionStatus"] != "unsold"]
-    out = {r["playerName"]: {"name": r["playerName"], "role": r["role"], "price": price_cr(r["auctionPrice"]),
-                             "overseas": r["isPlayerOverseas"] == "True"} for r in rows if r["playsForTeam"] == code}
+    out = {}
+    for r in rows:
+        if r["playsForTeam"] != code:
+            continue
+        n = resolve(db, r["playerName"])
+        out[n] = {"name": n, "role": r["role"], "price": price_cr(r["auctionPrice"]), "overseas": r["isPlayerOverseas"] == "True"}
     for name, frm, to, sal in TRADES:
         if frm == code:
-            out.pop(name, None)
+            out.pop(resolve(db, name), None)
         if to == code:
             base = next((r for r in rows if r["playerName"] == name), {})
+            name = resolve(db, name)
             out[name] = {"name": name, "role": base.get("role", ""), "price": sal, "overseas": base.get("isPlayerOverseas") == "True", "traded_in": frm}
     return out
 
@@ -131,7 +166,7 @@ def build(db, code):
     T = TEAMS[code]
     team = T["name"]
     colour = PALETTE[team]["primary"]
-    sq = squad(code)
+    sq = squad(code, db)
     names = list(sq)
     bat, bowl, pos, kind, phase = numbers(db, names)
     players = []
@@ -210,7 +245,7 @@ def build(db, code):
     below = sum(1 for p in played if p["wpa"] <= 0)
     board_title = f"{T['short']}'s squad by wins added since the mega auction: {top['name']} leads ({sg(top['wpa'])})"
     if len(board_title) > 80:
-        board_title = f"{T['short']}'s squad by wins added since the mega auction: {short(top['name'])} leads ({sg(top['wpa'])})"
+        board_title = f"{T['short']}'s squad by wins added since the mega auction: {called(top['name'])} leads ({sg(top['wpa'])})"
     lead = card("board", "squad_board", board_title,
                 {"colour": colour, "format": "signed2", "groups": groups,
                  "note": " · ".join(x for x in [
@@ -272,8 +307,12 @@ def build(db, code):
     big = next((p for p in played if p["name"] == T["big"]), max(played, key=lambda p: p["price"]))
     pool = [p for p in played if p is not big and not p.get("traded_in")]  # a player just traded in isn't a retention call
     under = max([p for p in pool if p["wpa"] < 0] or pool, key=lambda p: p["price"])
-    bargain = max([p for p in pool if p is not under and p["price"] <= 1.0] or [p for p in pool if p is not under],
-                  key=lambda p: p["wpa"])
+    # The bargain: the most wins added for ₹1 crore or less; when nobody that cheap added any (GT, Nov 2026: Kushagra at
+    # −0.07), the best for ₹4 crore or less, so "the bargain" is never a player the numbers argue against.
+    rest = [p for p in pool if p is not under]
+    bargain = max([p for p in rest if p["price"] <= 1.0] or rest, key=lambda p: p["wpa"])
+    if bargain["wpa"] <= 0:
+        bargain = max([p for p in rest if p["price"] <= 4.0] or rest, key=lambda p: p["wpa"])
     trio = [big, under, bargain]
     c5 = card("value", "scatter_plus",
               f"{short(under['name'])} cost {crore(under['price'])} for {sg(under['wpa'])} wins. {short(bargain['name'])}: {crore(bargain['price'])}, {sg(bargain['wpa'])}",
