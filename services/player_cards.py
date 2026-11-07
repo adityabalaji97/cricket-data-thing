@@ -272,44 +272,105 @@ def bowling_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
 KIND_CODES = {"pace": ["pace bowler"], "spin": ["spin bowler"]}
 
 
-def wheel(db, player: str, role: str, fmt: str = "T20", scope: str = "strong", period: str = "recent",
-          start_date: Optional[date] = None, end_date: Optional[date] = None, phase: Optional[str] = None,
-          kind: Optional[str] = None, family: Optional[str] = None, hand: Optional[str] = None) -> Dict[str, Any]:
-    """One wheel's zones and catches for the card's own filters: a phase, pace or spin, or one bowling family (a
-    batter's wheel), or the batter's hand (a bowler's). Same window and scope as the page; cached per filter."""
+def _filters(fmt: str, phase: Optional[str], kind: Optional[str], family: Optional[str], hand: Optional[str]) -> Dict[str, Any]:
+    """A card's own filters as query-builder arguments: a phase, pace or spin (or one bowling family), the batter's hand."""
     from services.analytics_common import phase_bounds
 
+    f: Dict[str, Any] = {}
+    if phase:
+        ph = next((p for p in phase_bounds(fmt, "male") if p.key == phase), None)
+        if ph:
+            f["over_min"] = ph.start_over
+            if ph.end_over is not None:
+                f["over_max"] = ph.end_over
+    if family:
+        f["bowl_style"] = [code for code, fam in FAMILIES.items() if fam == family]
+    elif kind in KIND_CODES:
+        f["bowl_kind"] = KIND_CODES[kind]
+    if hand in ("RHB", "LHB"):
+        f["bat_hand"] = hand
+    return f
+
+
+def card_slice(db, player: str, card: str, fmt: str = "T20", scope: str = "strong", period: str = "recent",
+               start_date: Optional[date] = None, end_date: Optional[date] = None, phase: Optional[str] = None,
+               kind: Optional[str] = None, family: Optional[str] = None, hand: Optional[str] = None) -> Dict[str, Any]:
+    """One profile card's numbers under the card's own filter (the sliders icon), in the page's window and scope:
+    wheel_bat / wheel_bowl (zones and catches), pace_map, shot_mix (and the average batter under the same filter),
+    pitch (the bowler's line and length), shots_against. Cached per card and filter."""
     def run():
         start, end = default_window(fmt, period=period)
         base = {"start_date": start_date or start, "end_date": end_date or end, **scope_params(fmt, scope)}
-        who = (dict(batters=[player], metrics_perspective="batting") if role == "bat"
-               else dict(bowlers=[player], metrics_perspective="bowling"))
-        if phase:
-            ph = next((p for p in phase_bounds(fmt, "male") if p.key == phase), None)
-            if ph:
-                who["over_min"] = ph.start_over
-                if ph.end_over is not None:
-                    who["over_max"] = ph.end_over
-        if family:
-            who["bowl_style"] = [code for code, fam in FAMILIES.items() if fam == family]
-        elif kind in KIND_CODES:
-            who["bowl_kind"] = KIND_CODES[kind]
-        if hand in ("RHB", "LHB"):
-            who["bat_hand"] = hand
-        zr = [{"zone": int(r["wagon_zone"]), "runs": r.get("runs") or 0, "balls": r.get("balls") or 0,
-               "strike_rate": _n(r.get("strike_rate"))}
-              for r in _q(db, fmt, group_by=["wagon_zone"], **who, **base) if r.get("wagon_zone") and 1 <= int(r["wagon_zone"]) <= 8]
-        balls = sum(z["balls"] for z in zr)
-        return {"zones": zr, "balls": balls,
-                "strike_rate": round(100 * sum(z["runs"] for z in zr) / balls, 1) if balls else None,
-                "catches": catch_points(db, fmt, {**who, **base})}
+        flt = _filters(fmt, phase, kind, family, hand)
+        bat = dict(metrics_perspective="batting", **base, **flt)
+        if card in ("wheel_bat", "wheel_bowl"):
+            who = {"batters": [player]} if card == "wheel_bat" else {"bowlers": [player], "metrics_perspective": "bowling"}
+            q = {**bat, **who}
+            zr = [{"zone": int(r["wagon_zone"]), "runs": r.get("runs") or 0, "balls": r.get("balls") or 0,
+                   "strike_rate": _n(r.get("strike_rate"))}
+                  for r in _q(db, fmt, group_by=["wagon_zone"], **q) if r.get("wagon_zone") and 1 <= int(r["wagon_zone"]) <= 8]
+            balls = sum(z["balls"] for z in zr)
+            return {"zones": zr, "balls": balls, "strike_rate": round(100 * sum(z["runs"] for z in zr) / balls, 1) if balls else None,
+                    "catches": catch_points(db, fmt, q)}
+        if card == "pace_map":
+            q = {**bat, "batters": [player], **PACE}
+            me = _q(db, fmt, group_by=["batter"], **q)
+            pace_sr = _n(me[0].get("strike_rate")) if me else None
+            cells = [{"line": r["line"], "length": r["length"], "balls": r.get("balls") or 0,
+                      "strike_rate": round(_n(r.get("strike_rate")) or 0, 1), "outs": r.get("wickets") or 0}
+                     for r in _q(db, fmt, group_by=["line", "length"], **q)
+                     if r.get("line") and r.get("length") and (r.get("balls") or 0) >= PACE_CELL_MIN] if pace_sr else []
+            return {"pace_sr": pace_sr, "pace_cells": cells, "balls": (me[0].get("balls") if me else 0)}
+        if card == "shot_mix":
+            rows = _q(db, fmt, group_by=["shot_family"], batters=[player], **bat)
+            shares = _family_run_shares(rows)
+            tagged = sum(r.get("runs") or 0 for r in rows if r.get("shot_family"))
+            hands = _q(db, fmt, group_by=["bat_hand"], batters=[player], metrics_perspective="batting", **base)
+            h = max(hands, key=lambda r: r.get("balls") or 0)["bat_hand"] if hands else "RHB"
+            avg = _family_run_shares(_q(db, fmt, group_by=["shot_family"], **{**bat, "bat_hand": h}))
+            if not shares or tagged < 60:
+                return {"shot_mix": None, "balls": sum(r.get("balls") or 0 for r in rows)}
+            top = sorted((k for k in shares if k not in NOT_SCORING), key=lambda k: -shares[k])[:6]
+            return {"shot_mix": {"rows": [{"family": k, "share": round(shares[k], 1), "average": round(avg.get(k, 0), 1)} for k in top],
+                                 "runs": tagged}, "balls": sum(r.get("balls") or 0 for r in rows)}
+        bowl = dict(bowlers=[player], metrics_perspective="bowling", **base, **flt)
+        if card == "pitch":
+            me = _q(db, fmt, group_by=["bowler"], **bowl)
+            if not me:
+                return {"cells": [], "economy": None, "balls": 0}
+            cells = [{"line": r["line"], "length": r["length"], "balls": r.get("balls") or 0, "runs": r.get("runs") or 0,
+                      "economy": round(_econ(r), 2), "wickets": r.get("wickets") or 0}
+                     for r in _q(db, fmt, group_by=["line", "length"], **bowl)
+                     if r.get("line") and r.get("length") and (r.get("balls") or 0) >= CELL_MIN_BALLS]
+            return {"cells": cells, "economy": round(_econ(me[0]), 2), "balls": me[0].get("balls")}
+        if card == "shots_against":
+            me = _q(db, fmt, group_by=["bowler"], **bowl)
+            if not me or not me[0].get("balls"):
+                return {"shots_against": [], "strike_rate_against": None, "balls": 0}
+            sr_off = 100 * (me[0].get("runs") or 0) / me[0]["balls"]
+            rows = [{"family": r["shot_family"], "balls": r.get("balls") or 0, "runs": r.get("runs") or 0,
+                     "wickets": r.get("wickets") or 0, "strike_rate": round(100 * (r.get("runs") or 0) / r["balls"], 1),
+                     "vs_all": round(100 * (r.get("runs") or 0) / r["balls"] - sr_off, 1)}
+                    for r in _q(db, fmt, group_by=["shot_family"], **bowl)
+                    if r.get("shot_family") and r["shot_family"] not in NOT_SCORING and (r.get("balls") or 0) >= SHOT_FAMILY_MIN]
+            return {"shots_against": sorted(rows, key=lambda r: -r["vs_all"]), "strike_rate_against": round(sr_off, 1),
+                    "balls": me[0]["balls"]}
+        raise ValueError(f"unknown card {card!r}")
 
-    key = {"kind": "player_wheel", "v": CARDS_VERSION, "player": player.strip().lower(), "role": role, "fmt": fmt,
+    key = {"kind": "player_card_slice", "v": CARDS_VERSION, "player": player.strip().lower(), "card": card, "fmt": fmt,
            "scope": scope, "period": period, "start_date": start_date, "end_date": end_date, "phase": phase,
            "bowl": family or kind, "hand": hand}
     if end_date is None:
         key["day"] = date.today()
     return cached_run(db, key, run)
+
+
+def wheel(db, player: str, role: str, fmt: str = "T20", scope: str = "strong", period: str = "recent",
+          start_date: Optional[date] = None, end_date: Optional[date] = None, phase: Optional[str] = None,
+          kind: Optional[str] = None, family: Optional[str] = None, hand: Optional[str] = None) -> Dict[str, Any]:
+    """The wheel cards' filter (kept for the /wheel route): card_slice's wheel_bat / wheel_bowl."""
+    return card_slice(db, player, "wheel_bat" if role == "bat" else "wheel_bowl", fmt, scope, period, start_date,
+                      end_date, phase, kind, family, hand)
 
 
 # ---- the call -----------------------------------------------------------------------------------------------------

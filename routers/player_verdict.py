@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.player_cards import CardsBusy, get_cards, wheel
+from services.player_cards import CardsBusy, card_slice, get_cards, wheel
 from services.player_verdict import PoolsCold, SummaryBusy, get_summary
 
 router = APIRouter(tags=["player"])
@@ -110,5 +110,27 @@ def player_wheel(
     """A scoring wheel with its own filters, for the gear on the profile's wheel cards: zones (runs, balls, strike
     rate) and catches, in the page's window and scope."""
     out = wheel(db, player_name, role, format, scope, period, start_date, end_date, phase, kind, family, hand)
+    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    return out
+
+
+@router.get("/player/{player_name}/slice")
+def player_card_slice(
+    response: Response,
+    player_name: str = Path(..., description="Any spelling of the player's name"),
+    card: Literal["wheel_bat", "wheel_bowl", "pace_map", "shot_mix", "pitch", "shots_against"] = Query(...),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    scope: Literal["strong", "all"] = Query(default="strong"),
+    period: Literal["recent", "career"] = Query(default="recent"),
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    phase: Optional[Literal["powerplay", "middle", "death"]] = Query(default=None),
+    kind: Optional[Literal["pace", "spin"]] = Query(default=None),
+    family: Optional[str] = Query(default=None),
+    hand: Optional[Literal["RHB", "LHB"]] = Query(default=None),
+    db: Session = Depends(get_session),
+):
+    """One profile card's numbers under its own filter (the sliders icon on the card), in the page's window and scope."""
+    out = card_slice(db, player_name, card, format, scope, period, start_date, end_date, phase, kind, family, hand)
     response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
     return out

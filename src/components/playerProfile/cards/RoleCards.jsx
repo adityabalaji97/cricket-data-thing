@@ -182,9 +182,12 @@ const PHASE_OPTS = [['', 'All overs'], ['powerplay', 'Powerplay'], ['middle', 'M
 const BOWL_OPTS = [['', 'All bowling'], ['kind:pace', 'Pace'], ['kind:spin', 'Spin'],
   ...['Right-arm pace', 'Left-arm pace', 'Off-spin', 'Leg-spin', 'Left-arm orthodox', 'Left-arm wrist spin'].map((f) => [`family:${f}`, f])];
 const PHASE_WORDS = { powerplay: 'powerplay', middle: 'middle overs', death: 'death overs' };
+const HAND_OPTS = [['', 'All batters'], ['RHB', 'Right-handers'], ['LHB', 'Left-handers']];
+const HAND_WORDS = { RHB: 'right-handers', LHB: 'left-handers' };
 
 /** The filter's words for the card's note, so a screenshot says what it shows ("Spin · death overs"). */
-const filterWords = (f) => [f.bowl ? f.bowl.split(':')[1] : null, f.phase ? PHASE_WORDS[f.phase] : null].filter(Boolean)
+const filterWords = (f) => [f.bowl ? f.bowl.split(':')[1] : null, f.hand ? HAND_WORDS[f.hand] : null,
+  f.phase ? PHASE_WORDS[f.phase] : null].filter(Boolean)
   .map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' · ');
 
 const Pill = ({ on, onClick, children }) => (
@@ -210,12 +213,17 @@ const FilterIcon = ({ open, active, onClick }) => (
   </Box>
 );
 
-/** The panel the icon opens: phase always; bowling for a batter's card. Clear sits with the choices. */
-const FilterPanel = ({ filter, setFilter, bowling }) => (
+/** The panel the icon opens: phase always; bowling for a batter's card, the batter's hand for a bowler's. "All ..." clears. */
+const FilterPanel = ({ filter, setFilter, bowling, hands }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, p: 1, borderRadius: '12px', bgcolor: colors.surface2 }}>
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
       {PHASE_OPTS.map(([v, l]) => <Pill key={l} on={filter.phase === v} onClick={() => setFilter({ ...filter, phase: v })}>{l}</Pill>)}
     </Box>
+    {hands && (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {HAND_OPTS.map(([v, l]) => <Pill key={l} on={(filter.hand || '') === v} onClick={() => setFilter({ ...filter, hand: v })}>{l}</Pill>)}
+      </Box>
+    )}
     {bowling && (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
         {BOWL_OPTS.map(([v, l]) => <Pill key={l} on={filter.bowl === v} onClick={() => setFilter({ ...filter, bowl: v })}>{l}</Pill>)}
@@ -226,27 +234,29 @@ const FilterPanel = ({ filter, setFilter, bowling }) => (
 
 /** A card's filter state: the choices, whether the panel is open, and the icon for the card's header. */
 const useCardFilter = () => {
-  const [filter, setFilter] = useState({ phase: '', bowl: '' });
+  const [filter, setFilter] = useState({ phase: '', bowl: '', hand: '' });
   const [open, setOpen] = useState(false);
-  const active = !!(filter.phase || filter.bowl);
+  const active = !!(filter.phase || filter.bowl || filter.hand);
   return { filter, setFilter, open, active, icon: <FilterIcon open={open} active={active} onClick={() => setOpen((o) => !o)} /> };
 };
 
-/** The filtered wheel's numbers (GET /player/{name}/wheel), only when a filter is on; null otherwise. */
-const useWheel = (player, role, query, filter, hand) => {
+/** A card's numbers under its own filter (GET /player/{name}/slice), only when a filter is on; null otherwise.
+ * `fixedHand`: a hand the card itself sets (the bowler's wheel switch), sent with the filter. */
+const useSlice = (player, card, query, filter, fixedHand) => {
   const [state, setState] = useState({ key: null, data: null, loading: false });
-  const on = !!(filter.phase || filter.bowl);
+  const on = !!(filter.phase || filter.bowl || filter.hand);
   const params = new URLSearchParams(query || '');
-  params.set('role', role);
+  params.set('card', card);
   if (filter.phase) params.set('phase', filter.phase);
   if (filter.bowl) { const [k, v] = filter.bowl.split(':'); params.set(k === 'kind' ? 'kind' : 'family', v); }
+  const hand = filter.hand || fixedHand;
   if (hand) params.set('hand', hand);
   const key = on ? params.toString() : null;
   useEffect(() => {
     if (!key) return undefined;
     let cancelled = false;
-    setState((s) => ({ ...s, loading: true }));
-    fetch(`${config.API_URL}/player/${encodeURIComponent(player)}/wheel?${key}`)
+    setState((st) => ({ ...st, loading: true }));
+    fetch(`${config.API_URL}/player/${encodeURIComponent(player)}/slice?${key}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data) => { if (!cancelled) setState({ key, data, loading: false }); })
       .catch(() => { if (!cancelled) setState({ key, data: null, loading: false }); });
@@ -258,7 +268,7 @@ const useWheel = (player, role, query, filter, hand) => {
 export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, catches, query }) => {
   const cf = useCardFilter();
   const { filter } = cf;
-  const f = useWheel(player, 'bat', query, filter);
+  const f = useSlice(player, 'wheel_bat', query, filter);
   if (!zones.reduce((a, z) => a + z.runs, 0)) return null;
   const left = hand === 'LHB';
   const on = !!(filter.phase || filter.bowl);
@@ -325,16 +335,19 @@ const PACE_LENGTH_NAMES = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good',
 
 /** Where to bowl to him (pace): his strike rate in each line and length against his strike rate against pace;
  * lime where he scores faster, red slower; the slowest cell with 40+ balls outlined. */
-export const PaceMapCard = ({ player, cells, paceSr }) => {
+const PaceMapView = ({ player, cells, paceSr, action, panel, filtered, noteOverride }) => {
   const by = useMemo(() => Object.fromEntries((cells || []).map((c) => [`${c.line}|${c.length}`, c])), [cells]);
   const lengths = PACE_LENGTHS.filter((l) => PACE_LINES.filter((ln) => by[`${ln}|${l}`]).length > 1);
-  if (!paceSr || lengths.length < 2) return null;
+  if (!paceSr || lengths.length < 2) {
+    return filtered ? <ProfileCard id="pace-map" title="Where to bowl to him (pace)" player={player} action={action} note={noteOverride}>{panel}<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box></ProfileCard> : null;
+  }
   const shown = (cells || []).filter((c) => lengths.includes(c.length));
   const tight = shown.filter((c) => c.balls >= 40).reduce((a, b) => (!a || b.strike_rate < a.strike_rate ? b : a), null);
   const cw = 58; const ch = 44; const L = 92; const W = L + cw * 4 + 4; const H = 24 + ch * lengths.length + 20;
   return (
-    <ProfileCard id="pace-map" title="Where to bowl to him (pace)" player={player}
-      note={`Strike rate, against his ${Math.round(paceSr)} v pace · 20+ balls a cell`}>
+    <ProfileCard id="pace-map" title="Where to bowl to him (pace)" player={player} action={action}
+      note={noteOverride || `Strike rate, against his ${Math.round(paceSr)} v pace · 20+ balls a cell`}>
+      {panel}
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
         aria-label={shown.map((c) => `${PACE_LENGTH_NAMES[c.length]} ${c.line}: strike rate ${c.strike_rate}`).join('; ')}>
         {lengths.map((l, i) => (
@@ -371,12 +384,15 @@ const SHOT_NAMES = { DRIVE: 'Drives', FLICK_GLANCE: 'Flicks and glances', PULL_H
   CUT: 'Cuts', SLOG: 'Slogs', SWEEP: 'Sweeps', RAMP_SCOOP: 'Ramps and scoops', REVERSE: 'Reverse sweeps' };
 
 /** How he scores: his main scoring shots' share of his runs, against the average batter of his hand. */
-export const ShotMixCard = ({ player, mix, hand }) => {
-  if (!mix?.rows?.length) return null;
+const ShotMixView = ({ player, mix, hand, action, panel, filtered, noteOverride }) => {
+  if (!mix?.rows?.length) {
+    return filtered ? <ShotMixShell player={player} action={action} note={noteOverride}>{panel}<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box></ShotMixShell> : null;
+  }
   const max = Math.max(...mix.rows.flatMap((r) => [r.share, r.average]), 1);
   return (
-    <ProfileCard id="shot-mix" title="How he scores" player={player}
-      note={`Share of his runs, v the average ${hand === 'LHB' ? 'left' : 'right'}-hander`}>
+    <ProfileCard id="shot-mix" title="How he scores" player={player} action={action}
+      note={noteOverride || `Share of his runs, v the average ${hand === 'LHB' ? 'left' : 'right'}-hander`}>
+      {panel}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
         {mix.rows.map((r) => (
           <Box key={r.family} sx={{ display: 'grid', gridTemplateColumns: '128px 1fr 74px', alignItems: 'center', gap: 1 }}>
@@ -406,14 +422,17 @@ const LENGTHS = ['YORKER', 'FULL', 'GOOD_LENGTH', 'SHORT_OF_A_GOOD_LENGTH', 'SHO
 const LENGTH_NAMES = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
 
 /** Economy by line and length (to all batters), against his own economy: cheaper in lime, dearer in red. */
-export const PitchCard = ({ player, cells, economy }) => {
+const PitchView = ({ player, cells, economy, action, panel, filtered, noteOverride }) => {
   const by = useMemo(() => Object.fromEntries((cells || []).map((c) => [`${c.line}|${c.length}`, c])), [cells]);
   const lengths = LENGTHS.filter((l) => LINES.some((ln) => by[`${ln}|${l}`]));
-  if (!lengths.length) return null;
+  if (!lengths.length) {
+    return filtered ? <ProfileCard id="pitch" title="Where he bowls" player={player} action={action} note={noteOverride}>{panel}<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box></ProfileCard> : null;
+  }
   const cheapest = (cells || []).filter((c) => c.balls >= 40).reduce((a, b) => (!a || b.economy < a.economy ? b : a), null);
   const cw = 58; const ch = 44; const L = 92; const W = L + cw * 4 + 4; const H = 24 + ch * lengths.length + 20;
   return (
-    <ProfileCard id="pitch" title="Where he bowls" player={player} note="Runs an over · 15+ balls a cell">
+    <ProfileCard id="pitch" title="Where he bowls" player={player} action={action} note={noteOverride || 'Runs an over · 15+ balls a cell'}>
+      {panel}
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
         aria-label={(cells || []).map((c) => `${LENGTH_NAMES[c.length] || c.length} ${c.line}: ${c.economy}`).join('; ')}>
         {lengths.map((l, i) => (
@@ -494,7 +513,7 @@ export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
   const cf = useCardFilter();
   const { filter } = cf;
   const h = hands.includes(pick) ? pick : hands[0];
-  const f = useWheel(player, 'bowl', query, filter, h);
+  const f = useSlice(player, 'wheel_bowl', query, filter, h);
   if (!hands.length) return null;
   const on = !!filter.phase;
   const base = byHand[h];
@@ -528,13 +547,16 @@ export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
 
 /** What works against him: batters' strike rate with each shot against him, against their strike rate off him, with
  * balls per wicket beside it (a shot that scores fast and gets you out every 8 balls isn't simply "working"). */
-export const ShotsAgainstCard = ({ player, rows, srAgainst }) => {
-  if (!rows?.length || srAgainst == null) return null;
+const ShotsAgainstView = ({ player, rows, srAgainst, action, panel, filtered, noteOverride }) => {
+  if (!rows?.length || srAgainst == null) {
+    return filtered ? <ProfileCard id="shots-against" title="What works against him" player={player} action={action} note={noteOverride}>{panel}<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box></ProfileCard> : null;
+  }
   const top = rows.slice(0, 7);
   const max = Math.max(...top.map((r) => Math.abs(r.vs_all)), 1);
   return (
-    <ProfileCard id="shots-against" title="What works against him" player={player}
-      note={`Batters' strike rate by shot, v ${Math.round(srAgainst)} off him`}>
+    <ProfileCard id="shots-against" title="What works against him" player={player} action={action}
+      note={noteOverride || `Batters' strike rate by shot, v ${Math.round(srAgainst)} off him`}>
+      {panel}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.9 }}>
         {top.map((r, i) => (
           <Box key={r.family} sx={{ display: 'grid', gridTemplateColumns: '136px 1fr 40px', alignItems: 'center', gap: 1 }}>
@@ -558,6 +580,67 @@ export const ShotsAgainstCard = ({ player, rows, srAgainst }) => {
   );
 };
 
+const ShotMixShell = ({ player, action, note, children }) => (
+  <ProfileCard id="shot-mix" title="How he scores" player={player} action={action} note={note}>{children}</ProfileCard>
+);
+
+/** A card wrapper: its filter (icon and panel), the filtered numbers when it's on, the card's own view drawing them. */
+const Filtered = ({ on, loading, children }) => <Box sx={{ opacity: on && loading ? 0.5 : 1, transition: 'opacity 150ms' }}>{children}</Box>;
+
+export const PaceMapCard = ({ player, cells, paceSr, query }) => {
+  const cf = useCardFilter();
+  const f = useSlice(player, 'pace_map', query, cf.filter);
+  const d = cf.active && f.data ? { cells: f.data.pace_cells, sr: f.data.pace_sr } : { cells, sr: paceSr };
+  return (
+    <Filtered on={cf.active} loading={f.loading}>
+      <PaceMapView player={player} cells={d.cells} paceSr={d.sr} action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} />}
+        noteOverride={cf.active ? `${filterWords(cf.filter)} · against his ${d.sr ? Math.round(d.sr) : '–'} v pace` : null} />
+    </Filtered>
+  );
+};
+
+export const ShotMixCard = ({ player, mix, hand, query }) => {
+  const cf = useCardFilter();
+  const f = useSlice(player, 'shot_mix', query, cf.filter);
+  const m = cf.active && f.data ? f.data.shot_mix : mix;
+  if (!cf.active && !mix?.rows?.length) return null;
+  return (
+    <Filtered on={cf.active} loading={f.loading}>
+      <ShotMixView player={player} mix={m} hand={hand} action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} bowling />}
+        noteOverride={cf.active ? `${filterWords(cf.filter)} · v the average ${hand === 'LHB' ? 'left' : 'right'}-hander` : null} />
+    </Filtered>
+  );
+};
+
+export const PitchCard = ({ player, cells, economy, query }) => {
+  const cf = useCardFilter();
+  const f = useSlice(player, 'pitch', query, cf.filter);
+  const d = cf.active && f.data ? { cells: f.data.cells, econ: f.data.economy } : { cells, econ: economy };
+  return (
+    <Filtered on={cf.active} loading={f.loading}>
+      <PitchView player={player} cells={d.cells} economy={d.econ ?? economy} action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} hands />}
+        noteOverride={cf.active ? `${filterWords(cf.filter)} · runs an over, his ${d.econ != null ? d.econ.toFixed(1) : '–'}` : null} />
+    </Filtered>
+  );
+};
+
+export const ShotsAgainstCard = ({ player, rows, srAgainst, query }) => {
+  const cf = useCardFilter();
+  const f = useSlice(player, 'shots_against', query, cf.filter);
+  const d = cf.active && f.data ? { rows: f.data.shots_against, sr: f.data.strike_rate_against } : { rows, sr: srAgainst };
+  if (!cf.active && (!rows?.length || srAgainst == null)) return null;
+  return (
+    <Filtered on={cf.active} loading={f.loading}>
+      <ShotsAgainstView player={player} rows={d.rows} srAgainst={d.sr} action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} hands />}
+        noteOverride={cf.active ? `${filterWords(cf.filter)} · v ${d.sr != null ? Math.round(d.sr) : '–'} off him` : null} />
+    </Filtered>
+  );
+};
+
 /** The batter's or bowler's four cards. */
 export const RoleCardSet = ({ role, player, data, hand, query }) => {
   if (!data) return null;
@@ -568,9 +651,9 @@ export const RoleCardSet = ({ role, player, data, hand, query }) => {
         {data.start?.points?.length > 1 && <StartCard player={player} start={data.start} />}
         <GroupHead>How to bowl to him</GroupHead>
         <FamiliesCard player={player} families={data.families} strikeRate={data.strike_rate} />
-        <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} />
+        <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} query={query} />
         {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} query={query} />}
-        <ShotMixCard player={player} mix={data.shot_mix} hand={h} />
+        <ShotMixCard player={player} mix={data.shot_mix} hand={h} query={query} />
         <OutsCard player={player} rows={data.dismissals} />
       </>
     );
@@ -578,9 +661,9 @@ export const RoleCardSet = ({ role, player, data, hand, query }) => {
   return (
     <>
       <GroupHead>How to bat against him</GroupHead>
-      <PitchCard player={player} cells={data.cells} economy={data.economy} />
+      <PitchCard player={player} cells={data.cells} economy={data.economy} query={query} />
       <BowlerWheelCard player={player} byHand={data.zones_by_hand} catchesByHand={data.catches_by_hand} query={query} />
-      <ShotsAgainstCard player={player} rows={data.shots_against} srAgainst={data.strike_rate_against} />
+      <ShotsAgainstCard player={player} rows={data.shots_against} srAgainst={data.strike_rate_against} query={query} />
       <PhaseCard player={player} phases={data.phases} />
       <HandsCard player={player} hands={data.hands} />
       <OutsCard player={player} rows={data.wickets} bowling />
