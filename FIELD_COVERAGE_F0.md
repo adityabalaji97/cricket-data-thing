@@ -52,3 +52,37 @@ cut. But the noise grows as the sample shrinks (about 0.2 at 250 balls), and som
    fast). That's both the standard field and the comparison.
 5. **Expect most suggestions to be small tweaks:** one or two fielders moved from standard. Present it that way: "the
    field for him: standard, but square leg back for the pull", not a dramatic reset.
+
+---
+
+# F1–F2: the solver and its out-of-sample test (7 Nov 2026)
+
+`services/field_model.py` (solver, unit-tested: the fielding rules are kept, a square hitter gets square riders, a thin
+cut stays standard), `articles/fields/prototype.py` (Rohit and Livingstone, six cuts, drawn as fields).
+
+**In sample, the fields look right and gain 0–12%.**
+- Sweep catchers against spin: Rohit gets short fine leg and fine leg; Livingstone gets deep backward square.
+- A pace-powerplay cordon; five on the rope at the death.
+
+**Out of sample, they don't beat the standard field.** Each field was fitted on 2023–24 and scored, with the standard
+field for the cut, on 2025–26 (`scripts/analysis/field_holdout.py`, 9 cuts across Rohit, Livingstone, Pooran and Kohli):
+
+| Settings | Mean gain v standard | Beats it | Worst | Best |
+|---|---|---|---|---|
+| As built (k 200, catches worth a wicket) | −4.7% | 3/9 | −25% | +8% |
+| k 600, smoothed ±20° | −1.8% | 2/9 | −14% | +13% |
+| k 1500, smoothed ±20° | −2.3% | 1/9 | −14% | +2% |
+| Runs only (no catches), k 600, smoothed | +0.4% | 3/9 | −8% | +9% |
+
+**Why:**
+- A batter's direction profile moves year to year as much as it differs from the average (F0).
+- Catches are rare but each is worth a wicket, so the solver chases a few lucky ones.
+- The solver is unstable: near-identical profiles give quite different fields.
+- **The standard field, fitted on hundreds of thousands of balls, is close to optimal for almost every batter.**
+
+**Decision for the user:** don't ship personal suggested fields (F3/F4 as planned). They would claim a precision the
+data doesn't have. What holds up instead:
+1. The descriptive wheel and its filters (live).
+2. Possibly a **gap index**: the share of a batter's runs that go where a standard field for the cut doesn't reach
+   ("a standard death field covers 65% of his runs, the average batter 72%"). It's descriptive and relative to a
+   fixed field, so it doesn't overfit. It needs its own stability test (does it repeat year to year?) before use.
