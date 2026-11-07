@@ -99,3 +99,18 @@ folder, scraped from Cricbuzz's auction pages.
 * A2: map Cricbuzz ids to our player ids (names + country + role; a manual list for the misses).
 * A3: `/player/{name}/auctions` endpoint, plus the price v wins-added query for posts.
 * A4: scrape or enter the 2027 auction live on 16 Dec (the same scraper the user already has?).
+
+## Post ideas backlog (undated)
+
+Ideas agreed in conversation but not yet scheduled. A pitch source for the morning brief (PITCH_BRIEF_PLAN.md P3).
+Add the date each came up; strike one through when it posts.
+
+| # | Idea | What it shows | Ready? | Came up |
+|---|---|---|---|---|
+| 1 | **The T20 standard field** | The field our model sets for the average batter, by phase × pace/spin × hand: nine fielders with coverage circles, as the broadcasts draw them. Labelled as a model built from where the ball goes, not real fielding positions. Optional extra: the few batters who stayed outliers in both periods (Suryakumar v middle-overs spin, Pollard v death pace, Johnson Charles v powerplay pace). Don't present the gap index as a ranking (it barely repeats). | Solver built: `services/field_model.py`, `articles/fields/prototype.py` (branch field-coverage, unmerged). Needs a card design. | 7 Nov 2026 |
+| 2 | **Oddly specific outliers** (a series) | Players unusually good or bad at one narrow thing, each against the typical player where they played. Seeds: **Babar Azam** bowled or LBW on 39% of dismissals v 25% typical (LBW 21% v 7%), and 13 of his 26 dismissals to spin since 2024; Suryakumar 11% v 21% (out caught when out); Varun attacks the stumps less than the typical spinner (25% v 35%) but bowls batters 31% of the time v 20%. Find more by ranking the profile cards' "v typical" numbers that hold in both periods. | Numbers come from the profile cards (`services/wicket_style.py`) and `scripts/analysis/{batter_bowled,stumps_attack}.py`. Check each seed repeats across periods before posting. | 7 Nov 2026 |
+| 3 | **Stump-hunters** | How bowlers take wickets: Thushara and Shaheen (bowled or LBW well above typical, attack the stumps most) v Hardik, Mustafizur and Muzarabani (cutters and the short ball, caught). Or wrist-spinners (Rashid, Tahir, Zampa, Noor) v finger-spinners. Style, not quality: it doesn't predict economy. | Same data as #2. | 7 Nov 2026 |
+| 4 | **Profile showcases** (batter, bowler, all-rounder) | One player each, a carousel that walks through his profile cards (verdict, plays like, where he scores or bowls, pace map, shot mix, how he gets out or takes wickets) to show the breadth and depth of the data and visuals. Pick players in the news. | Profile cards are live; needs a carousel builder that renders the profile's cards as slides. | 7 Nov 2026 |
+| 5 | **India's lower order (bat and ball, 5-8)** | Already agreed, held until the NZ v IND T20Is end (memory: india-lower-order-post). | Analysis done; branch post/india-lower-order. | Oct 2026 |
+| 6 | **How to bowl to X / how to bat against X** | The scouting templates as posts (pitch map, wheel, shot mix, what works against him), news-led (Livingstone, Noor). | `articles/scouting/build.py` (branch scouting-templates, unmerged); swap "the fielder who matters" for descriptive wording first. | 7 Nov 2026 |
+| 7 | **The winners' template** | What IPL playoff sides have that others don't: openers who last, powerplay average, boundary scoring at 5-7, middle-overs spin wickets, death economy, six regular bowlers, fewer players used. A one-off explainer (the retention posts use it per team). | `TEAM_TEMPLATE_IPL_FINDINGS.md`, `services/pinned/team_template_IPL.json`. | 6 Nov 2026 |
