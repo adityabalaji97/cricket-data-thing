@@ -114,7 +114,7 @@ const ANGLE_LHB = { Behind: 0, Point: 45, Cover: 90, 'Long off': 135, 'Long on':
  * strike rate and red where slower (or the colours given). zones: [{zone 1-8, runs, strike_rate}]. Shared by the
  * profile's card and the query builder's answer for a by-scoring-zone question.
  */
-export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = RED }) => {
+export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = RED, catches, outline, labels }) => {
   const total = zones.reduce((a, z) => a + z.runs, 0);
   if (!total) return null;
   const left = hand === 'LHB';
@@ -147,32 +147,58 @@ export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = 
             </g>
           );
         })}
+        {/* The zone the scouting line points to (the fielder who matters), outlined on the wheel itself. */}
+        {outline && (() => {
+          const lab = ZONES_RHB[left ? MIRROR[outline] : outline];
+          const deg = left ? ANGLE_LHB[lab] : (360 - ANGLE_LHB[lab]) % 360;
+          const rad = ((deg - 90) * Math.PI) / 180; const r = R + 6;
+          const a1 = rad - (22.5 * Math.PI) / 180; const a2 = rad + (22.5 * Math.PI) / 180;
+          return <path d={`M${c},${c} L${c + r * Math.cos(a1)},${c + r * Math.sin(a1)} A${r},${r} 0 0 1 ${c + r * Math.cos(a2)},${c + r * Math.sin(a2)} Z`}
+            fill="none" stroke={colors.textHi} strokeWidth="2" strokeDasharray="4 3" />;
+        })()}
+        {/* Catches: where he was caught (or, for a bowler, where his catches were taken), on the feed's 0-363 grid, a
+            fixed view of the ground as the wheel draws it; the boundary is about 181 from the middle. */}
+        {(catches?.points || []).map((p, i) => {
+          const k = (R + 6) / 181;
+          const dx = (p.x - 181) * k; const dy = (p.y - 181) * k;
+          const d = Math.hypot(dx, dy); const lim = R + 4;
+          const s = d > lim ? lim / d : 1;
+          return <circle key={i} cx={c + dx * s} cy={c + dy * s} r={2.6 + Math.min(2, (p.n - 1) * 0.8)} fill="#ffffff"
+            fillOpacity="0.9" stroke={colors.bg} strokeWidth="1" />;
+        })}
         <rect x={c - 3} y={c - 9} width="6" height="18" rx="2" fill="#c9b27c" />
       </Box>
-      <Legend items={[[`Faster than his ${Math.round(strikeRate)}`, faster], ['Slower', slower]]} />
+      <Legend items={[[labels?.[0] || `Faster than his ${Math.round(strikeRate)}`, faster], [labels?.[1] || 'Slower', slower],
+        ...(catches?.points?.length ? [[`Caught · ${catches.plotted} of ${catches.total}`, '#ffffff']] : [])]} />
     </>
   );
 };
 
 /** Where he scores: the scoring wheel on the profile. */
-export const ScoringAreasCard = ({ player, zones, hand, strikeRate }) => {
+export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, catches }) => {
   if (!zones.reduce((a, z) => a + z.runs, 0)) return null;
+  const left = hand === 'LHB';
+  const key = boundary ? ZONES_RHB[left ? MIRROR[boundary.key_zone] : boundary.key_zone].toLowerCase() : null;
   return (
-    <ProfileCard id="scoring" title="Where he scores" player={player} note={`Share of runs by area (${hand === 'LHB' ? 'left' : 'right'}-handed)`}>
-      <ScoringWheel zones={zones} hand={hand} strikeRate={strikeRate} />
+    <ProfileCard id="scoring" title="Where he scores" player={player}
+      note={boundary ? `Outlined: the fielder who matters v pace, ${key} · ${boundary.key_share}%` : `Share of runs by area (${left ? 'left' : 'right'}-handed)`}>
+      <ScoringWheel zones={zones} hand={hand} strikeRate={strikeRate} catches={catches} outline={boundary?.key_zone} />
     </ProfileCard>
   );
 };
 
-/** Strike rate against each of six bowling families; fastest in lime, slowest in red. */
-export const FamiliesCard = ({ player, families }) => {
+/** Who to bowl to him: strike rate against each of six bowling families, and against his own; fastest in lime,
+ * slowest in red. The bowler's type, not the variation (we don't have slower balls or googlies). */
+export const FamiliesCard = ({ player, families, strikeRate }) => {
   if (!families?.length) return null;
   const best = families.reduce((a, b) => (b.strike_rate > a.strike_rate ? b : a));
   const worst = families.reduce((a, b) => (b.strike_rate < a.strike_rate ? b : a));
   return (
-    <ProfileCard id="bowling-types" title="Against each bowling type" player={player} note="Strike rate · 40+ balls">
+    <ProfileCard id="bowling-types" title="Who to bowl to him" player={player}
+      note="Strike rate · bowler's type, not variation · 40+ balls">
       <BarRows format={(v) => Math.round(v)}
-        rows={families.map((f) => ({ label: f.family, detail: `${f.balls} balls · ${f.outs} out`, value: f.strike_rate,
+        rows={families.map((f) => ({ label: f.family, value: f.strike_rate,
+          detail: `${f.balls} balls · ${f.outs} out${f.vs_own != null ? ` · ${sign(f.vs_own, 0)}% v his` : ''}`,
           colour: f === best ? LIME : f === worst && families.length > 1 ? RED : SLATE }))} />
     </ProfileCard>
   );
@@ -189,6 +215,93 @@ export const OutsCard = ({ player, rows, bowling }) => {
     <ProfileCard id={bowling ? 'wickets' : 'dismissals'} title={bowling ? 'How he takes wickets' : 'How he gets out'} player={player}
       note={bowling ? 'Run-outs not counted' : null}>
       <BarRows rows={top.map((r, i) => ({ label: howName(r.how), value: r.count, colour: i === 0 ? LIME : SLATE }))} />
+    </ProfileCard>
+  );
+};
+
+/** A group heading between cards: "How to bowl to him", "How to bat against him" (PROFILE_SCOUTING_PLAN.md). */
+const GroupHead = ({ children }) => (
+  <Box sx={{ ...mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.accent, mt: 1, mb: -0.25 }}>
+    {children}
+  </Box>
+);
+
+const PACE_LINES = ['WIDE_OUTSIDE_OFFSTUMP', 'OUTSIDE_OFFSTUMP', 'ON_THE_STUMPS', 'DOWN_LEG'];
+const PACE_LINE_NAMES = ['Wide off', 'Off', 'Stumps', 'Leg'];
+const PACE_LENGTHS = ['YORKER', 'FULL', 'GOOD_LENGTH', 'SHORT_OF_A_GOOD_LENGTH', 'SHORT'];
+const PACE_LENGTH_NAMES = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
+
+/** Where to bowl to him (pace): his strike rate in each line and length against his strike rate against pace;
+ * lime where he scores faster, red slower; the slowest cell with 40+ balls outlined. */
+export const PaceMapCard = ({ player, cells, paceSr }) => {
+  const by = useMemo(() => Object.fromEntries((cells || []).map((c) => [`${c.line}|${c.length}`, c])), [cells]);
+  const lengths = PACE_LENGTHS.filter((l) => PACE_LINES.filter((ln) => by[`${ln}|${l}`]).length > 1);
+  if (!paceSr || lengths.length < 2) return null;
+  const shown = (cells || []).filter((c) => lengths.includes(c.length));
+  const tight = shown.filter((c) => c.balls >= 40).reduce((a, b) => (!a || b.strike_rate < a.strike_rate ? b : a), null);
+  const cw = 58; const ch = 44; const L = 92; const W = L + cw * 4 + 4; const H = 24 + ch * lengths.length + 20;
+  return (
+    <ProfileCard id="pace-map" title="Where to bowl to him (pace)" player={player}
+      note={`Strike rate, against his ${Math.round(paceSr)} v pace · 20+ balls a cell`}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+        aria-label={shown.map((c) => `${PACE_LENGTH_NAMES[c.length]} ${c.line}: strike rate ${c.strike_rate}`).join('; ')}>
+        {lengths.map((l, i) => (
+          <text key={l} x={L - 8} y={24 + i * ch + ch / 2 + 2} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textMed }}>{PACE_LENGTH_NAMES[l]}</text>
+        ))}
+        {lengths.map((l, i) => PACE_LINES.map((ln, j) => {
+          const cell = by[`${ln}|${l}`];
+          const x = L + j * cw; const y = 20 + i * ch;
+          if (!cell) return <rect key={`${l}${ln}`} x={x + 2} y={y + 2} width={cw - 4} height={ch - 4} rx="6" fill="none" stroke={colors.border} />;
+          const diff = cell.strike_rate - paceSr;
+          const op = Math.min(0.9, 0.18 + Math.abs(diff) / 120);
+          const ink = diff > 0 && op > 0.6 ? colors.bg : colors.textHi;
+          return (
+            <g key={`${l}${ln}`}>
+              <rect x={x + 2} y={y + 2} width={cw - 4} height={ch - 4} rx="6" fill={diff > 0 ? LIME : RED} fillOpacity={op}
+                stroke={cell === tight ? colors.textHi : 'none'} strokeWidth="2">
+                <title>{`${PACE_LENGTH_NAMES[l]}, ${PACE_LINE_NAMES[j]}: strike rate ${Math.round(cell.strike_rate)} (${cell.balls} balls, ${cell.outs} out)`}</title>
+              </rect>
+              <text x={x + cw / 2} y={y + ch / 2 + 2} textAnchor="middle" style={{ ...mono, fontSize: 13, fontWeight: 600, fill: ink }}>{Math.round(cell.strike_rate)}</text>
+              <text x={x + cw / 2} y={y + ch / 2 + 14} textAnchor="middle" style={{ ...mono, fontSize: 8.5, fill: ink, opacity: 0.8 }}>{`${cell.balls}b`}</text>
+            </g>
+          );
+        }))}
+        {PACE_LINE_NAMES.map((name, j) => (
+          <text key={name} x={L + j * cw + cw / 2} y={H - 4} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textMed }}>{name}</text>
+        ))}
+      </Box>
+      <Legend items={[[`Faster than his ${Math.round(paceSr)}`, LIME], ['Slower', RED]]} />
+    </ProfileCard>
+  );
+};
+
+const SHOT_NAMES = { DRIVE: 'Drives', FLICK_GLANCE: 'Flicks and glances', PULL_HOOK: 'Pulls and hooks', WORK_PUSH: 'Works and pushes',
+  CUT: 'Cuts', SLOG: 'Slogs', SWEEP: 'Sweeps', RAMP_SCOOP: 'Ramps and scoops', REVERSE: 'Reverse sweeps' };
+
+/** How he scores: his main scoring shots' share of his runs, against the average batter of his hand. */
+export const ShotMixCard = ({ player, mix, hand }) => {
+  if (!mix?.rows?.length) return null;
+  const max = Math.max(...mix.rows.flatMap((r) => [r.share, r.average]), 1);
+  return (
+    <ProfileCard id="shot-mix" title="How he scores" player={player}
+      note={`Share of his runs, v the average ${hand === 'LHB' ? 'left' : 'right'}-hander`}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+        {mix.rows.map((r) => (
+          <Box key={r.family} sx={{ display: 'grid', gridTemplateColumns: '128px 1fr 74px', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ fontSize: 13.5, whiteSpace: 'nowrap' }}>{SHOT_NAMES[r.family] || r.family}</Box>
+            <Box sx={{ position: 'relative', height: 12 }}>
+              <Box sx={{ position: 'absolute', left: 0, right: 0, top: 5, height: 2, bgcolor: colors.border }} />
+              <Box sx={{ position: 'absolute', left: `${(100 * r.average) / max}%`, top: 1, width: 10, height: 10, ml: '-5px', borderRadius: '50%', bgcolor: SLATE }} />
+              <Box sx={{ position: 'absolute', left: `${(100 * r.share) / max}%`, top: 1, width: 10, height: 10, ml: '-5px', borderRadius: '50%', bgcolor: LIME }} />
+            </Box>
+            <Box sx={{ ...mono, fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <Box component="span" sx={{ color: colors.textHi }}>{`${Math.round(r.share)}%`}</Box>
+              <Box component="span" sx={{ color: colors.textLo }}>{` v ${Math.round(r.average)}%`}</Box>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+      <Legend items={[['Him', LIME], ['Average batter', SLATE]]} />
     </ProfileCard>
   );
 };
@@ -281,22 +394,89 @@ export const HandsCard = ({ player, hands }) => {
   );
 };
 
+/** Where batters score off him, one hand at a time (a switch), with his catches on the same wheel: wedge size the
+ * share of runs, colour faster or slower than batters of that hand go off him, dots where the catches were taken. */
+export const BowlerWheelCard = ({ player, byHand, catchesByHand }) => {
+  const hands = ['RHB', 'LHB'].filter((h) => byHand?.[h]);
+  const [pick, setPick] = useState(null);
+  if (!hands.length) return null;
+  const h = hands.includes(pick) ? pick : hands[0];
+  const d = byHand[h];
+  return (
+    <ProfileCard id="scoring-against" title="Where batters score off him" player={player}
+      note={`Share of runs by area · ${h === 'LHB' ? 'left' : 'right'}-handers`}>
+      {hands.length > 1 && (
+        <Box role="tablist" aria-label="Batter's hand" sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+          {hands.map((x) => (
+            <Box key={x} component="button" type="button" role="tab" aria-selected={x === h} onClick={() => setPick(x)}
+              sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
+                bgcolor: x === h ? colors.accent : 'transparent', color: x === h ? colors.bg : colors.textMed }}>
+              {x === 'RHB' ? 'Right-handers' : 'Left-handers'}
+            </Box>
+          ))}
+        </Box>
+      )}
+      <ScoringWheel zones={d.zones} hand={h} strikeRate={d.strike_rate} catches={catchesByHand?.[h]}
+        labels={[`Faster than ${Math.round(d.strike_rate)} off him`, 'Slower']} />
+    </ProfileCard>
+  );
+};
+
+/** What works against him: batters' strike rate with each shot against him, against their strike rate off him, with
+ * balls per wicket beside it (a shot that scores fast and gets you out every 8 balls isn't simply "working"). */
+export const ShotsAgainstCard = ({ player, rows, srAgainst }) => {
+  if (!rows?.length || srAgainst == null) return null;
+  const top = rows.slice(0, 7);
+  const max = Math.max(...top.map((r) => Math.abs(r.vs_all)), 1);
+  return (
+    <ProfileCard id="shots-against" title="What works against him" player={player}
+      note={`Batters' strike rate by shot, v ${Math.round(srAgainst)} off him`}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.9 }}>
+        {top.map((r, i) => (
+          <Box key={r.family} sx={{ display: 'grid', gridTemplateColumns: '136px 1fr 40px', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ minWidth: 0, lineHeight: 1.15 }}>
+              <Box sx={{ fontSize: 13.5, whiteSpace: 'nowrap' }}>{SHOT_NAMES[r.family] || r.family}</Box>
+              <Box sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>
+                {`SR ${Math.round(r.strike_rate)} · ${r.wickets ? `${Math.round(r.balls / r.wickets)} balls per wicket` : `${r.balls} balls, no wicket`}`}
+              </Box>
+            </Box>
+            <Box sx={{ position: 'relative', height: 12 }}>
+              <Box sx={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '1px', bgcolor: colors.borderStrong }} />
+              <Box sx={{ position: 'absolute', top: 0, height: '100%', borderRadius: '4px',
+                left: r.vs_all >= 0 ? '50%' : `${50 - (50 * Math.abs(r.vs_all)) / max}%`, width: `${(50 * Math.abs(r.vs_all)) / max}%`,
+                bgcolor: i === 0 ? LIME : r.vs_all >= 0 ? SLATE : RED }} />
+            </Box>
+            <Box sx={{ ...mono, fontSize: 13, textAlign: 'right' }}>{sign(r.vs_all, 0)}</Box>
+          </Box>
+        ))}
+      </Box>
+    </ProfileCard>
+  );
+};
+
 /** The batter's or bowler's four cards. */
 export const RoleCardSet = ({ role, player, data, hand }) => {
   if (!data) return null;
   if (role === 'bat') {
+    const h = data.hand || hand;
     return (
       <>
         {data.start?.points?.length > 1 && <StartCard player={player} start={data.start} />}
-        {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={hand} strikeRate={data.strike_rate} />}
-        <FamiliesCard player={player} families={data.families} />
+        <GroupHead>How to bowl to him</GroupHead>
+        <FamiliesCard player={player} families={data.families} strikeRate={data.strike_rate} />
+        <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} />
+        {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} />}
+        <ShotMixCard player={player} mix={data.shot_mix} hand={h} />
         <OutsCard player={player} rows={data.dismissals} />
       </>
     );
   }
   return (
     <>
+      <GroupHead>How to bat against him</GroupHead>
       <PitchCard player={player} cells={data.cells} economy={data.economy} />
+      <BowlerWheelCard player={player} byHand={data.zones_by_hand} catchesByHand={data.catches_by_hand} />
+      <ShotsAgainstCard player={player} rows={data.shots_against} srAgainst={data.strike_rate_against} />
       <PhaseCard player={player} phases={data.phases} />
       <HandsCard player={player} hands={data.hands} />
       <OutsCard player={player} rows={data.wickets} bowling />

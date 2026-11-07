@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from services.player_verdict import ROLE_MIN_BALLS, default_window, scope_params
 from services.query_cache import cached_run
 
-CARDS_VERSION = "c1"
+CARDS_VERSION = "c3"  # c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels
 START_BALLS = 30          # the start card runs to the 30th ball of an innings
 FAMILY_MIN_BALLS = 40     # a bowling family with fewer balls is left off
 CELL_MIN_BALLS = 15       # a pitch-map cell with fewer balls is left blank
@@ -26,6 +26,9 @@ FAMILIES = {
     "OB": "Off-spin", "LB": "Leg-spin", "LBG": "Leg-spin", "SLA": "Left-arm orthodox", "LWS": "Left-arm wrist spin",
 }
 FAMILY_ORDER = ["Right-arm pace", "Left-arm pace", "Off-spin", "Leg-spin", "Left-arm orthodox", "Left-arm wrist spin"]
+SHOT_FAMILY_MIN = 30     # a shot family with fewer balls (against a bowler) is left off
+PACE_CELL_MIN = 20       # the batter's pitch map against pace
+NOT_SCORING = {"LEAVE", "DEFENCE"}
 NOT_BOWLER = {"run out", "retired hurt", "retired out", "retired not out (hurt)", "obstructing the field"}
 
 
@@ -99,13 +102,108 @@ def batting_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
     start = None
     if fmt == "T20":  # runs v par need the T20 Primer's per-ball Impact
         start = start_curve(_q(db, fmt, group_by=["match_id", "innings", "batter_ball_number"], **who))
+    sr = _n(me.get("strike_rate")) or 0
+    for f in fam_rows:  # against his own: "−36% v his 145"
+        f["vs_own"] = round(100 * (f["strike_rate"] / sr - 1), 1) if sr else None
     return {
-        "balls": me.get("balls"), "runs": me.get("runs"), "strike_rate": _n(me.get("strike_rate")),
+        "balls": me.get("balls"), "runs": me.get("runs"), "strike_rate": sr,
         "start": start,
         "zones": zones,
         "families": fam_rows,
         "dismissals": sorted(outs, key=lambda r: -r["count"]),
+        **scouting_batting(db, fmt, who, base),
     }
+
+
+# ---- scouting (PROFILE_SCOUTING_PLAN.md) ---------------------------------------------------------------------------
+
+PACE = {"bowl_kind": ["pace bowler"]}
+PACE_SHORT_OF_FULL = {"bowl_kind": ["pace bowler"], "length": ["GOOD_LENGTH", "SHORT_OF_A_GOOD_LENGTH"]}
+LEG_SQUARE = {"RHB": (1, 2, 3), "LHB": (7, 6, 5)}  # fine leg, square leg, midwicket (wagon zones are the field's, not the batter's)
+
+
+def _boundary_shares(rows: List[Dict[str, Any]]) -> Dict[int, float]:
+    got = {int(r["wagon_zone"]): 4 * (r.get("fours") or 0) + 6 * (r.get("sixes") or 0)
+           for r in rows if r.get("wagon_zone") is not None and 1 <= int(r["wagon_zone"]) <= 8}
+    t = sum(got.values())
+    return {z: 100 * v / t for z, v in got.items()} if t else {}
+
+
+def _family_run_shares(rows: List[Dict[str, Any]]) -> Dict[str, float]:
+    got = {r["shot_family"]: r.get("runs") or 0 for r in rows if r.get("shot_family")}
+    t = sum(got.values())
+    return {k: 100 * v / t for k, v in got.items()} if t else {}
+
+
+def _average_batter(db, fmt: str, base: Dict[str, Any], hand: str) -> Dict[str, Any]:
+    """The average batter of a hand in the window and scope: where his boundaries go against pace short of full, and
+    his share of runs by shot. Cached once and shared by every profile with that window."""
+    def run():
+        common = dict(bat_hand=hand, metrics_perspective="batting", **base)
+        return {"boundary": _boundary_shares(_q(db, fmt, group_by=["wagon_zone"], **PACE_SHORT_OF_FULL, **common)),
+                "shots": _family_run_shares(_q(db, fmt, group_by=["shot_family"], **common))}
+
+    key = {"kind": "scout_average_batter", "v": CARDS_VERSION, "fmt": fmt, "hand": hand,
+           **{k: v for k, v in base.items()}}
+    out = cached_run(db, key, run)
+    # JSON round-trips turn zone keys into strings.
+    return {"boundary": {int(k): v for k, v in out["boundary"].items()}, "shots": out["shots"]}
+
+
+def scouting_batting(db, fmt: str, who: Dict[str, Any], base: Dict[str, Any]) -> Dict[str, Any]:
+    """How to bowl to him: pace by line and length against his strike rate against pace; where his boundaries go
+    against pace short of full, against the average batter of his hand (and the fielder who matters); his scoring shots
+    against the same average."""
+    hands = _q(db, fmt, group_by=["bat_hand"], **who)
+    hand = max(hands, key=lambda r: r.get("balls") or 0)["bat_hand"] if hands else "RHB"
+    hand = hand if hand in ("RHB", "LHB") else "RHB"
+    pace_me = _q(db, fmt, group_by=["batter"], **PACE, **who)
+    pace_sr = _n(pace_me[0].get("strike_rate")) if pace_me else None
+    pace_cells = []
+    if pace_sr:
+        pace_cells = [{"line": r["line"], "length": r["length"], "balls": r.get("balls") or 0,
+                       "strike_rate": round(_n(r.get("strike_rate")) or 0, 1), "outs": r.get("wickets") or 0}
+                      for r in _q(db, fmt, group_by=["line", "length"], **PACE, **who)
+                      if r.get("line") and r.get("length") and (r.get("balls") or 0) >= PACE_CELL_MIN]
+    avg = _average_batter(db, fmt, base, hand)
+    zone_rows = _q(db, fmt, group_by=["wagon_zone"], **PACE_SHORT_OF_FULL, **who)
+    mine = _boundary_shares(zone_rows)
+    boundary_runs = sum(4 * (r.get("fours") or 0) + 6 * (r.get("sixes") or 0) for r in zone_rows)
+    boundary = None
+    if mine and boundary_runs >= 60:
+        key_zone = max(mine, key=mine.get)
+        boundary = {"leg_square": round(sum(mine.get(z, 0) for z in LEG_SQUARE[hand])),
+                    "leg_square_avg": round(sum(avg["boundary"].get(z, 0) for z in LEG_SQUARE[hand])),
+                    "key_zone": key_zone, "key_share": round(mine[key_zone]), "runs": boundary_runs}
+    shot_rows = _q(db, fmt, group_by=["shot_family"], **who)
+    shares = _family_run_shares(shot_rows)
+    tagged = sum(r.get("runs") or 0 for r in shot_rows if r.get("shot_family"))
+    shots = None
+    if shares and tagged >= 150:
+        top = sorted((k for k in shares if k not in NOT_SCORING), key=lambda k: -shares[k])[:6]
+        shots = {"rows": [{"family": k, "share": round(shares[k], 1), "average": round(avg["shots"].get(k, 0), 1)} for k in top],
+                 "runs": tagged}
+    return {"hand": hand, "pace_sr": pace_sr, "pace_cells": pace_cells, "boundary": boundary, "shot_mix": shots,
+            "catches": catch_points(db, fmt, who)}
+
+
+def catch_points(db, fmt: str, who: Dict[str, Any], by_hand: bool = False):
+    """Where the catches were taken, on the feed's grid (a fixed view of the ground, as the scoring wheel draws it), and
+    how many catches there were in all: about half carry a position (58% in 2022, 43% in 2025-26). by_hand: per batter's
+    hand, for a bowler (his wheel has a right-/left-hander switch)."""
+    group = (["bat_hand"] if by_hand else []) + ["wagon_x", "wagon_y"]
+    rows = _q(db, fmt, group_by=group, dismissal=["caught"], **who)
+
+    def pack(rs):
+        pts = [{"x": int(r["wagon_x"]), "y": int(r["wagon_y"]), "n": int(r.get("wickets") or 0)}
+               for r in rs if r.get("wagon_x") is not None and (r.get("wickets") or 0) > 0
+               and not (int(r["wagon_x"]) == 0 and int(r["wagon_y"]) == 0)]
+        total = sum(int(r.get("wickets") or 0) for r in rs)
+        return {"points": pts, "plotted": sum(p["n"] for p in pts), "total": total}
+
+    if not by_hand:
+        return pack(rows)
+    return {h: pack([r for r in rows if r.get("bat_hand") == h]) for h in ("RHB", "LHB")}
 
 
 # ---- bowling ------------------------------------------------------------------------------------------------------
@@ -138,8 +236,29 @@ def bowling_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
     wkts = [{"how": r["dismissal"], "count": r.get("wickets") or 0}
             for r in _q(db, fmt, group_by=["dismissal"], **who)
             if r.get("dismissal") and r["dismissal"] not in NOT_BOWLER and (r.get("wickets") or 0) > 0]
+    # What works against him: batters' strike rate with each shot, against their strike rate off him, with the cost.
+    sr_off = 100 * (me.get("runs") or 0) / me["balls"]
+    shots_against = [{"family": r["shot_family"], "balls": r.get("balls") or 0, "runs": r.get("runs") or 0,
+                      "wickets": r.get("wickets") or 0, "strike_rate": round(100 * (r.get("runs") or 0) / r["balls"], 1),
+                      "vs_all": round(100 * (r.get("runs") or 0) / r["balls"] - sr_off, 1)}
+                     for r in _q(db, fmt, group_by=["shot_family"], **who)
+                     if r.get("shot_family") and r["shot_family"] not in NOT_SCORING and (r.get("balls") or 0) >= SHOT_FAMILY_MIN]
+    # Where batters score off him, by their hand (his wheel has a switch), with his catches on it.
+    zones_by_hand = {}
+    for h in ("RHB", "LHB"):
+        zr = [{"zone": int(r["wagon_zone"]), "runs": r.get("runs") or 0, "balls": r.get("balls") or 0,
+               "strike_rate": _n(r.get("strike_rate"))}
+              for r in _q(db, fmt, group_by=["wagon_zone"], bat_hand=h, **who)
+              if r.get("wagon_zone") and 1 <= int(r["wagon_zone"]) <= 8]
+        hb = sum(z["balls"] for z in zr)
+        if hb >= 120:
+            zones_by_hand[h] = {"zones": zr, "strike_rate": round(100 * sum(z["runs"] for z in zr) / hb, 1) if hb else None}
     return {
         "balls": me.get("balls"), "economy": round(_econ(me), 2),
+        "strike_rate_against": round(sr_off, 1),
+        "zones_by_hand": zones_by_hand,
+        "catches_by_hand": catch_points(db, fmt, who, by_hand=True),
+        "shots_against": sorted(shots_against, key=lambda r: -r["vs_all"]),
         "cells": cells,
         "phases": sorted(phases, key=lambda r: ["powerplay", "middle", "death"].index(r["phase"])
                          if r["phase"] in ("powerplay", "middle", "death") else 9),

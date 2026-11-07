@@ -577,6 +577,8 @@ def get_legacy_grouping_columns_map():
         "shot_family": "NULL",
         "control": "NULL",
         "wagon_zone": "NULL",
+        "wagon_x": "NULL",
+        "wagon_y": "NULL",
         "dismissal": "d.wicket_type",
         # Match context
         "match_outcome": match_outcome_sql,
@@ -3528,6 +3530,10 @@ def get_grouping_columns_map(fmt: str = "T20", gender: str = "male"):
         "shot_family": shot_family_case_sql("dd.shot"),
         "control": "dd.control",
         "wagon_zone": "dd.wagon_zone",
+        # Where the ball went, on the feed's 0-363 grid (a fixed view of the ground: a right-hander's leg side on the
+        # right, a left-hander's on the left); 0,0 means no position recorded. For plotting points, e.g. catches.
+        "wagon_x": "dd.wagon_x",
+        "wagon_y": "dd.wagon_y",
         "dismissal": "dd.dismissal",
         # Match context
         "match_outcome": match_outcome_sql,
