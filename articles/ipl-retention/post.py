@@ -71,6 +71,43 @@ def called(name):
     return w[0] if len(w) > 1 and w[-1] in COMMON_SURNAMES else w[-1]
 
 
+BG = "#0a0c11"  # the slides' background (theme bg)
+
+
+def _lum(hex_):
+    """WCAG relative luminance."""
+    c = [int(hex_.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def contrast(a, b=BG):
+    la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def _lighten(hex_, target=3.0):
+    """Mix towards white until it reads on the background."""
+    r, g, b = (int(hex_.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    for k in range(0, 101, 2):
+        mix = "#%02x%02x%02x" % tuple(round(x + (255 - x) * k / 100) for x in (r, g, b))
+        if contrast(mix) >= target:
+            return mix
+    return "#ffffff"
+
+
+def readable_colour(team_palette):
+    """The team's colour for the dark slides, kept theirs (GT's navy disappeared on our background, 7 Nov 2026):
+    the primary if it reads (3:1 against the background); a mid-tone primary lightened just enough (MI's, DC's blue);
+    a very dark one swapped for the team's own second colour when that reads (GT and KKR gold, LSG orange)."""
+    p, s2 = team_palette["primary"], team_palette.get("secondary")
+    if contrast(p) >= 3:
+        return p
+    if contrast(p) >= 2 or not s2 or contrast(s2) < 3:
+        return _lighten(p)
+    return s2
+
+
 def sg(v, d=2):
     return f"{v:+.{d}f}".replace("-", "−")
 
@@ -165,7 +202,7 @@ def numbers(db, names):
 def build(db, code):
     T = TEAMS[code]
     team = T["name"]
-    colour = PALETTE[team]["primary"]
+    colour = readable_colour(PALETTE[team])
     sq = squad(code, db)
     names = list(sq)
     bat, bowl, pos, kind, phase = numbers(db, names)
@@ -247,7 +284,9 @@ def build(db, code):
     if len(board_title) > 80:
         board_title = f"{T['short']}'s squad by wins added since the mega auction: {called(top['name'])} leads ({sg(top['wpa'])})"
     lead = card("board", "squad_board", board_title,
-                {"colour": colour, "format": "signed2", "groups": groups,
+                # Ink on the strongest chips: dark on a light colour (GT gold, CSK yellow), white on a deep one (MI blue).
+                {"colour": colour, "ink": BG if contrast(colour, BG) >= contrast(colour, "#ffffff") else "#ffffff",
+                 "format": "signed2", "groups": groups,
                  "note": " · ".join(x for x in [
                      f"Traded in: {', '.join(short(p['name']) for p in ins)}" if ins else "",
                      f"Yet to play since 2025: {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:3])}{'…' if len(unplayed) > 3 else ''})" if unplayed else "",
