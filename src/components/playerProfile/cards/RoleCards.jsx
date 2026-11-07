@@ -321,6 +321,77 @@ export const OutsCard = ({ player, rows, bowling }) => {
   );
 };
 
+// ---- how a bowler takes wickets (services/wicket_style.py) ---------------------------------------------------------
+
+const HOW_PARTS = [['bowled', 'Bowled', LIME, colors.bg], ['lbw', 'LBW', '#7fa833', colors.bg],
+  ['caught', 'Caught', SLATE, colors.textHi], ['stumped', 'Stumped', '#363d4b', colors.textMed]];
+
+/** One 100% bar of wickets by type, each share written inside its segment when there's room. */
+const SplitBar = ({ shares }) => (
+  <Box sx={{ display: 'flex', height: 24, gap: '2px' }}>
+    {HOW_PARTS.filter(([k]) => shares[k] > 0).map(([k, , bg, ink], i, arr) => (
+      <Box key={k} sx={{ flex: shares[k], minWidth: 0, bgcolor: bg, color: ink, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        ...mono, fontSize: 11.5, overflow: 'hidden', whiteSpace: 'nowrap',
+        borderRadius: `${i === 0 ? 5 : 0}px ${i === arr.length - 1 ? 5 : 0}px ${i === arr.length - 1 ? 5 : 0}px ${i === 0 ? 5 : 0}px` }}>
+        {shares[k] >= 10 ? `${Math.round(shares[k])}%` : ''}
+      </Box>
+    ))}
+  </Box>
+);
+
+/** How he takes wickets: his wickets by type against a typical bowler of his type where he bowled (the competitions and
+ * years, weighted by his wickets), and how often he attacks the stumps. A style, not a rating. */
+const WicketsView = ({ player, style, action, panel, filtered, noteOverride }) => {
+  const shell = (body, note) => (
+    <ProfileCard id="wickets" title="How he takes wickets" player={player} action={action} note={noteOverride || note}>{panel}{body}</ProfileCard>
+  );
+  if (!style?.wickets) {
+    return filtered ? shell(<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few wickets for this filter.</Box>) : null;
+  }
+  const mine = Object.fromEntries(HOW_PARTS.map(([k]) => [k, (100 * style.split[k]) / style.wickets]));
+  const kind = style.kind === 'spin' ? 'spinner' : 'pace bowler';
+  const a = style.attack;
+  const scale = a ? Math.max(50, Math.ceil((Math.max(a.share, a.typical) + 5) / 10) * 10) : 50;
+  const row = (label, body) => (
+    <Box sx={{ display: 'grid', gridTemplateColumns: '58px 1fr', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ fontSize: 12.5, color: colors.textMed, whiteSpace: 'nowrap' }}>{label}</Box>{body}
+    </Box>
+  );
+  return shell(
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.1 }}>
+      {row('Him', <SplitBar shares={mine} />)}
+      {style.typical && row('Typical', <SplitBar shares={style.typical} />)}
+      <Legend items={HOW_PARTS.map(([, label, bg]) => [label, bg])} />
+      {a && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: '108px 1fr auto', alignItems: 'center', gap: 1, pt: 1, borderTop: `1px solid ${colors.border}` }}>
+          <Box sx={{ fontSize: 12.5, color: colors.textMed, whiteSpace: 'nowrap' }}>Attacks the stumps</Box>
+          <Box sx={{ position: 'relative', height: 6, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '3px' }}>
+            <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(100 * a.share) / scale}%`, bgcolor: LIME, borderRadius: '3px' }} />
+            <Box sx={{ position: 'absolute', top: -5, height: 16, width: '2px', left: `${(100 * a.typical) / scale}%`, bgcolor: colors.textHi }} />
+          </Box>
+          <Box sx={{ ...mono, fontSize: 12.5, whiteSpace: 'nowrap' }}>{`${Math.round(a.share)}% v ${Math.round(a.typical)}%`}</Box>
+        </Box>
+      )}
+    </Box>,
+    style.typical ? `${style.wickets} wkts · typical: a ${kind} where he bowled` : `${style.wickets} wkts · too few to compare`,
+  );
+};
+
+/** The card with its filter (phase, the batter's hand); the batter's "How he gets out" stays OutsCard. */
+export const WicketsCard = ({ player, style, rows, query }) => {
+  const cf = useCardFilter();
+  const f = useSlice(player, 'wickets', query, cf.filter);
+  if (!style) return <OutsCard player={player} rows={rows} bowling />;
+  const d = cf.active && f.data ? f.data.wicket_style : style;
+  return (
+    <Filtered on={cf.active} loading={f.loading}>
+      <WicketsView player={player} style={d} action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} hands />}
+        noteOverride={cf.active && d?.wickets ? `${filterWords(cf.filter)} · ${d.wickets} wkts${d.typical ? '' : ' · too few to compare'}` : null} />
+    </Filtered>
+  );
+};
+
 /** A group heading between cards: "How to bowl to him", "How to bat against him" (PROFILE_SCOUTING_PLAN.md). */
 const GroupHead = ({ children }) => (
   <Box sx={{ ...mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.accent, mt: 1, mb: -0.25 }}>
@@ -666,7 +737,7 @@ export const RoleCardSet = ({ role, player, data, hand, query }) => {
       <ShotsAgainstCard player={player} rows={data.shots_against} srAgainst={data.strike_rate_against} query={query} />
       <PhaseCard player={player} phases={data.phases} />
       <HandsCard player={player} hands={data.hands} />
-      <OutsCard player={player} rows={data.wickets} bowling />
+      <WicketsCard player={player} style={data.wicket_style} rows={data.wickets} query={query} />
     </>
   );
 };

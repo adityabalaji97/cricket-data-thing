@@ -30,7 +30,9 @@ His start and how he gets out stay as they are.
 | 1 | Where he bowls | as is | Economy by line and length (already on the profile) |
 | 2 | What works against him | **new** | Batters' strike rate with each shot against him, against their strike rate off him, with balls per wicket, so "it works" is honest |
 
-Phases, hands and wickets stay as they are.
+| 3 | How he takes wickets | **upgrade** (7 Nov 2026) | His wickets bowled, LBW, caught and stumped against a typical bowler of his type in the competitions and years he bowled in (LBWs run 4-8.5% of wickets by competition), plus how often he attacks the stumps (on the stumps, full or good length or yorker) against typical. A style, not a rating: it repeats year to year but doesn't predict economy (`scripts/analysis/stumps_attack.py`). 20+ wickets to compare, 300+ tagged balls for the stumps line. Filter: phase, batter's hand. `services/wicket_style.py`. |
+
+Phases and hands stay as they are.
 
 ## Cost
 
