@@ -15,8 +15,9 @@ from typing import Any, Dict, List, Optional
 
 from services.player_verdict import ROLE_MIN_BALLS, default_window, scope_params
 from services.query_cache import cached_run
+from services.wicket_style import wicket_style
 
-CARDS_VERSION = "c3"  # c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels
+CARDS_VERSION = "c4"  # c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels; c4: wicket style
 START_BALLS = 30          # the start card runs to the 30th ball of an innings
 FAMILY_MIN_BALLS = 40     # a bowling family with fewer balls is left off
 CELL_MIN_BALLS = 15       # a pitch-map cell with fewer balls is left blank
@@ -264,6 +265,7 @@ def bowling_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
                          if r["phase"] in ("powerplay", "middle", "death") else 9),
         "hands": hands,
         "wickets": sorted(wkts, key=lambda r: -r["count"]),
+        "wicket_style": wicket_style(db, fmt, player, base),
     }
 
 
@@ -297,7 +299,7 @@ def card_slice(db, player: str, card: str, fmt: str = "T20", scope: str = "stron
                kind: Optional[str] = None, family: Optional[str] = None, hand: Optional[str] = None) -> Dict[str, Any]:
     """One profile card's numbers under the card's own filter (the sliders icon), in the page's window and scope:
     wheel_bat / wheel_bowl (zones and catches), pace_map, shot_mix (and the average batter under the same filter),
-    pitch (the bowler's line and length), shots_against. Cached per card and filter."""
+    pitch (the bowler's line and length), shots_against, wickets (services/wicket_style.py). Cached per card and filter."""
     def run():
         start, end = default_window(fmt, period=period)
         base = {"start_date": start_date or start, "end_date": end_date or end, **scope_params(fmt, scope)}
@@ -355,6 +357,8 @@ def card_slice(db, player: str, card: str, fmt: str = "T20", scope: str = "stron
                     if r.get("shot_family") and r["shot_family"] not in NOT_SCORING and (r.get("balls") or 0) >= SHOT_FAMILY_MIN]
             return {"shots_against": sorted(rows, key=lambda r: -r["vs_all"]), "strike_rate_against": round(sr_off, 1),
                     "balls": me[0]["balls"]}
+        if card == "wickets":
+            return {"wicket_style": wicket_style(db, fmt, player, base, flt)}
         raise ValueError(f"unknown card {card!r}")
 
     key = {"kind": "player_card_slice", "v": CARDS_VERSION, "player": player.strip().lower(), "card": card, "fmt": fmt,

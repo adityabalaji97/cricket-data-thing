@@ -118,7 +118,7 @@ def player_wheel(
 def player_card_slice(
     response: Response,
     player_name: str = Path(..., description="Any spelling of the player's name"),
-    card: Literal["wheel_bat", "wheel_bowl", "pace_map", "shot_mix", "pitch", "shots_against"] = Query(...),
+    card: Literal["wheel_bat", "wheel_bowl", "pace_map", "shot_mix", "pitch", "shots_against", "wickets"] = Query(...),
     format: Literal["T20", "ODI"] = Query(default="T20"),
     scope: Literal["strong", "all"] = Query(default="strong"),
     period: Literal["recent", "career"] = Query(default="recent"),
