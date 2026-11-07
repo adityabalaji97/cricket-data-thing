@@ -196,37 +196,40 @@ const Pill = ({ on, onClick, children }) => (
   </Box>
 );
 
-/** The gear and its panel: phase always; bowling for a batter's wheel. */
-const WheelFilter = ({ filter, setFilter, bowling }) => {
+/** The filter's icon, beside the card's share icon: horizontal sliders; lime with a dot when a filter is on. */
+const FilterIcon = ({ open, active, onClick }) => (
+  <Box component="button" type="button" onClick={onClick} aria-expanded={open} aria-label="Filter this card"
+    sx={{ all: 'unset', cursor: 'pointer', position: 'relative', display: 'inline-flex', p: 0.75, borderRadius: '8px',
+      color: active || open ? colors.accent : colors.textMed, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
+    <Box component="svg" viewBox="0 0 24 24" sx={{ width: 22, height: 22 }} aria-hidden="true">
+      <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" strokeWidth="2" />
+      <circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" strokeWidth="2" />
+    </Box>
+    {active && <Box component="span" sx={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', bgcolor: colors.accent }} />}
+  </Box>
+);
+
+/** The panel the icon opens: phase always; bowling for a batter's card. Clear sits with the choices. */
+const FilterPanel = ({ filter, setFilter, bowling }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, p: 1, borderRadius: '12px', bgcolor: colors.surface2 }}>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+      {PHASE_OPTS.map(([v, l]) => <Pill key={l} on={filter.phase === v} onClick={() => setFilter({ ...filter, phase: v })}>{l}</Pill>)}
+    </Box>
+    {bowling && (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {BOWL_OPTS.map(([v, l]) => <Pill key={l} on={filter.bowl === v} onClick={() => setFilter({ ...filter, bowl: v })}>{l}</Pill>)}
+      </Box>
+    )}
+  </Box>
+);
+
+/** A card's filter state: the choices, whether the panel is open, and the icon for the card's header. */
+const useCardFilter = () => {
+  const [filter, setFilter] = useState({ phase: '', bowl: '' });
   const [open, setOpen] = useState(false);
   const active = !!(filter.phase || filter.bowl);
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-      <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
-        <Box component="button" type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Filter this chart"
-          sx={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.6, fontSize: 12.5, px: 1.1, py: '3px',
-            borderRadius: '999px', border: `1px solid ${active ? colors.accent : colors.borderStrong}`, color: active ? colors.accent : colors.textMed }}>
-          <Box component="svg" viewBox="0 0 24 24" sx={{ width: 14, height: 14 }} aria-hidden="true">
-            <path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4L10.7 6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
-          </Box>
-          {active ? filterWords(filter) : 'Filter'}
-        </Box>
-        {active && <Pill on={false} onClick={() => setFilter({ phase: '', bowl: '' })}>Clear</Pill>}
-      </Box>
-      {open && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, p: 1, borderRadius: '12px', bgcolor: colors.surface2 }}>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {PHASE_OPTS.map(([v, l]) => <Pill key={l} on={filter.phase === v} onClick={() => setFilter({ ...filter, phase: v })}>{l}</Pill>)}
-          </Box>
-          {bowling && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {BOWL_OPTS.map(([v, l]) => <Pill key={l} on={filter.bowl === v} onClick={() => setFilter({ ...filter, bowl: v })}>{l}</Pill>)}
-            </Box>
-          )}
-        </Box>
-      )}
-    </Box>
-  );
+  return { filter, setFilter, open, active, icon: <FilterIcon open={open} active={active} onClick={() => setOpen((o) => !o)} /> };
 };
 
 /** The filtered wheel's numbers (GET /player/{name}/wheel), only when a filter is on; null otherwise. */
@@ -253,7 +256,8 @@ const useWheel = (player, role, query, filter, hand) => {
 };
 
 export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, catches, query }) => {
-  const [filter, setFilter] = useState({ phase: '', bowl: '' });
+  const cf = useCardFilter();
+  const { filter } = cf;
   const f = useWheel(player, 'bat', query, filter);
   if (!zones.reduce((a, z) => a + z.runs, 0)) return null;
   const left = hand === 'LHB';
@@ -265,8 +269,8 @@ export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, ca
     : boundary ? `Outlined: most of his boundaries off pace, ${key} · ${boundary.key_share}%` : `Share of runs by area (${left ? 'left' : 'right'}-handed)`;
   const empty = on && f.data && !f.data.zones?.length;
   return (
-    <ProfileCard id="scoring" title="Where he scores" player={player} note={note}>
-      <WheelFilter filter={filter} setFilter={setFilter} bowling />
+    <ProfileCard id="scoring" title="Where he scores" player={player} note={note} action={cf.icon}>
+      {cf.open && <FilterPanel filter={filter} setFilter={cf.setFilter} bowling />}
       <Box sx={{ opacity: on && f.loading ? 0.45 : 1, transition: 'opacity 150ms' }}>
         {empty ? <Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box>
           : <ScoringWheel zones={d.zones || zones} hand={hand} strikeRate={d.strike_rate || strikeRate} catches={d.catches} outline={on ? null : boundary?.key_zone} />}
@@ -487,7 +491,8 @@ export const HandsCard = ({ player, hands }) => {
 export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
   const hands = ['RHB', 'LHB'].filter((h) => byHand?.[h]);
   const [pick, setPick] = useState(null);
-  const [filter, setFilter] = useState({ phase: '', bowl: '' });
+  const cf = useCardFilter();
+  const { filter } = cf;
   const h = hands.includes(pick) ? pick : hands[0];
   const f = useWheel(player, 'bowl', query, filter, h);
   if (!hands.length) return null;
@@ -497,7 +502,7 @@ export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
   const empty = on && f.data && !f.data.zones?.length;
   return (
     <ProfileCard id="scoring-against" title="Where batters score off him" player={player}
-      note={`${h === 'LHB' ? 'Left' : 'Right'}-handers${on ? ` · ${PHASE_WORDS[filter.phase]}` : ''} · share of runs by area`}>
+      note={`${h === 'LHB' ? 'Left' : 'Right'}-handers${on ? ` · ${PHASE_WORDS[filter.phase]}` : ''} · share of runs by area`} action={cf.icon}>
       <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
         {hands.length > 1 && (
           <Box role="tablist" aria-label="Batter's hand" sx={{ display: 'inline-flex', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
@@ -511,7 +516,7 @@ export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
           </Box>
         )}
       </Box>
-      <WheelFilter filter={filter} setFilter={setFilter} />
+      {cf.open && <FilterPanel filter={filter} setFilter={cf.setFilter} />}
       <Box sx={{ opacity: on && f.loading ? 0.45 : 1, transition: 'opacity 150ms' }}>
         {empty ? <Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box>
           : <ScoringWheel zones={d.zones || base.zones} hand={h} strikeRate={d.strike_rate || base.strike_rate} catches={d.catches}
