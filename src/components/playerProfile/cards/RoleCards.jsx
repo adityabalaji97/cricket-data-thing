@@ -340,13 +340,15 @@ const SplitBar = ({ shares }) => (
 );
 
 /** How he takes wickets: his wickets by type against a typical bowler of his type where he bowled (the competitions and
- * years, weighted by his wickets), and how often he attacks the stumps. A style, not a rating. */
-const WicketsView = ({ player, style, action, panel, filtered, noteOverride }) => {
+ * years, weighted by his wickets), and how often he attacks the stumps. A style, not a rating. `bat`: the batter's
+ * "How he gets out", against a typical batter out to the same kinds of bowling where he batted (no stumps line). */
+const WicketsView = ({ player, style, bat, action, panel, filtered, noteOverride }) => {
   const shell = (body, note) => (
-    <ProfileCard id="wickets" title="How he takes wickets" player={player} action={action} note={noteOverride || note}>{panel}{body}</ProfileCard>
+    <ProfileCard id={bat ? 'dismissals' : 'wickets'} title={bat ? 'How he gets out' : 'How he takes wickets'} player={player}
+      action={action} note={noteOverride || note}>{panel}{body}</ProfileCard>
   );
   if (!style?.wickets) {
-    return filtered ? shell(<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few wickets for this filter.</Box>) : null;
+    return filtered ? shell(<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>{`Too few ${bat ? 'dismissals' : 'wickets'} for this filter.`}</Box>) : null;
   }
   const mine = Object.fromEntries(HOW_PARTS.map(([k]) => [k, (100 * style.split[k]) / style.wickets]));
   const kind = style.kind === 'spin' ? 'spinner' : 'pace bowler';
@@ -373,21 +375,22 @@ const WicketsView = ({ player, style, action, panel, filtered, noteOverride }) =
         </Box>
       )}
     </Box>,
-    style.typical ? `${style.wickets} wkts · typical: a ${kind} where he bowled` : `${style.wickets} wkts · too few to compare`,
+    bat ? (style.typical ? `${style.wickets} outs · typical: same bowling where he batted` : `${style.wickets} outs · too few to compare`)
+      : style.typical ? `${style.wickets} wkts · typical: a ${kind} where he bowled` : `${style.wickets} wkts · too few to compare`,
   );
 };
 
-/** The card with its filter (phase, the batter's hand); the batter's "How he gets out" stays OutsCard. */
-export const WicketsCard = ({ player, style, rows, query }) => {
+/** The card with its filter: a bowler's by phase and the batter's hand, a batter's by phase and the bowling. */
+export const WicketsCard = ({ player, style, rows, query, bat }) => {
   const cf = useCardFilter();
-  const f = useSlice(player, 'wickets', query, cf.filter);
-  if (!style) return <OutsCard player={player} rows={rows} bowling />;
+  const f = useSlice(player, bat ? 'dismissals' : 'wickets', query, cf.filter);
+  if (!style) return <OutsCard player={player} rows={rows} bowling={!bat} />;
   const d = cf.active && f.data ? f.data.wicket_style : style;
   return (
     <Filtered on={cf.active} loading={f.loading}>
-      <WicketsView player={player} style={d} action={cf.icon} filtered={cf.active}
-        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} hands />}
-        noteOverride={cf.active && d?.wickets ? `${filterWords(cf.filter)} · ${d.wickets} wkts${d.typical ? '' : ' · too few to compare'}` : null} />
+      <WicketsView player={player} style={d} bat={bat} action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} hands={!bat} bowling={bat} />}
+        noteOverride={cf.active && d?.wickets ? `${filterWords(cf.filter)} · ${d.wickets} ${bat ? 'outs' : 'wkts'}${d.typical ? '' : ' · too few to compare'}` : null} />
     </Filtered>
   );
 };
@@ -725,7 +728,7 @@ export const RoleCardSet = ({ role, player, data, hand, query }) => {
         <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} query={query} />
         {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} query={query} />}
         <ShotMixCard player={player} mix={data.shot_mix} hand={h} query={query} />
-        <OutsCard player={player} rows={data.dismissals} />
+        <WicketsCard player={player} style={data.out_style} rows={data.dismissals} query={query} bat />
       </>
     );
   }
