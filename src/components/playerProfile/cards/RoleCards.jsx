@@ -214,7 +214,7 @@ const FilterIcon = ({ open, active, onClick }) => (
 );
 
 /** The panel the icon opens: phase always; bowling for a batter's card, the batter's hand for a bowler's. "All ..." clears. */
-const FilterPanel = ({ filter, setFilter, bowling, hands }) => (
+const FilterPanel = ({ filter, setFilter, bowling, hands, bowlOpts }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, p: 1, borderRadius: '12px', bgcolor: colors.surface2 }}>
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
       {PHASE_OPTS.map(([v, l]) => <Pill key={l} on={filter.phase === v} onClick={() => setFilter({ ...filter, phase: v })}>{l}</Pill>)}
@@ -224,9 +224,9 @@ const FilterPanel = ({ filter, setFilter, bowling, hands }) => (
         {HAND_OPTS.map(([v, l]) => <Pill key={l} on={(filter.hand || '') === v} onClick={() => setFilter({ ...filter, hand: v })}>{l}</Pill>)}
       </Box>
     )}
-    {bowling && (
+    {(bowling || bowlOpts) && (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-        {BOWL_OPTS.map(([v, l]) => <Pill key={l} on={filter.bowl === v} onClick={() => setFilter({ ...filter, bowl: v })}>{l}</Pill>)}
+        {(bowlOpts || BOWL_OPTS).map(([v, l]) => <Pill key={l} on={(filter.bowl || '') === v} onClick={() => setFilter({ ...filter, bowl: v })}>{l}</Pill>)}
       </Box>
     )}
   </Box>
@@ -407,20 +407,28 @@ const PACE_LINE_NAMES = ['Wide off', 'Off', 'Stumps', 'Leg'];
 const PACE_LENGTHS = ['YORKER', 'FULL', 'GOOD_LENGTH', 'SHORT_OF_A_GOOD_LENGTH', 'SHORT'];
 const PACE_LENGTH_NAMES = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
 
-/** Where to bowl to him (pace): his strike rate in each line and length against his strike rate against pace;
- * lime where he scores faster, red slower; the slowest cell with 40+ balls outlined. */
-const PaceMapView = ({ player, cells, paceSr, action, panel, filtered, noteOverride }) => {
+/** Enough of a map to draw: two or more lengths with balls in two or more lines. */
+const mapLengths = (cells) => {
+  const by = new Set((cells || []).map((c) => `${c.line}|${c.length}`));
+  return PACE_LENGTHS.filter((l) => PACE_LINES.filter((ln) => by.has(`${ln}|${l}`)).length > 1);
+};
+
+/** Where to bowl to him: his strike rate in each line and length against his strike rate against that kind of bowling
+ * (pace or spin, a switch; one bowling type behind the filter); lime where he scores faster, red slower; the slowest
+ * cell with 40+ balls outlined. */
+const PaceMapView = ({ player, cells, paceSr, kindWord = 'pace', switcher, action, panel, filtered, noteOverride }) => {
   const by = useMemo(() => Object.fromEntries((cells || []).map((c) => [`${c.line}|${c.length}`, c])), [cells]);
-  const lengths = PACE_LENGTHS.filter((l) => PACE_LINES.filter((ln) => by[`${ln}|${l}`]).length > 1);
+  const lengths = mapLengths(cells);
   if (!paceSr || lengths.length < 2) {
-    return filtered ? <ProfileCard id="pace-map" title="Where to bowl to him (pace)" player={player} action={action} note={noteOverride}>{panel}<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box></ProfileCard> : null;
+    return filtered ? <ProfileCard id="pace-map" title="Where to bowl to him" player={player} action={action} note={noteOverride}>{switcher}{panel}<Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box></ProfileCard> : null;
   }
   const shown = (cells || []).filter((c) => lengths.includes(c.length));
   const tight = shown.filter((c) => c.balls >= 40).reduce((a, b) => (!a || b.strike_rate < a.strike_rate ? b : a), null);
   const cw = 58; const ch = 44; const L = 92; const W = L + cw * 4 + 4; const H = 24 + ch * lengths.length + 20;
   return (
-    <ProfileCard id="pace-map" title="Where to bowl to him (pace)" player={player} action={action}
-      note={noteOverride || `Strike rate, against his ${Math.round(paceSr)} v pace · 20+ balls a cell`}>
+    <ProfileCard id="pace-map" title="Where to bowl to him" player={player} action={action}
+      note={noteOverride || `Strike rate, against his ${Math.round(paceSr)} v ${kindWord} · 20+ balls a cell`}>
+      {switcher}
       {panel}
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
         aria-label={shown.map((c) => `${PACE_LENGTH_NAMES[c.length]} ${c.line}: strike rate ${c.strike_rate}`).join('; ')}>
@@ -661,15 +669,51 @@ const ShotMixShell = ({ player, action, note, children }) => (
 /** A card wrapper: its filter (icon and panel), the filtered numbers when it's on, the card's own view drawing them. */
 const Filtered = ({ on, loading, children }) => <Box sx={{ opacity: on && loading ? 0.5 : 1, transition: 'opacity 150ms' }}>{children}</Box>;
 
-export const PaceMapCard = ({ player, cells, paceSr, query }) => {
+const KIND_FAMILIES = {
+  pace: ['Right-arm pace', 'Left-arm pace'],
+  spin: ['Off-spin', 'Leg-spin', 'Left-arm orthodox', 'Left-arm wrist spin'],
+};
+
+/** A two-way switch in a card (pace or spin here; the bowler's wheel has its own for the batter's hand). */
+const Switch = ({ label, options, value, onChange }) => (
+  <Box role="tablist" aria-label={label} sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+    {options.map(([v, text]) => (
+      <Box key={v} component="button" type="button" role="tab" aria-selected={v === value} onClick={() => onChange(v)}
+        sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
+          bgcolor: v === value ? colors.accent : 'transparent', color: v === value ? colors.bg : colors.textMed,
+          '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
+        {text}
+      </Box>
+    ))}
+  </Box>
+);
+
+/** Where to bowl to him: pace or spin (the switch, shown when both have a map), each against his own strike rate
+ * against that kind; the filter adds a phase and one bowling type of the chosen kind. */
+export const PaceMapCard = ({ player, cells, paceSr, spinCells, spinSr, query }) => {
+  const kinds = [['pace', cells, paceSr], ['spin', spinCells, spinSr]].filter(([, c, sr]) => sr && mapLengths(c).length >= 2);
+  const [pick, setPick] = useState(null);
+  const kind = kinds.some(([k]) => k === pick) ? pick : kinds[0]?.[0] || 'pace';
   const cf = useCardFilter();
-  const f = useSlice(player, 'pace_map', query, cf.filter);
-  const d = cf.active && f.data ? { cells: f.data.pace_cells, sr: f.data.pace_sr } : { cells, sr: paceSr };
+  // The slice always says which kind (a filter on spin must stay on spin); a bowling type narrows it further.
+  const eff = cf.active ? { ...cf.filter, bowl: cf.filter.bowl || `kind:${kind}` } : cf.filter;
+  const f = useSlice(player, 'pace_map', query, eff);
+  if (!kinds.length && !cf.active) return null;
+  const base = kind === 'spin' ? { cells: spinCells, sr: spinSr } : { cells, sr: paceSr };
+  const d = cf.active && f.data ? { cells: f.data.pace_cells, sr: f.data.pace_sr } : base;
+  const family = cf.filter.bowl?.startsWith('family:') ? cf.filter.bowl.slice(7) : null;
+  const word = family || kind;
+  const switcher = kinds.length > 1 && (
+    <Switch label="Pace or spin" value={kind} options={[['pace', 'Pace'], ['spin', 'Spin']]}
+      onChange={(k) => { setPick(k); if (family) cf.setFilter({ ...cf.filter, bowl: '' }); }} />
+  );
+  const bowlOpts = [['', `All ${kind}`], ...KIND_FAMILIES[kind].map((x) => [`family:${x}`, x])];
   return (
     <Filtered on={cf.active} loading={f.loading}>
-      <PaceMapView player={player} cells={d.cells} paceSr={d.sr} action={cf.icon} filtered={cf.active}
-        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} />}
-        noteOverride={cf.active ? `${filterWords(cf.filter)} · against his ${d.sr ? Math.round(d.sr) : '–'} v pace` : null} />
+      <PaceMapView player={player} cells={d.cells} paceSr={d.sr} kindWord={word.toLowerCase()} switcher={switcher}
+        action={cf.icon} filtered={cf.active}
+        panel={cf.open && <FilterPanel filter={cf.filter} setFilter={cf.setFilter} bowlOpts={bowlOpts} />}
+        noteOverride={cf.active ? `${[family, cf.filter.phase ? PHASE_WORDS[cf.filter.phase] : null].filter(Boolean).join(' · ').replace(/^./, (c) => c.toUpperCase())} · v his ${d.sr ? Math.round(d.sr) : '–'} v ${family ? 'it' : kind}` : null} />
     </Filtered>
   );
 };
@@ -725,7 +769,7 @@ export const RoleCardSet = ({ role, player, data, hand, query }) => {
         {data.start?.points?.length > 1 && <StartCard player={player} start={data.start} />}
         <GroupHead>How to bowl to him</GroupHead>
         <FamiliesCard player={player} families={data.families} strikeRate={data.strike_rate} />
-        <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} query={query} />
+        <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} spinCells={data.spin_cells} spinSr={data.spin_sr} query={query} />
         {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} query={query} />}
         <ShotMixCard player={player} mix={data.shot_mix} hand={h} query={query} />
         <WicketsCard player={player} style={data.out_style} rows={data.dismissals} query={query} bat />

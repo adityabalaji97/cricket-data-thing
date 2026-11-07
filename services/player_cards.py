@@ -17,7 +17,7 @@ from services.player_verdict import ROLE_MIN_BALLS, default_window, scope_params
 from services.query_cache import cached_run
 from services.wicket_style import wicket_style
 
-CARDS_VERSION = "c5"  # c5: the batter's out style; c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels; c4: wicket style
+CARDS_VERSION = "c6"  # c6: the spin length map; c5: the batter's out style; c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels; c4: wicket style
 START_BALLS = 30          # the start card runs to the 30th ball of an innings
 FAMILY_MIN_BALLS = 40     # a bowling family with fewer balls is left off
 CELL_MIN_BALLS = 15       # a pitch-map cell with fewer balls is left blank
@@ -120,6 +120,7 @@ def batting_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
 # ---- scouting (PROFILE_SCOUTING_PLAN.md) ---------------------------------------------------------------------------
 
 PACE = {"bowl_kind": ["pace bowler"]}
+SPIN = {"bowl_kind": ["spin bowler"]}
 PACE_SHORT_OF_FULL = {"bowl_kind": ["pace bowler"], "length": ["GOOD_LENGTH", "SHORT_OF_A_GOOD_LENGTH"]}
 LEG_SQUARE = {"RHB": (1, 2, 3), "LHB": (7, 6, 5)}  # fine leg, square leg, midwicket (wagon zones are the field's, not the batter's)
 
@@ -152,6 +153,19 @@ def _average_batter(db, fmt: str, base: Dict[str, Any], hand: str) -> Dict[str, 
     return {"boundary": {int(k): v for k, v in out["boundary"].items()}, "shots": out["shots"]}
 
 
+def _length_map(db, fmt: str, q: Dict[str, Any]):
+    """His strike rate against one kind (or type) of bowling, and by line and length (cells with 20+ balls). Pace and
+    spin are kept apart: a good length from a spinner is a different ball, so one map would show the mix he faced."""
+    me = _q(db, fmt, group_by=["batter"], **q)
+    sr = _n(me[0].get("strike_rate")) if me else None
+    if not sr:
+        return None, []
+    return sr, [{"line": r["line"], "length": r["length"], "balls": r.get("balls") or 0,
+                 "strike_rate": round(_n(r.get("strike_rate")) or 0, 1), "outs": r.get("wickets") or 0}
+                for r in _q(db, fmt, group_by=["line", "length"], **q)
+                if r.get("line") and r.get("length") and (r.get("balls") or 0) >= PACE_CELL_MIN]
+
+
 def scouting_batting(db, fmt: str, who: Dict[str, Any], base: Dict[str, Any]) -> Dict[str, Any]:
     """How to bowl to him: pace by line and length against his strike rate against pace; where his boundaries go
     against pace short of full, against the average batter of his hand (and the fielder who matters); his scoring shots
@@ -159,14 +173,8 @@ def scouting_batting(db, fmt: str, who: Dict[str, Any], base: Dict[str, Any]) ->
     hands = _q(db, fmt, group_by=["bat_hand"], **who)
     hand = max(hands, key=lambda r: r.get("balls") or 0)["bat_hand"] if hands else "RHB"
     hand = hand if hand in ("RHB", "LHB") else "RHB"
-    pace_me = _q(db, fmt, group_by=["batter"], **PACE, **who)
-    pace_sr = _n(pace_me[0].get("strike_rate")) if pace_me else None
-    pace_cells = []
-    if pace_sr:
-        pace_cells = [{"line": r["line"], "length": r["length"], "balls": r.get("balls") or 0,
-                       "strike_rate": round(_n(r.get("strike_rate")) or 0, 1), "outs": r.get("wickets") or 0}
-                      for r in _q(db, fmt, group_by=["line", "length"], **PACE, **who)
-                      if r.get("line") and r.get("length") and (r.get("balls") or 0) >= PACE_CELL_MIN]
+    pace_sr, pace_cells = _length_map(db, fmt, {**who, **PACE})
+    spin_sr, spin_cells = _length_map(db, fmt, {**who, **SPIN})
     avg = _average_batter(db, fmt, base, hand)
     zone_rows = _q(db, fmt, group_by=["wagon_zone"], **PACE_SHORT_OF_FULL, **who)
     mine = _boundary_shares(zone_rows)
@@ -185,7 +193,8 @@ def scouting_batting(db, fmt: str, who: Dict[str, Any], base: Dict[str, Any]) ->
         top = sorted((k for k in shares if k not in NOT_SCORING), key=lambda k: -shares[k])[:6]
         shots = {"rows": [{"family": k, "share": round(shares[k], 1), "average": round(avg["shots"].get(k, 0), 1)} for k in top],
                  "runs": tagged}
-    return {"hand": hand, "pace_sr": pace_sr, "pace_cells": pace_cells, "boundary": boundary, "shot_mix": shots,
+    return {"hand": hand, "pace_sr": pace_sr, "pace_cells": pace_cells, "spin_sr": spin_sr, "spin_cells": spin_cells,
+            "boundary": boundary, "shot_mix": shots,
             "catches": catch_points(db, fmt, who)}
 
 
@@ -316,14 +325,11 @@ def card_slice(db, player: str, card: str, fmt: str = "T20", scope: str = "stron
             return {"zones": zr, "balls": balls, "strike_rate": round(100 * sum(z["runs"] for z in zr) / balls, 1) if balls else None,
                     "catches": catch_points(db, fmt, q)}
         if card == "pace_map":
-            q = {**bat, "batters": [player], **PACE}
+            # The length map for pace (the default) or spin, or one bowling type behind the card's filter.
+            q = {**bat, "batters": [player], **({} if ("bowl_kind" in flt or "bowl_style" in flt) else PACE)}
+            sr, cells = _length_map(db, fmt, q)
             me = _q(db, fmt, group_by=["batter"], **q)
-            pace_sr = _n(me[0].get("strike_rate")) if me else None
-            cells = [{"line": r["line"], "length": r["length"], "balls": r.get("balls") or 0,
-                      "strike_rate": round(_n(r.get("strike_rate")) or 0, 1), "outs": r.get("wickets") or 0}
-                     for r in _q(db, fmt, group_by=["line", "length"], **q)
-                     if r.get("line") and r.get("length") and (r.get("balls") or 0) >= PACE_CELL_MIN] if pace_sr else []
-            return {"pace_sr": pace_sr, "pace_cells": cells, "balls": (me[0].get("balls") if me else 0)}
+            return {"pace_sr": sr, "pace_cells": cells, "balls": (me[0].get("balls") if me else 0)}
         if card == "shot_mix":
             rows = _q(db, fmt, group_by=["shot_family"], batters=[player], **bat)
             shares = _family_run_shares(rows)
