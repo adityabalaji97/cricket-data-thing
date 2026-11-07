@@ -52,7 +52,10 @@ SCRIPT_MODEL = os.getenv("REEL_SCRIPT_MODEL", llm.MODEL_STRONG)
 TONE = os.getenv("REEL_TONE") or ("Brisk, confident cricket analyst on a highlights show: a quick, lively pace. "
                                   "Conversational, energetic but not shouty; land each number clearly; slight lift on the hook.")
 FPS = 30
-W, H, SLIDE_H, TOP = 1080, 1920, 1350, 285
+#: The slide sits in a centred 880x1100 box, not edge to edge: on a tall phone (19.5:9) Instagram fills the screen's
+#: height with a 9:16 Reel and crops about 95px off each side, which cut into the slide's labels and values (GT, 7 Nov).
+W, H, SLIDE_W, SLIDE_H, TOP = 1080, 1920, 880, 1100, 300
+LEFT = (W - SLIDE_W) // 2
 BG = "0x0a0c11"
 GAP = 0.12                     # seconds of silence between lines
 #: Two lengths: short (about 25-30s, 3 charts) and long (45-60s, up to 5 charts, room for the advanced metrics).
@@ -566,7 +569,7 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
         # the first beat gives up that time, so everything after stays where the voice put it.
         clip = tmp / "cover.mp4"
         _ff([ffmpeg, "-y", "-loglevel", "error", "-loop", "1", "-t", f"{COVER_SECONDS:.3f}", "-i", str(cover),
-             "-vf", f"scale={W}:{SLIDE_H},pad={W}:{H}:0:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
+             "-vf", f"scale={SLIDE_W}:{SLIDE_H},pad={W}:{H}:{LEFT}:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
              "-t", f"{COVER_SECONDS:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(clip)], timeout=120)
         clips.append(clip)
         lead = COVER_SECONDS
@@ -576,8 +579,8 @@ def compose(tmp: Path, beat_frames: List[Path], durations: List[float], voice: P
         n = len(list(frames.glob("*.png")))
         hold = max(0.0, secs - n / FPS)
         _ff([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", str(frames / "%03d.png"),
-             "-vf", f"scale={W}:{SLIDE_H},tpad=stop_mode=clone:stop_duration={hold:.3f},"
-                    f"pad={W}:{H}:0:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
+             "-vf", f"scale={SLIDE_W}:{SLIDE_H},tpad=stop_mode=clone:stop_duration={hold:.3f},"
+                    f"pad={W}:{H}:{LEFT}:{TOP}:color={BG},setsar=1,fps={FPS},format=yuv420p",
              "-t", f"{secs:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(clip)], timeout=300)
         clips.append(clip)
     listing = tmp / "clips.txt"
@@ -724,7 +727,7 @@ def cover_png(slide: Path, out: Path) -> Path:
     brand = out.parent / "cover-brand.txt"
     brand.write_text("HINDSIGHT  ·  hindsightcricket.com")
     _ff([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-i", str(slide), "-vf",
-         f"scale={W}:{SLIDE_H},pad={W}:{H}:0:{TOP}:color={BG},"
+         f"scale={SLIDE_W}:{SLIDE_H},pad={W}:{H}:{LEFT}:{TOP}:color={BG},"
          + _drawtext(brand, FONT_BODY, 34, f"({TOP}-text_h)/2", 0, 1, color="0xb6f24a"),
          "-frames:v", "1", str(out)], timeout=60)
     return out

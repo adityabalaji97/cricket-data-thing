@@ -299,18 +299,23 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
     return tweets
 
 
-def hand_thread(texts: List[str], caption: str, players: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def hand_thread(texts: List[Any], caption: str, players: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """A hand-written thread with the thread rules applied (docs/social_rules.md, X): each player's first mention as a
     hashtag, and every tweet ending with the post's lead tag (the caption's first tag, e.g. #NZvIND) and
     #CricketTwitter. Write the texts without those tags; a tweet that no longer fits raises, so it gets rewritten,
-    not cut."""
+    not cut.
+
+    Each text is a string (it gets the slide with its own number) or (slide, text): the carousel slide the tweet is
+    written around and goes out with (None: no image). The tweets reuse the Instagram images, so write each one about
+    its slide."""
     tags = " ".join(thread_tags(caption))
+    pairs = [t if isinstance(t, tuple) else (n, t) for n, t in enumerate(texts, start=1)]
     out = []
-    for n, text in enumerate(tag_players(texts, players or []), start=1):
+    for n, ((slide, _), text) in enumerate(zip(pairs, tag_players([t for _, t in pairs], players or [])), start=1):
         tweet = f"{text.rstrip()}\n{tags}"
         if _weight(tweet) > LIMIT:
             raise ValueError(f"tweet {n} is {_weight(tweet)} characters with its tags ({LIMIT} max): {tweet!r}")
-        out.append({"n": n, "slide": n, "text": tweet})
+        out.append({"n": n, "slide": slide, "text": tweet})
     return out
 
 

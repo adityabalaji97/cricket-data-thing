@@ -422,7 +422,8 @@ def build(db, code):
               kicker="Against the winners' template")
     return {"team": team, "code": code, "colour": colour, "lead": lead, "cards": [c2, c3, c4, c5, c6, c7],
             "players": players, "trio": trio, "under": under, "bargain": bargain, "big": big, "top": top, "below": below,
-            "bill": bill, "freed": freed, "played": played, "trade": trade, "grade": g, "gaps": gaps}
+            "bill": bill, "freed": freed, "played": played, "trade": trade, "grade": g, "gaps": gaps,
+            "best_b": best_b, "worst_b": worst_b, "best_c": best_c}
 
 
 # A role as copy says it.
@@ -472,23 +473,37 @@ def copy(b):
 
 
 def thread(b, link):
+    """One tweet per carousel slide, in slide order, each written about its own image (the tweets reuse the
+    Instagram slides: 1 cover, 2 wins added, 3 batting, 4 bowling, 5 value, 6 three calls, 7 template, 8 end)."""
     T = TEAMS[b["code"]]
-    u, g, big = b["under"], b["bargain"], b["big"]
+    u, g, big, top = b["under"], b["bargain"], b["big"], b["top"]
+    bb, wb, bc = b["best_b"], b["worst_b"], b["best_c"]
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
+    wins = f"Most wins added in this squad since 2025: {top['name']}, {sg(top['wpa'])}. {b['below']} of {len(b['played'])} added none or less."
     tr = b.get("trade")
+    if tr:
+        full, head = trade_tweet(tr), trade_tweet(tr).split(" Since 2025:")[0]
+        wins = next((f"{t}\n\n{wins}" for t in (full, head) if len(f"{t}\n\n{wins}") <= 230), wins)
     texts = [
-        f"{u['name']} cost {crore(u['price'])} and added {sg(u['wpa'])} wins for {T['short']} since the mega auction. "
-        f"{g['name']} cost {crore(g['price'])}: {sg(g['wpa'])}. The retention case, player by player 🧵",
-    ] + ([trade_tweet(tr)] if tr else []) + [
-        f"Most wins added in this squad: {b['top']['name']}, {sg(b['top']['wpa'])}. {b['below']} of {len(b['played'])} added none or less.",
-        f"The big name: {big['name']} ({crore(big['price'])}), {sg(big['wpa'])} wins since 2025.",
-        f"Against what playoff sides have had since 2023: {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
-        + (f" Furthest short: {gap_text(b['gaps'][0])}." if b["gaps"] else ""),
-        f"Who would you keep?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9",
+        (1, f"{T['short']} have until 17 November to name who they keep for IPL 2027. {u['name']} cost {crore(u['price'])} "
+            f"and added {sg(u['wpa'])} wins since the mega auction. The case, player by player 🧵"),
+        (2, wins),
+        (3, f"Batting by role, in runs above par per 100 balls: {bb['name']} the best at {sg(bb['bat_raa100'], 0)}, "
+            f"{wb['name']} the furthest below at {sg(wb['bat_raa100'], 0)}."),
+        (4, (f"Bowling by phase: {bc[0]} saves {bc[2]:.1f} runs every four overs {'at the death' if bc[1] == 'death' else 'in the ' + PH[bc[1]]}, "
+             f"the most by anyone in any phase." if bc else "Bowling by phase: runs saved against par, every four overs.")),
+        (5, f"Price against wins added. The bargain: {g['name']}, {sg(g['wpa'])} for {crore(g['price'])}. "
+            f"The big price: {u['name']}, {sg(u['wpa'])} for {crore(u['price'])}."),
+        (6, f"Three calls: {big['name']} ({crore(big['price'])}, {sg(big['wpa'])} wins), {u['name']} ({crore(u['price'])}, "
+            f"{sg(u['wpa'])}) and {g['name']} ({crore(g['price'])}, {sg(g['wpa'])}). The case for and against each."),
+        (7, f"Against what playoff sides have had since 2023: {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
+            + (f" Furthest short: {gap_text(b['gaps'][0])}." if b["gaps"] else "")),
+        (8, f"Who would you keep?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9"),
     ]
     from services.ig_x import hand_thread
 
-    return hand_thread(texts, copy(b)[1], [u["name"], g["name"], big["name"]])
+    return hand_thread(texts, copy(b)[1], list(dict.fromkeys([u["name"], g["name"], big["name"], top["name"], bb["name"],
+                                                              wb["name"]] + ([bc[0]] if bc else []))))
 
 
 def trade_tweet(tr):
@@ -533,9 +548,10 @@ def main() -> int:
     ap.add_argument("--team", required=True, choices=sorted(TEAMS))
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--base", default=SITE)
+    ap.add_argument("--x-only", action="store_true", help="production: rewrite only the queued post's X thread (no render, no Reel)")
     ap.add_argument("--date", help="the day it posts (RETENTION_SERIES_PLAN.md schedule), YYYY-MM-DD; default today")
     args = ap.parse_args()
-    if args.write:
+    if args.write or args.x_only:
         assert "localhost" not in os.environ.get("DATABASE_URL", ""), "--write is production: leave DATABASE_URL unset"
     from database import get_session
     from services.social_rules import findings, hook_problem, thread_problems
@@ -561,6 +577,21 @@ def main() -> int:
     (out / "reel.json").write_text(json.dumps(reel_script(b), indent=1))
     (out / "slides.json").write_text(json.dumps({"slides": slides, "hook": hook, "caption": caption, "x": th}, default=str, indent=1))
     print("REEL:", json.dumps(reel_script(b)))
+    if args.x_only and not tp:
+        from sqlalchemy import text
+
+        from database import engine
+        from services.ig_links import post_link
+
+        key = f"ig:retention-{args.team.lower()}-2027"
+        with engine.begin() as conn:
+            fact = conn.execute(text("SELECT facts FROM content_packs WHERE angle_key = :k"), {"k": key}).scalar()
+            assert fact, f"{key} isn't queued"
+            x = thread(b, post_link(fact))
+            conn.execute(text("UPDATE content_packs SET facts = jsonb_set(facts, '{x}', CAST(:x AS jsonb)) WHERE angle_key = :k"),
+                         {"x": json.dumps(x), "k": key})
+        print(f"rewrote the X thread of {key}: {len(x)} tweets, slides {[t['slide'] for t in x]}")
+        return 0
     if problems or hp or tp or not args.write:
         return 1 if (problems or hp or tp) else 0
 
