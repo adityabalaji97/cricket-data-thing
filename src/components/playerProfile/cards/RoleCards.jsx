@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { colors, fonts } from '../../../theme/hindsightDark';
 import ProfileCard from './ProfileCard';
+import config from '../../../config';
 
 // The role cards below the verdict and "plays like" (PROFILE_SIMPLIFY_PLAN.md P3-P5), drawn from GET
 // /player/{name}/cards for the verdict's window. Batters: his start, where he scores, against each bowling type, how
@@ -169,20 +170,107 @@ export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = 
         <rect x={c - 3} y={c - 9} width="6" height="18" rx="2" fill="#c9b27c" />
       </Box>
       <Legend items={[[labels?.[0] || `Faster than his ${Math.round(strikeRate)}`, faster], [labels?.[1] || 'Slower', slower],
-        ...(catches?.points?.length ? [[`Caught · ${catches.plotted} of ${catches.total}`, '#ffffff']] : [])]} />
+        ...(catches?.points?.length ? [[`Caught · ${catches.plotted}/${catches.total}`, '#ffffff']] : [])]} />
     </>
   );
 };
 
 /** Where he scores: the scoring wheel on the profile. */
-export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, catches }) => {
+// ---- the wheel's own filters (a gear on the card: phase, pace or spin, a bowling type) ----------------------------
+
+const PHASE_OPTS = [['', 'All overs'], ['powerplay', 'Powerplay'], ['middle', 'Middle'], ['death', 'Death']];
+const BOWL_OPTS = [['', 'All bowling'], ['kind:pace', 'Pace'], ['kind:spin', 'Spin'],
+  ...['Right-arm pace', 'Left-arm pace', 'Off-spin', 'Leg-spin', 'Left-arm orthodox', 'Left-arm wrist spin'].map((f) => [`family:${f}`, f])];
+const PHASE_WORDS = { powerplay: 'powerplay', middle: 'middle overs', death: 'death overs' };
+
+/** The filter's words for the card's note, so a screenshot says what it shows ("Spin · death overs"). */
+const filterWords = (f) => [f.bowl ? f.bowl.split(':')[1] : null, f.phase ? PHASE_WORDS[f.phase] : null].filter(Boolean)
+  .map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' · ');
+
+const Pill = ({ on, onClick, children }) => (
+  <Box component="button" type="button" onClick={onClick} aria-pressed={on}
+    sx={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, px: 1.1, py: '3px', borderRadius: '999px', whiteSpace: 'nowrap',
+      border: `1px solid ${on ? colors.accent : colors.borderStrong}`, bgcolor: on ? colors.accent : 'transparent',
+      color: on ? colors.bg : colors.textMed, '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
+    {children}
+  </Box>
+);
+
+/** The gear and its panel: phase always; bowling for a batter's wheel. */
+const WheelFilter = ({ filter, setFilter, bowling }) => {
+  const [open, setOpen] = useState(false);
+  const active = !!(filter.phase || filter.bowl);
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+      <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+        <Box component="button" type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Filter this chart"
+          sx={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.6, fontSize: 12.5, px: 1.1, py: '3px',
+            borderRadius: '999px', border: `1px solid ${active ? colors.accent : colors.borderStrong}`, color: active ? colors.accent : colors.textMed }}>
+          <Box component="svg" viewBox="0 0 24 24" sx={{ width: 14, height: 14 }} aria-hidden="true">
+            <path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4L10.7 6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
+          </Box>
+          {active ? filterWords(filter) : 'Filter'}
+        </Box>
+        {active && <Pill on={false} onClick={() => setFilter({ phase: '', bowl: '' })}>Clear</Pill>}
+      </Box>
+      {open && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, p: 1, borderRadius: '12px', bgcolor: colors.surface2 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {PHASE_OPTS.map(([v, l]) => <Pill key={l} on={filter.phase === v} onClick={() => setFilter({ ...filter, phase: v })}>{l}</Pill>)}
+          </Box>
+          {bowling && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {BOWL_OPTS.map(([v, l]) => <Pill key={l} on={filter.bowl === v} onClick={() => setFilter({ ...filter, bowl: v })}>{l}</Pill>)}
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+/** The filtered wheel's numbers (GET /player/{name}/wheel), only when a filter is on; null otherwise. */
+const useWheel = (player, role, query, filter, hand) => {
+  const [state, setState] = useState({ key: null, data: null, loading: false });
+  const on = !!(filter.phase || filter.bowl);
+  const params = new URLSearchParams(query || '');
+  params.set('role', role);
+  if (filter.phase) params.set('phase', filter.phase);
+  if (filter.bowl) { const [k, v] = filter.bowl.split(':'); params.set(k === 'kind' ? 'kind' : 'family', v); }
+  if (hand) params.set('hand', hand);
+  const key = on ? params.toString() : null;
+  useEffect(() => {
+    if (!key) return undefined;
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true }));
+    fetch(`${config.API_URL}/player/${encodeURIComponent(player)}/wheel?${key}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data) => { if (!cancelled) setState({ key, data, loading: false }); })
+      .catch(() => { if (!cancelled) setState({ key, data: null, loading: false }); });
+    return () => { cancelled = true; };
+  }, [key, player]);
+  return on ? { data: state.key === key ? state.data : null, loading: state.loading } : { data: null, loading: false };
+};
+
+export const ScoringAreasCard = ({ player, zones, hand, strikeRate, boundary, catches, query }) => {
+  const [filter, setFilter] = useState({ phase: '', bowl: '' });
+  const f = useWheel(player, 'bat', query, filter);
   if (!zones.reduce((a, z) => a + z.runs, 0)) return null;
   const left = hand === 'LHB';
+  const on = !!(filter.phase || filter.bowl);
+  const d = on && f.data ? f.data : { zones, strike_rate: strikeRate, catches };
   const key = boundary ? ZONES_RHB[left ? MIRROR[boundary.key_zone] : boundary.key_zone].toLowerCase() : null;
+  // Descriptive, not advice: we don't know where the fielders stood, so where his boundaries go isn't where to put one.
+  const note = on ? `${filterWords(filter)} · ${d.zones ? d.zones.reduce((a, z) => a + z.balls, 0) : 0} balls`
+    : boundary ? `Outlined: most of his boundaries off pace, ${key} · ${boundary.key_share}%` : `Share of runs by area (${left ? 'left' : 'right'}-handed)`;
+  const empty = on && f.data && !f.data.zones?.length;
   return (
-    <ProfileCard id="scoring" title="Where he scores" player={player}
-      note={boundary ? `Outlined: the fielder who matters v pace, ${key} · ${boundary.key_share}%` : `Share of runs by area (${left ? 'left' : 'right'}-handed)`}>
-      <ScoringWheel zones={zones} hand={hand} strikeRate={strikeRate} catches={catches} outline={boundary?.key_zone} />
+    <ProfileCard id="scoring" title="Where he scores" player={player} note={note}>
+      <WheelFilter filter={filter} setFilter={setFilter} bowling />
+      <Box sx={{ opacity: on && f.loading ? 0.45 : 1, transition: 'opacity 150ms' }}>
+        {empty ? <Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box>
+          : <ScoringWheel zones={d.zones || zones} hand={hand} strikeRate={d.strike_rate || strikeRate} catches={d.catches} outline={on ? null : boundary?.key_zone} />}
+      </Box>
     </ProfileCard>
   );
 };
@@ -396,28 +484,39 @@ export const HandsCard = ({ player, hands }) => {
 
 /** Where batters score off him, one hand at a time (a switch), with his catches on the same wheel: wedge size the
  * share of runs, colour faster or slower than batters of that hand go off him, dots where the catches were taken. */
-export const BowlerWheelCard = ({ player, byHand, catchesByHand }) => {
+export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
   const hands = ['RHB', 'LHB'].filter((h) => byHand?.[h]);
   const [pick, setPick] = useState(null);
-  if (!hands.length) return null;
+  const [filter, setFilter] = useState({ phase: '', bowl: '' });
   const h = hands.includes(pick) ? pick : hands[0];
-  const d = byHand[h];
+  const f = useWheel(player, 'bowl', query, filter, h);
+  if (!hands.length) return null;
+  const on = !!filter.phase;
+  const base = byHand[h];
+  const d = on && f.data ? f.data : { ...base, catches: catchesByHand?.[h] };
+  const empty = on && f.data && !f.data.zones?.length;
   return (
     <ProfileCard id="scoring-against" title="Where batters score off him" player={player}
-      note={`Share of runs by area · ${h === 'LHB' ? 'left' : 'right'}-handers`}>
-      {hands.length > 1 && (
-        <Box role="tablist" aria-label="Batter's hand" sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
-          {hands.map((x) => (
-            <Box key={x} component="button" type="button" role="tab" aria-selected={x === h} onClick={() => setPick(x)}
-              sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
-                bgcolor: x === h ? colors.accent : 'transparent', color: x === h ? colors.bg : colors.textMed }}>
-              {x === 'RHB' ? 'Right-handers' : 'Left-handers'}
-            </Box>
-          ))}
-        </Box>
-      )}
-      <ScoringWheel zones={d.zones} hand={h} strikeRate={d.strike_rate} catches={catchesByHand?.[h]}
-        labels={[`Faster than ${Math.round(d.strike_rate)} off him`, 'Slower']} />
+      note={`${h === 'LHB' ? 'Left' : 'Right'}-handers${on ? ` · ${PHASE_WORDS[filter.phase]}` : ''} · share of runs by area`}>
+      <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
+        {hands.length > 1 && (
+          <Box role="tablist" aria-label="Batter's hand" sx={{ display: 'inline-flex', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
+            {hands.map((x) => (
+              <Box key={x} component="button" type="button" role="tab" aria-selected={x === h} onClick={() => setPick(x)}
+                sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
+                  bgcolor: x === h ? colors.accent : 'transparent', color: x === h ? colors.bg : colors.textMed }}>
+                {x === 'RHB' ? 'Right-handers' : 'Left-handers'}
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Box>
+      <WheelFilter filter={filter} setFilter={setFilter} />
+      <Box sx={{ opacity: on && f.loading ? 0.45 : 1, transition: 'opacity 150ms' }}>
+        {empty ? <Box sx={{ color: colors.textLo, fontSize: 13.5, py: 4, textAlign: 'center' }}>Too few balls for this filter.</Box>
+          : <ScoringWheel zones={d.zones || base.zones} hand={h} strikeRate={d.strike_rate || base.strike_rate} catches={d.catches}
+            labels={[`Faster than ${Math.round(d.strike_rate || base.strike_rate)} off him`, 'Slower']} />}
+      </Box>
     </ProfileCard>
   );
 };
@@ -455,7 +554,7 @@ export const ShotsAgainstCard = ({ player, rows, srAgainst }) => {
 };
 
 /** The batter's or bowler's four cards. */
-export const RoleCardSet = ({ role, player, data, hand }) => {
+export const RoleCardSet = ({ role, player, data, hand, query }) => {
   if (!data) return null;
   if (role === 'bat') {
     const h = data.hand || hand;
@@ -465,7 +564,7 @@ export const RoleCardSet = ({ role, player, data, hand }) => {
         <GroupHead>How to bowl to him</GroupHead>
         <FamiliesCard player={player} families={data.families} strikeRate={data.strike_rate} />
         <PaceMapCard player={player} cells={data.pace_cells} paceSr={data.pace_sr} />
-        {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} />}
+        {data.zones?.length > 0 && <ScoringAreasCard player={player} zones={data.zones} hand={h} strikeRate={data.strike_rate} boundary={data.boundary} catches={data.catches} query={query} />}
         <ShotMixCard player={player} mix={data.shot_mix} hand={h} />
         <OutsCard player={player} rows={data.dismissals} />
       </>
@@ -475,7 +574,7 @@ export const RoleCardSet = ({ role, player, data, hand }) => {
     <>
       <GroupHead>How to bat against him</GroupHead>
       <PitchCard player={player} cells={data.cells} economy={data.economy} />
-      <BowlerWheelCard player={player} byHand={data.zones_by_hand} catchesByHand={data.catches_by_hand} />
+      <BowlerWheelCard player={player} byHand={data.zones_by_hand} catchesByHand={data.catches_by_hand} query={query} />
       <ShotsAgainstCard player={player} rows={data.shots_against} srAgainst={data.strike_rate_against} />
       <PhaseCard player={player} phases={data.phases} />
       <HandsCard player={player} hands={data.hands} />

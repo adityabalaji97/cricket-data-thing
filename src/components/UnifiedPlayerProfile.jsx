@@ -155,7 +155,7 @@ const UnifiedPlayerProfile = () => {
           </>
         )}
         {cards.status === 'ready' && shown.map((role) => (
-          <RoleCardSet key={role} role={role} player={name} data={cards.data.roles[role]} hand={summary?.identity?.bat_hand} />
+          <RoleCardSet key={role} role={role} player={name} data={cards.data.roles[role]} hand={summary?.identity?.bat_hand} query={windowQuery(win)} />
         ))}
         {cards.status === 'error' && (
           <Box sx={{ color: colors.textLo, fontSize: 13.5 }}>The detailed cards couldn't load just now. Try again shortly.</Box>

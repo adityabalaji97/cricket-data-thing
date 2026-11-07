@@ -267,6 +267,51 @@ def bowling_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
     }
 
 
+# ---- the wheel's own filters (the gear on "Where he scores" / "Where batters score off him") ------------------------
+
+KIND_CODES = {"pace": ["pace bowler"], "spin": ["spin bowler"]}
+
+
+def wheel(db, player: str, role: str, fmt: str = "T20", scope: str = "strong", period: str = "recent",
+          start_date: Optional[date] = None, end_date: Optional[date] = None, phase: Optional[str] = None,
+          kind: Optional[str] = None, family: Optional[str] = None, hand: Optional[str] = None) -> Dict[str, Any]:
+    """One wheel's zones and catches for the card's own filters: a phase, pace or spin, or one bowling family (a
+    batter's wheel), or the batter's hand (a bowler's). Same window and scope as the page; cached per filter."""
+    from services.analytics_common import phase_bounds
+
+    def run():
+        start, end = default_window(fmt, period=period)
+        base = {"start_date": start_date or start, "end_date": end_date or end, **scope_params(fmt, scope)}
+        who = (dict(batters=[player], metrics_perspective="batting") if role == "bat"
+               else dict(bowlers=[player], metrics_perspective="bowling"))
+        if phase:
+            ph = next((p for p in phase_bounds(fmt, "male") if p.key == phase), None)
+            if ph:
+                who["over_min"] = ph.start_over
+                if ph.end_over is not None:
+                    who["over_max"] = ph.end_over
+        if family:
+            who["bowl_style"] = [code for code, fam in FAMILIES.items() if fam == family]
+        elif kind in KIND_CODES:
+            who["bowl_kind"] = KIND_CODES[kind]
+        if hand in ("RHB", "LHB"):
+            who["bat_hand"] = hand
+        zr = [{"zone": int(r["wagon_zone"]), "runs": r.get("runs") or 0, "balls": r.get("balls") or 0,
+               "strike_rate": _n(r.get("strike_rate"))}
+              for r in _q(db, fmt, group_by=["wagon_zone"], **who, **base) if r.get("wagon_zone") and 1 <= int(r["wagon_zone"]) <= 8]
+        balls = sum(z["balls"] for z in zr)
+        return {"zones": zr, "balls": balls,
+                "strike_rate": round(100 * sum(z["runs"] for z in zr) / balls, 1) if balls else None,
+                "catches": catch_points(db, fmt, {**who, **base})}
+
+    key = {"kind": "player_wheel", "v": CARDS_VERSION, "player": player.strip().lower(), "role": role, "fmt": fmt,
+           "scope": scope, "period": period, "start_date": start_date, "end_date": end_date, "phase": phase,
+           "bowl": family or kind, "hand": hand}
+    if end_date is None:
+        key["day"] = date.today()
+    return cached_run(db, key, run)
+
+
 # ---- the call -----------------------------------------------------------------------------------------------------
 
 def build_cards(db, player: str, fmt: str = "T20", scope: str = "strong", start_date: Optional[date] = None,

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
-from services.player_cards import CardsBusy, get_cards
+from services.player_cards import CardsBusy, get_cards, wheel
 from services.player_verdict import PoolsCold, SummaryBusy, get_summary
 
 router = APIRouter(tags=["player"])
@@ -87,5 +87,28 @@ def player_compare(
         out = get_compare(db, a, b, format, period, scope)
     except PoolsCold:
         raise HTTPException(status_code=503, detail="Career pools are still being built; try again shortly", headers={"Retry-After": "30"})
+    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    return out
+
+
+@router.get("/player/{player_name}/wheel")
+def player_wheel(
+    response: Response,
+    player_name: str = Path(..., description="Any spelling of the player's name"),
+    role: Literal["bat", "bowl"] = Query(default="bat"),
+    format: Literal["T20", "ODI"] = Query(default="T20"),
+    scope: Literal["strong", "all"] = Query(default="strong"),
+    period: Literal["recent", "career"] = Query(default="recent"),
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    phase: Optional[Literal["powerplay", "middle", "death"]] = Query(default=None),
+    kind: Optional[Literal["pace", "spin"]] = Query(default=None, description="Pace or spin (a batter's wheel)"),
+    family: Optional[str] = Query(default=None, description="One bowling family, e.g. Off-spin (a batter's wheel)"),
+    hand: Optional[Literal["RHB", "LHB"]] = Query(default=None, description="The batter's hand (a bowler's wheel)"),
+    db: Session = Depends(get_session),
+):
+    """A scoring wheel with its own filters, for the gear on the profile's wheel cards: zones (runs, balls, strike
+    rate) and catches, in the page's window and scope."""
+    out = wheel(db, player_name, role, format, scope, period, start_date, end_date, phase, kind, family, hand)
     response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
     return out
