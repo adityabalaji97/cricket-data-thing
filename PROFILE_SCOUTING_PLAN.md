@@ -21,7 +21,9 @@ upgrading cards we already have instead of duplicating them.
 | 3 | Where he scores | **upgrade** | The existing wheel, plus one line: against pace short of full, his share of boundary runs square on the leg side against the average batter of his hand, and **the fielder who matters**. |
 | 4 | How he scores | **new** | His main scoring shots, share of runs against the average batter of his hand (the slog share). |
 
-His start and how he gets out stay as they are.
+| 5 | How he gets out | **upgrade** (7 Nov 2026) | His dismissals bowled, LBW, caught and stumped against a typical batter out to the same kinds of bowling in the competitions and years he batted (run-outs left out). Repeats year to year (0.34) but isn't tied to his average or strike rate (`scripts/analysis/batter_bowled.py`): how he gets out, not how good he is. 30+ dismissals to compare. Filter: phase, bowling. `services/wicket_style.py` (role="bat"). |
+
+His start stays as it is.
 
 ## Bowlers: the "How to bat against him" group
 

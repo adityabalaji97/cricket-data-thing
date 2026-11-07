@@ -17,7 +17,7 @@ from services.player_verdict import ROLE_MIN_BALLS, default_window, scope_params
 from services.query_cache import cached_run
 from services.wicket_style import wicket_style
 
-CARDS_VERSION = "c4"  # c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels; c4: wicket style
+CARDS_VERSION = "c5"  # c5: the batter's out style; c2: the scouting cards (PROFILE_SCOUTING_PLAN.md); c3: catches on the wheels; c4: wicket style
 START_BALLS = 30          # the start card runs to the 30th ball of an innings
 FAMILY_MIN_BALLS = 40     # a bowling family with fewer balls is left off
 CELL_MIN_BALLS = 15       # a pitch-map cell with fewer balls is left blank
@@ -112,6 +112,7 @@ def batting_cards(db, fmt: str, player: str, base: Dict[str, Any]) -> Optional[D
         "zones": zones,
         "families": fam_rows,
         "dismissals": sorted(outs, key=lambda r: -r["count"]),
+        "out_style": wicket_style(db, fmt, player, base, role="bat"),
         **scouting_batting(db, fmt, who, base),
     }
 
@@ -359,6 +360,8 @@ def card_slice(db, player: str, card: str, fmt: str = "T20", scope: str = "stron
                     "balls": me[0]["balls"]}
         if card == "wickets":
             return {"wicket_style": wicket_style(db, fmt, player, base, flt)}
+        if card == "dismissals":
+            return {"wicket_style": wicket_style(db, fmt, player, base, flt, role="bat")}
         raise ValueError(f"unknown card {card!r}")
 
     key = {"kind": "player_card_slice", "v": CARDS_VERSION, "player": player.strip().lower(), "card": card, "fmt": fmt,

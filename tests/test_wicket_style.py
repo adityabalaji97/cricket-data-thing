@@ -3,8 +3,8 @@ from services import wicket_style as W
 
 
 def _fake(monkeypatch, mine, typ):
-    monkeypatch.setattr(W, "_tables", lambda db, fmt, who: mine)
-    monkeypatch.setattr(W, "typical_tables", lambda db, fmt, base, flt: typ)
+    monkeypatch.setattr(W, "_tables", lambda db, fmt, who, balls=True: mine)
+    monkeypatch.setattr(W, "typical_tables", lambda db, fmt, base, flt, perspective="bowling": typ)
 
 
 def test_typical_is_weighted_by_where_he_took_his_wickets(monkeypatch):
@@ -36,3 +36,14 @@ def test_floors_hide_the_comparison_not_the_split(monkeypatch):
 def test_no_wickets_no_card(monkeypatch):
     _fake(monkeypatch, {"wickets": {}, "balls": {}}, {"wickets": {}, "balls": {}})
     assert W.wicket_style(None, "T20", "X", {}) is None
+
+
+def test_a_batter_needs_more_dismissals_and_has_no_stumps_line(monkeypatch):
+    w = {("A", 2025, "pace bowler"): {"bowled": 8, "lbw": 2, "caught": 15, "stumped": 0}}
+    typ = {"wickets": {"A|2025|pace bowler": {"bowled": 20, "lbw": 5, "caught": 75, "stumped": 0}}, "balls": {}}
+    _fake(monkeypatch, {"wickets": w, "balls": {}}, typ)
+    s = W.wicket_style(None, "T20", "X", {}, role="bat")
+    assert s["wickets"] == 25 and s["typical"] is None and s["attack"] is None and s["kind"] is None  # 25 < 30
+    w[("A", 2025, "pace bowler")]["caught"] = 25
+    s = W.wicket_style(None, "T20", "X", {}, role="bat")
+    assert s["typical"] == {"bowled": 20.0, "lbw": 5.0, "caught": 75.0, "stumped": 0.0}
