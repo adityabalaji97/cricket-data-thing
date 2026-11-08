@@ -37,7 +37,7 @@ TEAMS = {
     "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Andre Russell"},
     # A player just traded in isn't a retention call, so a side's big name is one it already had (Pant, Kuldeep moved).
     "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel"},  # captain
-    "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Nicholas Pooran"},
+    "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Nicholas Pooran", "hook": "big"},
     "SRH": {"name": "Sunrisers Hyderabad", "short": "Hyderabad", "tag": "#SRH", "big": "Pat Cummins"},
     "RR": {"name": "Rajasthan Royals", "short": "Rajasthan", "tag": "#RR", "big": "Yashasvi Jaiswal"},
     "PBKS": {"name": "Punjab Kings", "short": "Punjab", "tag": "#PBKS", "big": "Shreyas Iyer"},
@@ -382,7 +382,9 @@ def build(db, code):
             (bits_for if (p["bat_raa"] or 0) > 0 else bits_against).append(f"{sg(p['bat_raa'], 0)} runs above par off {p['bat_balls']} balls")
         if p["bowl_balls"] >= MIN_BOWL:
             (bits_for if (p["bowl_raa"] or 0) > 0 else bits_against).append(f"{sg(p['bowl_raa'], 0)} runs saved, {p['wkts']} wickets")
-        (bits_for if p["wpa"] > 0 else bits_against).append(f"{sg(p['wpa'])} wins added")
+        balls = (p["bat_balls"] or 0) + (p["bowl_balls"] or 0)
+        small = f" off {balls} balls (a small sample)" if balls < 300 else ""
+        (bits_for if p["wpa"] > 0 else bits_against).append(f"{sg(p['wpa'])} wins added{small}")
         if p["price"] >= 8:
             bits_against.append(f"costs {crore(p['price'])}")
         elif p["price"] <= 1:
@@ -443,7 +445,10 @@ def gap_text(r):
 def copy(b):
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
-    hook = (f"{u['name']}: {crore(u['price'])}, {sg(u['wpa'])} wins since the mega auction. "
+    # The hook's player: the big price, or the big name where the big price's number rests on a small sample
+    # (TEAMS "hook": "big"; LSG, 8 Nov 2026: Mayank Yadav's −0.60 came from 144 balls).
+    h = big if T.get("hook") == "big" else u
+    hook = (f"{h['name']}: {crore(h['price'])}, {sg(h['wpa'])} wins since the mega auction. "
             f"{g['name']}: {crore(g['price'])}, {sg(g['wpa'])}.")
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
     tr = b.get("trade")
@@ -478,6 +483,7 @@ def thread(b, link):
     T = TEAMS[b["code"]]
     u, g, big, top = b["under"], b["bargain"], b["big"], b["top"]
     bb, wb, bc = b["best_b"], b["worst_b"], b["best_c"]
+    h = big if T.get("hook") == "big" else u
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
     wins = f"Most wins added in this squad since 2025: {top['name']}, {sg(top['wpa'])}. {b['below']} of {len(b['played'])} added none or less."
     tr = b.get("trade")
@@ -485,8 +491,8 @@ def thread(b, link):
         full, head = trade_tweet(tr), trade_tweet(tr).split(" Since 2025:")[0]
         wins = next((f"{t}\n\n{wins}" for t in (full, head) if len(f"{t}\n\n{wins}") <= 230), wins)
     texts = [
-        (1, f"{T['short']} have until 17 November to name who they keep for IPL 2027. {u['name']} cost {crore(u['price'])} "
-            f"and added {sg(u['wpa'])} wins since the mega auction. The case, player by player 🧵"),
+        (1, f"{T['short']} have until 17 November to name who they keep for IPL 2027. {h['name']} cost {crore(h['price'])} "
+            f"and added {sg(h['wpa'])} wins since the mega auction. The case, player by player 🧵"),
         (2, wins),
         (3, f"Batting by role, in runs above par per 100 balls: {bb['name']} the best at {sg(bb['bat_raa100'], 0)}, "
             f"{wb['name']} the furthest below at {sg(wb['bat_raa100'], 0)}."),
@@ -525,12 +531,14 @@ def reel_script(b):
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
     say = lambda p: crore(p["price"]).replace("₹", "")  # noqa: E731
-    return {"hook": f"{u['name']} cost {T['short']} {say(u)}. Since the mega auction, he {spoken(u['wpa'])}.",
+    h = big if T.get("hook") == "big" else u
+    return {"hook": f"{h['name']} cost {T['short']} {say(h)}. Since the mega auction, he {spoken(h['wpa'])}.",
             "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
                       else "Here's the whole squad, by wins added since 2025.",
                       f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
-                      f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
-                      f"{big['name']}, the big name, {spoken(big['wpa'])}.",
+                      (f"And he cost just {say(g)}." if g is b["top"] else f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}."),
+                      (f"{u['name']}, the big price, {spoken(u['wpa'])}, from a small sample." if h is big
+                       else f"{big['name']}, the big name, {spoken(big['wpa'])}."),
                       (f"Against playoff sides, the biggest gap: {SAY[b['gaps'][0]['key']]}."
                        if b["gaps"] else "Against playoff sides, every role is at their level.")]}
 
