@@ -159,7 +159,19 @@ def resolve(db, name):
         return all(max(SequenceMatcher(None, w, x).ratio() for x in long_) >= 0.75 for w in short_)
 
     fits = sorted(k for k in known if same(name, k))
-    return fits[0] if len(fits) == 1 else name
+    if len(fits) == 1:
+        return fits[0]
+    if not fits:
+        # No alias reaches him: try everyone sharing his first name or surname, same rule, one match only ("Digvesh
+        # Singh Rathi" -> "Digvesh Rathi", 8 Nov 2026: he was listed as yet to play since 2025).
+        # Words in any order and any spacing ("Ravichandran Smaran", "Raj<nbsp>Bawa", "Rasikh Dar" for "Rasikh Dar Salam").
+        w = name.split()
+        pool = db.execute(text("SELECT display_name FROM player_identity WHERE display_name ILIKE :a OR display_name ILIKE :b"),
+                          {"a": f"%{w[0]}%", "b": f"%{w[-1]}%"}).scalars().all()
+        fits = sorted({k for k in pool if same(name, k)})
+        if len(fits) == 1:
+            return fits[0]
+    return name
 
 
 def squad(code, db=None):
@@ -348,10 +360,13 @@ def build(db, code):
     under = max([p for p in pool if p["wpa"] < 0] or pool, key=lambda p: p["price"])
     # The bargain: the most wins added for ₹1 crore or less; when nobody that cheap added any (GT, Nov 2026: Kushagra at
     # −0.07), the best for ₹4 crore or less, so "the bargain" is never a player the numbers argue against.
+    # A bargain also needs a real sample and a real number (LSG, 8 Nov 2026: Akash Singh's +0.32 came from 109 balls,
+    # Digvesh Rathi's +0.02 from 546): 300+ balls and +0.10 wins, else the ₹4 crore fallback.
     rest = [p for p in pool if p is not under]
-    bargain = max([p for p in rest if p["price"] <= 1.0] or rest, key=lambda p: p["wpa"])
-    if bargain["wpa"] <= 0:
-        bargain = max([p for p in rest if p["price"] <= 4.0] or rest, key=lambda p: p["wpa"])
+    real = [p for p in rest if (p["bat_balls"] or 0) + (p["bowl_balls"] or 0) >= 300] or rest
+    bargain = max([p for p in real if p["price"] <= 1.0] or real, key=lambda p: p["wpa"])
+    if bargain["wpa"] < 0.1:
+        bargain = max([p for p in real if p["price"] <= 4.0] or real, key=lambda p: p["wpa"])
     trio = [big, under, bargain]
     c5 = card("value", "scatter_plus",
               f"{short(under['name'])} cost {crore(under['price'])} for {sg(under['wpa'])} wins. {short(bargain['name'])}: {crore(bargain['price'])}, {sg(bargain['wpa'])}",
