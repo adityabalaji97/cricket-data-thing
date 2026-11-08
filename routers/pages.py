@@ -70,6 +70,15 @@ def query_suggestions(response: Response, db: Session = Depends(get_session)):
     return suggestions(db)
 
 
+@router.get("/query-recent")
+def query_recent(response: Response, db: Session = Depends(get_session)):
+    """What visitors recently asked the query builder, newest first: the empty screen's "Recently asked"."""
+    from services.recent_questions import recent_questions
+
+    response.headers["Cache-Control"] = "public, max-age=120, s-maxage=300, stale-while-revalidate=3600"
+    return {"items": recent_questions(db)}
+
+
 @router.get("/matchup")
 def matchup(
     response: Response,

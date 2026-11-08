@@ -124,6 +124,14 @@ const QueryPage = ({ isMobile }) => {
       .then((d) => { if (d?.items?.length) setSuggest(d); }).catch(() => {});
   }, []);
 
+  // What visitors recently asked, site-wide (GET /query-recent); this browser's own list when there's none.
+  const [asked, setAsked] = useState(null);
+  useEffect(() => {
+    fetch(`${config.API_URL}/query-recent`).then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAsked((d?.items || []).map((x) => ({ ...x, at: Date.parse(x.at) })))).catch(() => setAsked([]));
+  }, []);
+  const askedList = asked?.length ? asked : recent;
+
   // Run the query whenever the URL holds one.
   useEffect(() => {
     if (!live) { setRun({ status: 'idle', data: null, qs: '' }); return undefined; }
@@ -261,10 +269,10 @@ const QueryPage = ({ isMobile }) => {
               </Box>
             </Box>
           )}
-          {recent.length > 0 && (
+          {askedList.length > 0 && (
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-              <Eyebrow>Your recent</Eyebrow>
-              {recent.map((r) => (
+              <Eyebrow>{asked?.length ? 'Recently asked' : 'Your recent'}</Eyebrow>
+              {askedList.map((r) => (
                 <Box key={r.q} component="button" type="button" onClick={() => navigate({ search: r.search })}
                   sx={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 1, py: 1, borderBottom: `1px solid ${colors.border}`, fontSize: 14.5 }}>
                   <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.q}</Box>
