@@ -2,8 +2,8 @@
 "Recently asked" on the query builder's empty screen: what visitors actually asked, newest first (user, 8 Nov 2026).
 
 From app_events: query_run events (a query that ran) whose page carries the question (q=), in the last 30 days.
-Left out: the owner (any browser that has opened /admin), headless renders and test runs (no country), embeds, and
-questions that look like junk. One row per question (case-insensitive), the latest run's link.
+The owner's own questions count (post work goes through the connector and the database, not this page; user, 8 Nov
+2026). Left out: headless renders and test runs (no country), embeds, and questions that look like junk. One row per question (case-insensitive), the latest run's link.
 """
 from __future__ import annotations
 
@@ -30,7 +30,6 @@ def recent_questions(db, limit: int = LIMIT) -> List[Dict[str, Any]]:
         SELECT ts, path FROM app_events
         WHERE event = 'query_run' AND ts >= now() - interval '30 days' AND path LIKE '/query?%' AND path LIKE '%q=%'
           AND country IS NOT NULL AND anon_id NOT LIKE 'embed-%'
-          AND anon_id NOT IN (SELECT DISTINCT anon_id FROM app_events WHERE path LIKE '/admin%' AND anon_id IS NOT NULL)
         ORDER BY ts DESC LIMIT 500""")).fetchall()
     out, seen = [], set()
     for ts, path in rows:
