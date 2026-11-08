@@ -90,7 +90,8 @@ export const track = (event, props) => {
   if (disabled()) return;
   queue.push({
     event,
-    path: `${window.location.pathname}${window.location.search}`.slice(0, 200),
+    // 1000, not 200: a query builder run's link carries its whole question, and a cut one can't be replayed.
+    path: `${window.location.pathname}${window.location.search}`.slice(0, 1000),
     props: props || undefined,
   });
   if (!timer) timer = setTimeout(flush, FLUSH_MS);
