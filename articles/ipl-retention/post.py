@@ -309,8 +309,12 @@ def build(db, code):
 
     # 2. Who carried them.
     carried = sorted(played, key=lambda p: -p["wpa"])[:8]
+    pair = f"{short(carried[0]['name'])} {sg(carried[0]['wpa'])}, {short(carried[1]['name'])} {sg(carried[1]['wpa'])}"
+    # Two lines at most on the slide (RR, 9 Nov 2026: "V Sooryavanshi" ran it to three).
+    carried_title = (f"Most wins added in this squad since 2025: {pair}" if len(pair) <= 30
+                     else f"Most wins added since 2025: {pair}")
     c2 = card("carried", "metric_bars",
-              f"Most wins added in this squad since 2025: {short(carried[0]['name'])} {sg(carried[0]['wpa'])}, {short(carried[1]['name'])} {sg(carried[1]['wpa'])}",
+              carried_title,
               {"metric": {"label": "Wins added since the 2025 auction", "format": "signed2", "signed": True}, "label_width": 150,
                "rows": [{"name": p["name"], "value": round(p["wpa"], 2), "highlight": i == 0,
                          "detail": " · ".join(x for x in [f"bat RAA {sg(p['bat_raa'], 0)}" if p["bat_balls"] >= MIN_BAT else "",
