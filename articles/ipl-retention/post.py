@@ -228,7 +228,7 @@ def build(db, code):
         spot = max(spots, key=lambda kv: kv[1])[0] if spots else None
         kinds = {k[1]: v for k, v in kind.items() if k[0] == n}
         spin = kinds.get("spin bowler", 0) > kinds.get("pace bowler", 0)
-        if bb < 10 and wb < 12:
+        if bb < 10 and wb < 12:  # the cover's note says "barely played (under 10 balls)": RR's Pretorius faced 8
             group = "Yet to play since 2025"
         elif bb >= MIN_BAT and wb >= MIN_BOWL:
             group = "All-rounders"
@@ -295,13 +295,15 @@ def build(db, code):
     board_title = f"{T['short']}'s squad by wins added since the mega auction: {top['name']} leads ({sg(top['wpa'])})"
     if len(board_title) > 80:
         board_title = f"{T['short']}'s squad by wins added since the mega auction: {called(top['name'])} leads ({sg(top['wpa'])})"
+    if len(board_title) > 80:  # RR, 9 Nov 2026: "Sooryavanshi" is 2 too many
+        board_title = f"{T['short']}'s squad by wins added since 2025: {called(top['name'])} leads ({sg(top['wpa'])})"
     lead = card("board", "squad_board", board_title,
                 # Ink on the strongest chips: dark on a light colour (GT gold, CSK yellow), white on a deep one (MI blue).
                 {"colour": colour, "ink": BG if contrast(colour, BG) >= contrast(colour, "#ffffff") else "#ffffff",
                  "format": "signed2", "groups": groups,
                  "note": " · ".join(x for x in [
                      f"Traded in: {', '.join(short(p['name']) for p in ins)}" if ins else "",
-                     f"Yet to play since 2025: {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:3])}{'…' if len(unplayed) > 3 else ''})" if unplayed else "",
+                     f"Barely played since 2025 (under 10 balls): {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:3])}{'…' if len(unplayed) > 3 else ''})" if unplayed else "",
                  ] if x) or None},
                 f"Wins added (T20 Primer), batting and bowling · IPL 2025-26, any side · {len(played)} of {len(players)} played")
 
@@ -492,6 +494,12 @@ def copy(b):
     return hook, caption
 
 
+def team_link(team):
+    from urllib.parse import quote
+
+    return f"https://hindsightcricket.com/team?team={quote(team)}"
+
+
 def thread(b, link):
     """One tweet per carousel slide, in slide order, each written about its own image (the tweets reuse the
     Instagram slides: 1 cover, 2 wins added, 3 batting, 4 bowling, 5 value, 6 three calls, 7 template, 8 end)."""
@@ -590,7 +598,7 @@ def main() -> int:
     problems, hp = findings(slides, "spotlight"), hook_problem(hook)
     print("lint:", problems or "clean", "| hook:", hp or "ok")
     print(caption)
-    th = thread(b, "hindsightcricket.com")
+    th = thread(b, team_link(b["team"]))
     for t in th:
         print(f"--- tweet {t['n']} ({len(t['text'])})\n{t['text']}")
     tp = thread_problems(th, [b["under"]["name"], b["bargain"]["name"], b["big"]["name"]])
@@ -628,7 +636,8 @@ def main() -> int:
     n = len(slides)
     fact = {"kind": "spotlight", "title": hook, "hook": hook, "subject": b["under"]["name"], "subject_role": "batter",
             "carousel_id": carousel["id"], "slides": n, "render": True, "post_time": "8 pm"}
-    fact["x"] = thread(b, post_link(fact))
+    # The last tweet links to the team's page (it unfurls with the team preview card, api/og.mjs), not the post.
+    fact["x"] = thread(b, team_link(b["team"]))
     fact["youtube"] = youtube_copy(fact, caption, hook)
     ist = timezone(timedelta(hours=5, minutes=30))
     today = date.fromisoformat(args.date) if args.date else datetime.now(ist).date()
