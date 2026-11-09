@@ -38,7 +38,8 @@ _recent: Dict[str, Deque[float]] = defaultdict(deque)
 
 class Event(BaseModel):
     event: str = Field(max_length=40)
-    path: Optional[str] = Field(default=None, max_length=200)
+    # Up to 1000 stored (migration 037); anything longer is trimmed below, not rejected, so a long URL never loses a batch.
+    path: Optional[str] = Field(default=None, max_length=4000)
     props: Optional[Dict[str, Any]] = None
 
 
@@ -74,7 +75,7 @@ def post_events(batch: EventBatch, request: Request) -> Response:
             props = "{}"
         enqueue("event", {
             "anon_id": batch.anon_id, "session_id": batch.session_id, "event": event.event,
-            "path": event.path, "props": props, "referrer": batch.referrer, "country": country,
+            "path": (event.path or None) and event.path[:1000], "props": props, "referrer": batch.referrer, "country": country,
         })
     return Response(status_code=204)
 
