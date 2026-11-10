@@ -171,6 +171,13 @@ def load_csv(csv_path, engine, chunk_size=50000, dry_run=False, existing_keys=No
         # Convert p_match to string
         df['p_match'] = df['p_match'].astype(str)
 
+        # Player names with single plain spaces: the feed sometimes sends a non-breaking or a double space ("Raj Bawa"
+        # with U+00A0), which no typed search matches (migration 039 cleaned the rows already stored).
+        for name_col in ('bat', 'bowl', 'non_striker'):
+            if name_col in df.columns:
+                df[name_col] = df[name_col].map(
+                    lambda v: ' '.join(v.replace(' ', ' ').split()) if isinstance(v, str) else v)
+
         # Fix over numbering: new dataset is 1-indexed, existing is 0-indexed
         df['over'] = df['over'] - 1
 
