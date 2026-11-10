@@ -36,8 +36,11 @@ def top_players(db, team: str, fmt: str) -> Dict[str, Optional[str]]:
     from services.teams import get_all_team_name_variations
 
     names = get_all_team_name_variations(team)
+    # The last five within two years: an old match (a database that lacks the recent ones) would suggest a retired
+    # player (Yuvraj Singh in ODIs, 9 Nov 2026, on a partial local copy).
     recent = """SELECT p_match FROM delivery_details WHERE (team_bat = ANY(:t) OR team_bowl = ANY(:t)) AND format = :f
-                AND gender = 'male' GROUP BY p_match ORDER BY MAX(match_date) DESC LIMIT 5"""
+                AND gender = 'male' AND match_date >= to_char(now() - interval '2 years', 'YYYY-MM-DD')
+                GROUP BY p_match ORDER BY MAX(match_date) DESC LIMIT 5"""
     bat = db.execute(text(f"""SELECT bat FROM delivery_details WHERE p_match IN ({recent}) AND team_bat = ANY(:t)
         GROUP BY bat ORDER BY SUM(batruns) DESC LIMIT 1"""), {"t": names, "f": fmt}).scalar()
     bowl = db.execute(text(f"""SELECT bowl FROM delivery_details WHERE p_match IN ({recent}) AND team_bowl = ANY(:t)
