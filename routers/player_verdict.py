@@ -114,6 +114,20 @@ def player_wheel(
     return out
 
 
+@router.get("/player/{player_name}/auctions")
+def player_auctions(
+    response: Response,
+    player_name: str = Path(..., description="Any spelling of the player's name"),
+    db: Session = Depends(get_session),
+):
+    """His IPL auction history (migration 038): year, status (sold, retained, unsold, ...), team, base and final price
+    in lakh, and how many bids his lot drew. 2018-26 complete; 2008-17 the top 20 lots a year."""
+    from services.auctions import history
+
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400"
+    return {"player": player_name, "lots": history(db, player_name)}
+
+
 @router.get("/player/{player_name}/slice")
 def player_card_slice(
     response: Response,

@@ -8,6 +8,7 @@ import VerdictScreen, { windowQuery } from './playerProfile/verdict/VerdictScree
 import PlaysLikeCard from './playerProfile/cards/PlaysLikeCard';
 import ProfileFilters from './playerProfile/cards/ProfileFilters';
 import { RoleCardSet } from './playerProfile/cards/RoleCards';
+import AuctionCard from './playerProfile/cards/AuctionCard';
 
 // The player profile, simplified (PROFILE_SIMPLIFY_PLAN.md, agreed 3 Nov 2026): the verdict, who he plays like, then
 // four cards for his role (both sets for an all-rounder, main role first, with a switch). One window and scope for
@@ -157,6 +158,7 @@ const UnifiedPlayerProfile = () => {
         {cards.status === 'ready' && shown.map((role) => (
           <RoleCardSet key={role} role={role} player={name} data={cards.data.roles[role]} hand={summary?.identity?.bat_hand} query={windowQuery(win)} />
         ))}
+        <AuctionCard player={name} />
         {cards.status === 'error' && (
           <Box sx={{ color: colors.textLo, fontSize: 13.5 }}>The detailed cards couldn't load just now. Try again shortly.</Box>
         )}
