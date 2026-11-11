@@ -84,6 +84,21 @@ def team_squad_route(response: Response, team: str = Query(..., description="An 
     return out
 
 
+@router.get("/xi-builder")
+def xi_builder_route(response: Response, team: str = Query(..., description="An IPL side's full name or code"),
+                     db: Session = Depends(get_session)):
+    """The XI Builder's data (XI_BUILDER_PLAN.md X5): the squad, the auction pool, each player's role totals, the
+    template benchmarks and the limits; the browser scores swaps itself (src/utils/xiEngine.js)."""
+    from services.squad_view import code_for
+    from services.xi_engine import payload
+
+    code = code_for(team)
+    if not code:
+        raise HTTPException(status_code=404, detail=f"No IPL squad for {team}")
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
+    return payload(db, code)
+
+
 @router.get("/query-recent")
 def query_recent(response: Response, db: Session = Depends(get_session)):
     """What visitors recently asked the query builder, newest first: the empty screen's "Recently asked"."""
