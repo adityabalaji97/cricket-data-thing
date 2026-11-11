@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import {
-  BUDGET, COST_MIN, OVERSEAS_MAX, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, profile, seasonResults,
+  BUDGET, COST_MIN, OVERSEAS_MAX, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, isBatSlot, profile, seasonResults,
 } from '../../utils/draftEngine';
 
 // Season Draft (XI_BUILDER_PLAN.md X10): fill eleven slots in any order from IPL player-seasons, five dealt per slot,
@@ -13,34 +13,53 @@ import {
 // not a prediction. Every draft gets its own deal (d); the deal and the picks (p) live in the URL, so a draft is a link.
 
 const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums' };
-const UNIT = { openers: 'avg', top: 'SR', finishers: 'SR', pp_pace: 'wkts / 4 ov', mid_spin: 'wkts / 4 ov', death_pace: 'an over' };
-const LABEL = { openers: 'opening', top: 'at 3-4', finishers: 'at 5-7', pp_pace: 'powerplay', mid_spin: 'middle overs', death_pace: 'death' };
-const fmtV = (k, v) => (k === 'openers' ? v.toFixed(1) : k === 'top' || k === 'finishers' ? v.toFixed(0) : v.toFixed(2));
 const newDeal = () => Math.random().toString(36).slice(2, 10);
+const BOWL_ROLES = ['pp_pace', 'mid_spin', 'death_pace'];
+const f1 = (x) => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(1));
+const overs = (balls) => `${Math.floor(balls / 6)}${balls % 6 ? `.${balls % 6}` : ''}`;
 
-const CardRow = ({ card, slot, cost, onPick, why }) => (
-  <Box component="button" type="button" disabled={!!why} onClick={onPick}
-    sx={{ all: 'unset', cursor: why ? 'default' : 'pointer', opacity: why ? 0.45 : 1, display: 'block', bgcolor: colors.surface1,
-      border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.5, py: 1.1, '&:hover': { borderColor: why ? colors.border : colors.accent } }}>
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-      <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {`${card.name} ${card.season}`}
-      </Box>
-      <Box sx={{ ...mono, fontSize: 15, color: colors.accent, whiteSpace: 'nowrap' }}>{`${cost} cr`}</Box>
+// A card shows the season's headline numbers, the way fans judge a season: batting at the slot's positions, bowling
+// over the whole season (a batter's too, as it counts when he's among the XI's busiest bowlers). The era-adjusted
+// ratios the score uses stay behind the scenes.
+const batLines = (b) => [
+  `Avg ${b.outs ? f1(b.runs / b.outs) : '–'} · SR ${f1((100 * b.runs) / b.balls)} · BpD ${b.outs ? f1(b.balls / b.outs) : '–'}`,
+  `${b.runs} runs · ${b.inns} inns`,
+];
+const bowlLines = (w) => [
+  `Avg ${w.wkts ? f1(w.runs / w.wkts) : '–'} · SR ${w.wkts ? f1(w.balls / w.wkts) : '–'} · Econ ${(6 * w.runs / w.balls).toFixed(2)}`,
+  `${w.wkts} wkts · ${overs(w.balls)} ov`,
+];
+
+const Stat = ({ label, lines }) => (
+  <Box sx={{ display: 'grid', gridTemplateColumns: '38px 1fr', columnGap: 1, mt: 0.5 }}>
+    <Box sx={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textLo, pt: '3px' }}>{label}</Box>
+    <Box>
+      <Box sx={{ ...mono, fontSize: 13.5, color: colors.textHi }}>{lines[0]}</Box>
+      <Box sx={{ fontSize: 12, color: colors.textMed }}>{lines[1]}</Box>
     </Box>
-    <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{[card.team, card.overseas ? 'overseas' : null, why].filter(Boolean).join(' · ')}</Box>
-    {slot.roles.filter((r) => card.roles[r]).map((r) => {
-      const x = card.roles[r];
-      const good = r === 'death_pace' ? x.r < 1 : x.r > 1;
-      return (
-        <Box key={r} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mt: 0.3, fontSize: 13 }}>
-          <Box sx={{ color: colors.textMed, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`${fmtV(r, x.v)} ${UNIT[r]} ${LABEL[r]} · ${x.balls}b`}</Box>
-          <Box sx={{ ...mono, whiteSpace: 'nowrap', color: good ? colors.accent : colors.textLo }}>{`${x.r.toFixed(2)}×`}</Box>
-        </Box>
-      );
-    })}
   </Box>
 );
+
+const CardRow = ({ card, slotIndex, cost, onPick, why }) => {
+  const slot = SLOTS[slotIndex];
+  const bat = isBatSlot(slotIndex) ? card.bat?.[slot.key] : null;
+  const bowls = card.bowl && Object.keys(card.roles).some((r) => BOWL_ROLES.includes(r));
+  return (
+    <Box component="button" type="button" disabled={!!why} onClick={onPick}
+      sx={{ all: 'unset', boxSizing: 'border-box', cursor: why ? 'default' : 'pointer', opacity: why ? 0.45 : 1, display: 'block', bgcolor: colors.surface1,
+        border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.5, py: 1.1, '&:hover': { borderColor: why ? colors.border : colors.accent } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
+        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {`${card.name} ${card.season}`}
+        </Box>
+        <Box sx={{ ...mono, fontSize: 15, color: colors.accent, whiteSpace: 'nowrap' }}>{`${cost} cr`}</Box>
+      </Box>
+      <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{[card.team, card.overseas ? 'overseas' : null, why].filter(Boolean).join(' · ')}</Box>
+      {bat && <Stat label="Bat" lines={batLines(bat)} />}
+      {bowls && <Stat label="Bowl" lines={bowlLines(card.bowl)} />}
+    </Box>
+  );
+};
 
 const Strip = ({ results }) => (
   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 0.75 }}>
@@ -87,8 +106,8 @@ const SeasonDraftGame = () => {
   }, [dealt, pStr, table]);
   const filled = picks.filter(Boolean).length;
   const done = !!dealt && filled === SLOTS.length;
-  const results = useMemo(() => (done ? seasonResults(profile(picks), data.seasons, data.roles, `${d}|${pStr}`) : null), [done, picks, data, d, pStr]);
-  const best = useMemo(() => (done ? seasonResults(profile(bestFromDeal(dealt, data.roles, table)), data.seasons, data.roles, `${d}|best`) : null), [done, dealt, data, d, table]);
+  const results = useMemo(() => (done ? seasonResults(profile(picks), data.seasons, data.roles, d) : null), [done, picks, data, d]);
+  const best = useMemo(() => (done ? seasonResults(profile(bestFromDeal(dealt, data.roles, table)), data.seasons, data.roles, d) : null), [done, dealt, data, d, table]);
 
   if (error) return <Box sx={{ p: 2, color: colors.textLo }}>The draft couldn't load just now. Try again shortly.</Box>;
   if (!dealt) return <Box sx={{ p: 2, color: colors.textLo }}>Dealing…</Box>;
@@ -147,8 +166,9 @@ const SeasonDraftGame = () => {
 
       {!done && (
         <Box sx={{ fontSize: 11.5, color: colors.textLo }}>
-          Tap any slot to see its five cards. A card's cost (in credits) comes from how far above his season he was and how much he
-          played; "×" is his number against that season's league average for the role.
+          Tap any slot to see its five cards. Batters' numbers are at that slot's positions; bowling is the whole season. A
+          batter who bowls also joins your attack when he's among its busiest bowlers. A card's cost (in credits) comes from
+          how good that season was for its time.
         </Box>
       )}
 
@@ -161,9 +181,9 @@ const SeasonDraftGame = () => {
           <Strip results={results} />
           <Box sx={{ fontSize: 13, color: colors.textMed }}>{`The best XI this deal allowed on the budget: ${best.filter((r) => r.made).length}/${best.length}. Swap a pick to try again.`}</Box>
           <Box sx={{ fontSize: 11.5, color: colors.textLo }}>
-            How scoring works: each pick's numbers against his season's league average for the role. Your XI then plays each
-            of the 19 seasons against that season's real sides, the stronger side more likely to win each game; top four on
-            wins makes the playoffs. A game, not a prediction.
+            How scoring works: each pick's numbers are measured against his season's league average, so a 2009 strike rate
+            and a 2024 one compare. Your XI then plays each of the 19 seasons against that season's real sides, the stronger
+            side more likely to win each game; top four on wins makes the playoffs. A game, not a prediction.
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Box component="button" type="button" onClick={() => navigate({ search: `?d=${newDeal()}` })}
@@ -190,7 +210,7 @@ const SeasonDraftGame = () => {
               )}
             </Box>
             {dealt[open].map((c, n) => (
-              <CardRow key={c.name} card={c} slot={SLOTS[open]} cost={costOf(c, open, table)}
+              <CardRow key={c.name} card={c} slotIndex={open} cost={costOf(c, open, table)}
                 why={picks[open] === c ? 'picked' : why(c, open)} onPick={() => setPick(open, n)} />
             ))}
           </Box>

@@ -237,7 +237,7 @@ async function draftSummary(params) {
   const dealt = deal(data.cards, `season-draft-${dealId}`);
   const chosen = picksStr.split('').map(Number).map((n, i) => dealt[i]?.[n] || null);
   if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards)).ok) return null;
-  const res = seasonResults(profile(chosen), data.seasons, data.roles, `${dealId}|${picksStr}`);
+  const res = seasonResults(profile(chosen), data.seasons, data.roles, dealId);
   const made = res.filter((r) => r.made).length;
   const stars = chosen.slice().sort((a, b) => Math.max(...Object.values(b.roles).map((x) => x.balls)) - Math.max(...Object.values(a.roles).map((x) => x.balls)))
     .slice(0, 3).map((c) => `${c.name} ${c.season}`);

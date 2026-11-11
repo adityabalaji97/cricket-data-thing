@@ -1,4 +1,4 @@
-import { BUDGET, bestFromDeal, checkPicks, costOf, costTable, deal, profile, rng, seasonResults, SLOTS } from '../draftEngine';
+import { BUDGET, rolesFilled, bestFromDeal, checkPicks, costOf, costTable, deal, profile, rng, seasonResults, SLOTS } from '../draftEngine';
 
 const roles = [{ key: 'openers', lower: false }, { key: 'top', lower: false }, { key: 'finishers', lower: false },
   { key: 'pp_pace', lower: false }, { key: 'mid_spin', lower: false }, { key: 'death_pace', lower: true }];
@@ -50,4 +50,14 @@ test('a better season of the same kind costs more', () => {
   const table = costTable(cards);
   expect(costOf(cards.find((c) => c.name === 'O11'), 0, table)).toBeGreaterThan(costOf(cards.find((c) => c.name === 'O0'), 0, table));
   expect(checkPicks(Array(11).fill(null), table).left).toBe(BUDGET);
+});
+
+test("a batter's bowling counts when he's among the busiest bowlers; a bowler's batting doesn't", () => {
+  const ar = card('AR', { finishers: 1.2, death_pace: 0.8 });
+  ar.roles.death_pace.balls = 300;
+  expect(rolesFilled(ar, 4)).toEqual(['finishers', 'death_pace']);
+  const bowler = card('B', { pp_pace: 1.1, finishers: 1.3 });
+  expect(rolesFilled(bowler, 7)).toEqual(['pp_pace']);
+  const picks = Array(11).fill(null); picks[4] = ar; picks[7] = card('P', { death_pace: 1.2 }); picks[8] = card('Q', { death_pace: 1.2 });
+  expect(profile(picks).death_pace).toBeLessThan(1.2);   // AR bowled most at the death: he's a holder
 });

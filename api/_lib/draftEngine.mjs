@@ -8,9 +8,9 @@
 // Scoring is a game rule, not a prediction (XI_SCORE_CHECK.md): each season is simulated. The XI joins that season's
 // real sides; every side's strength is its role profile against the season's (mean z-score over the roles, economy the
 // other way round, a missing role -1.5); each pair plays twice, a win drawn with probability 1/(1+e^(-K·gap)); top
-// four on wins "made the playoffs", top "topped it". Seeded by the deal and the picks, so a draft always scores the
-// same. K was tuned (12 Nov 2026) so a random draft makes ~10 of 19 (4-15), the best a deal allows ~16 (13-18), the
-// worst ~2: ranking alone was all-or-nothing (a standout XI topped every season).
+// four on wins "made the playoffs", top "topped it". Seeded by the deal alone: every XI on a deal faces the same luck, so a draft always scores the
+// same. K and the budget were tuned together (12 Nov 2026, see BUDGET); ranking alone was all-or-nothing (a standout
+// XI topped every season).
 
 export const SLOTS = [
   { key: 'openers', label: 'Opener', roles: ['openers'] }, { key: 'openers', label: 'Opener', roles: ['openers'] },
@@ -47,22 +47,26 @@ const quality = (c, slot) => Math.max(...slot.roles.map((r) => {
   return Math.sqrt(x.balls) * Math.sqrt(Math.max(0.35, good));
 }));
 
-/** How far above his season a card was in the slot's role (economy the other way): what wins the simulated seasons. */
-const goodness = (c, slot) => Math.max(...slot.roles.map((r) => {
+/** A card's ratio to its season, pulled toward 1 (the league average) by SHRINK balls: a short burst isn't scored or
+ * priced like a full great season. Wickets are noisier than runs, so they're pulled harder. Used by the score and
+ * the price alike. 12 Nov 2026 (a 78-ball powerplay burst at 2.1x was costing more than Malinga 2015). */
+const SHRINK = { openers: 300, top: 300, finishers: 300, pp_pace: 600, mid_spin: 600, death_pace: 300 };
+export const adjRatio = (x, r) => (x.r * x.balls + SHRINK[r]) / (x.balls + SHRINK[r]);
+const good = (c, r) => {
   const x = c.roles[r];
-  if (!x) return 0;
-  return LOWER[r] ? 1 / x.r : x.r;
-}));
-
-/** What a card costs is based on: his ratio to the season, pulled toward 1 (the league average) by PRICE_SHRINK
- * balls, so a short hot streak isn't priced like a full great season. */
-const PRICE_SHRINK = 300;
-const priceValue = (c, slot) => Math.max(...slot.roles.map((r) => {
-  const x = c.roles[r];
-  if (!x) return 0;
-  const g = LOWER[r] ? 1 / x.r : x.r;
-  return (g * x.balls + PRICE_SHRINK) / (x.balls + PRICE_SHRINK);
-}));
+  if (!x) return null;
+  return LOWER[r] ? 1 / adjRatio(x, r) : adjRatio(x, r);
+};
+/** What a card costs is based on: in a batting slot, his batting there plus any bowling above average (an
+ * all-rounder costs more); in a bowling slot, his phases balls-weighted (a pace bowler on both powerplay and death). */
+const priceValue = (c, slot) => {
+  const own = slot.roles.filter((r) => c.roles[r]);
+  if (!own.length) return 0;
+  const w = own.reduce((a, r) => a + c.roles[r].balls, 0);
+  const base = own.reduce((a, r) => a + good(c, r) * c.roles[r].balls, 0) / w;
+  if (!['openers', 'top', 'finishers'].includes(slot.key)) return base;
+  return base + ['pp_pace', 'mid_spin', 'death_pace'].reduce((a, r) => a + Math.max(0, (good(c, r) ?? 1) - 1), 0);
+};
 
 export const PER_SLOT = 5;
 
@@ -83,22 +87,34 @@ export const deal = (cards, seed, perSlot = PER_SLOT) => {
   });
 };
 
-/** The XI's role profile: each role's ratio, balls-weighted over the picks who did it. */
-export const profile = (picks) => {
-  const acc = {};
-  picks.forEach((card, i) => {
-    if (!card) return;
-    SLOTS[i].roles.forEach((r) => {
-      const x = card.roles[r];
-      if (!x) return;
-      const a = (acc[r] = acc[r] || { w: 0, s: 0 });
-      a.w += x.balls; a.s += x.r * x.balls;
-    });
-  });
-  return Object.fromEntries(Object.entries(acc).map(([r, a]) => [r, a.s / a.w]));
+// Which picks fill each role (12 Nov 2026, the squad grade's rule, services/squad_grade.py): the batting slots bat
+// 1-7 in their bands; every pick's bowling counts, batters' too (Russell at 5-7 also bowls), and each bowling role is
+// held by its busiest HOLDERS among the XI, as a captain would use them. Bowlers bat 8-11, which isn't scored.
+const BAT_ROLES = ['openers', 'top', 'finishers'];
+const HOLDERS = { openers: 2, top: 2, finishers: 3, pp_pace: 2, mid_spin: 2, death_pace: 2 };
+export const isBatSlot = (slotIndex) => BAT_ROLES.includes(SLOTS[slotIndex].key);
+
+/** The roles a pick can fill: his slot's band (a batting slot) and all his bowling. */
+export const rolesFilled = (card, slotIndex) => {
+  const bowl = Object.keys(card.roles).filter((r) => !BAT_ROLES.includes(r));
+  return isBatSlot(slotIndex) ? [...SLOTS[slotIndex].roles.filter((r) => card.roles[r]), ...bowl] : bowl;
 };
 
-export const K = 0.4;
+/** The XI's role profile: each role's (sample-adjusted) ratio, balls-weighted over its holders. */
+export const profile = (picks) => {
+  const cands = {};
+  picks.forEach((card, i) => {
+    if (!card) return;
+    rolesFilled(card, i).forEach((r) => { (cands[r] = cands[r] || []).push(card.roles[r]); });  // ratios adjusted below
+  });
+  return Object.fromEntries(Object.entries(cands).map(([r, xs]) => {
+    const held = xs.slice().sort((a, b) => b.balls - a.balls).slice(0, HOLDERS[r] || 2);
+    const w = held.reduce((a, x) => a + x.balls, 0);
+    return [r, held.reduce((a, x) => a + adjRatio(x, r) * x.balls, 0) / w];
+  }));
+};
+
+export const K = 1.0;
 
 /** Every side's strength in a season: the mean over roles of its z-score among the season's sides (and the XI). */
 const strengths = (season, prof, roles) => {
@@ -141,7 +157,7 @@ export const seasonResults = (prof, seasons, roles, seed = 'draft') => {
 
 // ---- the budget (12 Nov 2026: tight; a card's cost from the data, one scale for all 19 seasons) -------------------
 
-export const BUDGET = 100;           // credits for eleven (costs 4-12). Tuned 12 Nov 2026: the best a deal allows ~14 of 19 (10-17), a random legal XI ~9 (4-14)
+export const BUDGET = 110;           // credits for eleven (costs 4-12). Tuned 12 Nov 2026 with K: the best a deal allows ~13 of 19 (11-17), a random legal XI ~6 (2-10)
 export const COST_MIN = 4;
 export const COST_MAX = 12;
 
@@ -175,7 +191,8 @@ export const checkPicks = (picks, table) => {
   return { spent, left: BUDGET - spent, overseas, ok: spent <= BUDGET && overseas <= OVERSEAS_MAX && new Set(names).size === names.length };
 };
 
-/** The best XI the deal allowed under the budget and the overseas cap: the most total goodness, by dynamic programming
+/** The best XI the deal allowed under the budget and the overseas cap: the most total value (what prices are
+ * based on), by dynamic programming
  * over (slot, credits spent, overseas used). */
 export const bestFromDeal = (dealt, roles, table) => {
   const half = (x) => Math.round(x * 2);
@@ -190,7 +207,7 @@ export const bestFromDeal = (dealt, roles, table) => {
         if (st.picks.some((p) => p.name === c.name)) return;
         const cost = half(costOf(c, i, table)); const o = ov + (c.overseas ? 1 : 0);
         if (sp + cost > B || o > OVERSEAS_MAX) return;
-        const k = `${sp + cost},${o}`; const sc = st.score + goodness(c, SLOTS[i]);
+        const k = `${sp + cost},${o}`; const sc = st.score + priceValue(c, SLOTS[i]);
         if (!next.has(k) || next.get(k).score < sc) next.set(k, { score: sc, picks: [...st.picks, c] });
       });
     });

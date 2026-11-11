@@ -140,7 +140,7 @@ def main() -> int:
                 m = merged[p["name"]]
                 m["teams"].append(team)
                 for pos, r in p["bat"].items():
-                    for k in ("balls", "runs", "wickets"):
+                    for k in ("balls", "runs", "wickets", "innings_count"):
                         m["bat"][bat_slot(int(pos))][k] += r.get(k) or 0
                 for slot, r in p["bowl"].items():
                     for k in ("balls", "runs", "wickets"):
@@ -156,8 +156,17 @@ def main() -> int:
                     ratios[key] = {"r": round(v / rate[key], 4), "v": round(v, 2), "balls": int(t["balls"])}
             if ratios:
                 bowled = sum(t["balls"] for t in m["bowl"].values())
+                # The card's headline numbers (what the player sees; the ratios are what's scored): batting in each band
+                # he did enough of (runs, balls, outs, innings), bowling over the whole season (runs, balls, wickets).
+                bat = {key: {"runs": int(m["bat"][slot]["runs"]), "balls": int(m["bat"][slot]["balls"]),
+                             "outs": int(m["bat"][slot]["wickets"]), "inns": int(m["bat"][slot]["innings_count"])}
+                       for key, _l, side, slot, *_r in roles if side == "bat" and key in ratios}
+                bowl = None
+                if bowled >= 24:
+                    bowl = {"runs": int(sum(t["runs"] for t in m["bowl"].values())), "balls": int(bowled),
+                            "wkts": int(sum(t["wickets"] for t in m["bowl"].values()))}
                 cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]),
-                              "roles": ratios, "regular": bowled >= 120})
+                              "roles": ratios, "regular": bowled >= 120, "bat": bat, "bowl": bowl})
         print(s["season"], len(teams), "teams,", sum(1 for c in cards if c["season"] == str(s["season"])), "cards")
     out = {"league": "IPL", "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],
            "seasons": seasons, "cards": cards}
