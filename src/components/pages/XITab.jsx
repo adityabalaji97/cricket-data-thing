@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Box, Drawer } from '@mui/material';
 import { colors, fonts } from '../../theme/hindsightDark';
 import OverseasMark from '../common/OverseasMark';
+import OutsideIplTag from '../common/OutsideIplTag';
 import { defaultXI, scoreXI } from '../../utils/xiEngine';
 import { Eyebrow } from '../pageKit/pageKit';
 
@@ -80,7 +81,7 @@ const XITab = ({ data, squad, q, setParams, RoleRows }) => {
               sx={{ all: 'unset', cursor: 'pointer', minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                 <Box sx={{ fontSize: 14.5, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n}</Box>
-                {players[n]?.overseas && <OverseasMark />}
+                {players[n]?.overseas && <OverseasMark />}{players[n]?.outside && <OutsideIplTag />}
               </Box>
               <Box sx={{ fontSize: 11, color: s.flags[n] ? '#f0b429' : colors.textLo, whiteSpace: 'nowrap' }}>
                 {`${SLOT(i)}${s.flags[n] ? ` · ${s.flags[n]}` : ''}`}
@@ -140,7 +141,7 @@ const XITab = ({ data, squad, q, setParams, RoleRows }) => {
             {bench.map((p) => (
               <Box key={p.name} component="button" type="button" onClick={() => replace(pickFor, p.name)}
                 sx={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', width: '100%', py: 0.9, borderTop: `1px solid ${colors.border}` }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', fontSize: 14.5 }}>{p.name}{p.overseas && <OverseasMark />}</Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', fontSize: 14.5 }}>{p.name}{p.overseas && <OverseasMark />}{p.outside && <OutsideIplTag />}</Box>
                 <Box sx={{ fontSize: 12, color: colors.textLo }}>{p.role}</Box>
               </Box>
             ))}

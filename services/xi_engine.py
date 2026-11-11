@@ -124,22 +124,24 @@ def payload(db, code: str, season: int = 2027) -> Dict[str, Any]:
     def run():
         sq = squad_of(db, code, season)
         ipl = {p["name"]: p for p in pool(db)}
-        # Squad players without IPL balls in the window still need their (empty) roles.
-        missing = [n for n in sq if n not in ipl]
-        extra = {p["name"]: p for p in (squad_players(db, "IPL", missing, START, END) if missing else [])}
-
-        def compact(name, meta):
-            p = ipl.get(name) or extra.get(name) or {"name": name, "bat": {}, "bowl": {}}
-            return {"name": name, "price": meta.get("price"), "overseas": bool(meta.get("overseas")),
-                    "role": meta.get("role") or "", "roles": _roles_of(p),
-                    "best_season_balls": p.get("best_season_balls", 0), **_record(p)}
-
-        squad = [compact(n, m) for n, m in sq.items()]
         avail = set(db.execute(text("""
             SELECT p.display_name FROM auction_lots a JOIN player_identity p ON p.pid = a.pid
             WHERE a.tournament = 'ipl' AND a.year = :y AND a.status = 'unsold'
             UNION SELECT player_name FROM squad_moves WHERE league = 'ipl' AND season = :s AND kind = 'released'"""),
             {"y": season - 1, "s": season}).scalars().all())
+        # No IPL balls in the window (an uncapped signing, an overseas player new to the league): his record in every
+        # men's T20 instead (SMAT, SA20, T20Is...), unadjusted and flagged "outside": league factors didn't beat the IPL
+        # average for newcomers (X4D_LEAGUE_FACTORS.md), so the raw numbers are shown as what they are. 13 Nov 2026.
+        missing = sorted({n for n in list(sq) + list(avail) if n not in ipl})
+        outside = {p["name"]: p for p in (squad_players(db, None, missing, START, END) if missing else [])}
+
+        def compact(name, meta):
+            p = ipl.get(name) or outside.get(name) or {"name": name, "bat": {}, "bowl": {}}
+            return {"name": name, "price": meta.get("price"), "overseas": bool(meta.get("overseas")),
+                    "role": meta.get("role") or "", "roles": _roles_of(p), "outside": name not in ipl and name in outside,
+                    "best_season_balls": p.get("best_season_balls", 0), **_record(p)}
+
+        squad = [compact(n, m) for n, m in sq.items()]
         lots = {r[0]: r for r in db.execute(text("""
             SELECT DISTINCT ON (p.display_name) p.display_name, a.price_lakh, a.base_lakh, a.overseas, a.role
             FROM auction_lots a JOIN player_identity p ON p.pid = a.pid
@@ -162,7 +164,7 @@ def payload(db, code: str, season: int = 2027) -> Dict[str, Any]:
                           for k, v in tmpl["benchmarks"].items()},
                 "roles": [{"key": r[0], "label": r[1], "side": r[2], "measure": r[4], "n": r[5], "lower": r[6]}
                           for r in ROLES]}
-    return cached_run(db, {"kind": "xi_payload", "v": 2, "code": code, "day": date.today(), "moves": moves}, run)
+    return cached_run(db, {"kind": "xi_payload", "v": 3, "code": code, "day": date.today(), "moves": moves}, run)
 
 
 def score_link(db, code: str, add: List[str], drop: List[str], pin: List[str]) -> Dict[str, Any]:
