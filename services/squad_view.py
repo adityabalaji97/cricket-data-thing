@@ -399,15 +399,17 @@ def team_squad(db, team: str):
     if not code:
         return None
     moves = db.execute(text("SELECT COALESCE(MAX(id), 0), MAX(created_at) FROM squad_moves WHERE league = 'ipl'")).fetchone()
-    key = {"kind": "team_squad", "v": 1, "code": code, "day": date.today(), "moves": [moves[0], str(moves[1])]}
+    key = {"kind": "team_squad", "v": 2, "code": code, "day": date.today(), "moves": [moves[0], str(moves[1])]}
 
     def run():
         b = build(db, code)
         by_id = {c["id"]: c for c in b["cards"]}
         cards = [b["lead"]] + [by_id[k] for k in ("template", "value", "cases") if k in by_id]
         tr = b.get("trade") or {}
+        from services.fit import fits  # who fills the gaps (XI_BUILDER_PLAN.md X4)
         return {"team": b["team"], "code": code, "colour": b["colour"], "as_of": date.today().isoformat(),
                 "window": "IPL 2025-26 at any side (the template: 2024-26)", "cards": cards,
                 "deals": tr.get("deals") or [], "gaps": [{"key": g["key"], "label": g["label"], "status": g["status"]}
-                                                       for g in b.get("gaps") or []]}
+                                                       for g in b.get("gaps") or []],
+                "fits": fits(db, code, b.get("gaps") or [])}
     return cached_run(db, key, run)
