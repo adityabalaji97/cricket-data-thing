@@ -46,6 +46,19 @@ reader can swap players in and out, slot by slot, and watch the score move. Thre
 | X3 | **Squad cards on the team page.** Squad board, against the winners' template, price v wins added, three calls; "as of" and each move's status in the note. Fixes "top players" to the current squad (Boult for RR). | `GET /team-squad`, `TeamPage.jsx` |
 | X4 | **Who fits.** For each role short of playoff level: the best available players for it, ranked on shrunk, repeatable measures, with samples; before 17 Nov the pool is "players at other sides" (labelled), after it the released list. Each list is also a post. | `services/fit.py`, a card per gap |
 
+### Stage 1b: realistic fits (agreed 12 Nov 2026, before stage 2)
+
+The first "who fits" cards were right but unrealistic: the best options were stars at other sides (Bumrah, Rabada) no
+one can sign. The builder's pool has to be players a side could actually get, judged on all the evidence we hold.
+
+| # | Chunk | Output |
+|---|---|---|
+| X4a | **The profile, not the stars.** Each gap card opens with what fits: playoff sides' level on the role's measure plus two style markers (death pace: economy, dot %, yorker share; powerplay pace: wickets, dot %, swing lengths; middle spin: wickets, economy, false shots), "like Bumrah, Harshit Rana". The "at other sides" list goes; the names become examples in the profile line. | card change |
+| X4c | **The available pool.** Unsold at the 2026 auction, released on 17 Nov (squad_moves), and the auction register when published (early Dec; a loader like the auction files'). Each candidate's role numbers from **every** T20 we hold (IPL, SMAT, other leagues, T20Is), not only the IPL. | `services/fit.py` pool |
+| X4d | **Expected IPL numbers.** League factors from players who played the same role in both a league and the IPL within two seasons (SMAT → IPL, SA20 → IPL, ...): the typical change in economy, strike rate, wickets per 4 overs. A candidate's expected IPL number = his record there × the factor, shrunk by sample, with a range. **Backtest** on 2023–26 debuts/returns: does the expected number beat "the league average for the role" at predicting the next IPL season? Only factors that pass are used. | `services/league_factors.py`, `scripts/analysis/league_factor_check.py`, findings |
+| X4e | **Style twins as potential (gated).** For a candidate with under 150 IPL balls in the role: his nearest style twins (services/twins.py, style kind) among proven role holders; their numbers as a "plays like" signal. **Test first:** for players with small IPL samples, do their style twins' numbers predict their next IPL season better than their own small sample (and better than X4d)? Shown only if it passes, labelled "unproven, bowls like ...". | `scripts/analysis/style_potential_check.py`, findings; card list if it passes |
+| X4f | **The cards again.** Per gap: the profile line; "In the auction pool" ranked by expected IPL number (IPL record where it's enough, else the league-adjusted one, its source and range shown: "SMAT 2025: 7.4 an over, ~8.5 expected in the IPL"); "plays like" if X4e passed. Phone screenshots. The same pool feeds stage 2. | `TeamSquad.jsx` |
+
 ### Stage 2: the builder, 17 Nov – 16 Dec
 
 | # | Chunk | Output |
