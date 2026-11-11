@@ -25,7 +25,14 @@ import {
 // rule, not a prediction. Phone rules (13 Nov 2026 audit): one-line text at 390px, 11px+ text, 32px+ tap targets,
 // nothing told by colour alone, help in a sheet rather than on the screen.
 
-export const GAME_NAME = '19-0';
+// A league's version of the game (13 Nov 2026): the IPL at /games/19-0, the BBL at /games/15-0. The name is the
+// perfect record over the league's seasons; the overseas cap comes from its data (the BBL's 3).
+const WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five'];
+const gameOf = (league, data) => {
+  const n = data?.seasons.length || 19;
+  return { league, n, name: `${n}-0`, path: `/games/${n}-0`, max: data?.rules?.overseas_max || OVERSEAS_MAX,
+    first: data?.seasons[0]?.season || '', last: data?.seasons[n - 1]?.season || '' };
+};
 const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums' };
 const oneLine = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 const newDeal = () => Math.random().toString(36).slice(2, 10);
@@ -109,24 +116,24 @@ const Sheet = ({ open, onClose, children }) => (
   </Drawer>
 );
 
-const HOW = [
-  `Fill eleven slots, in any order, from five cards each: IPL player-seasons from 2008 to 2026. You have ${BUDGET} credits, up to four overseas players and at least one wicketkeeper.`,
+const HOW = (g) => [
+  `Fill eleven slots, in any order, from five cards each: ${g.league} player-seasons from ${g.first} to ${g.last}. You have ${BUDGET} credits, up to ${WORDS[g.max].toLowerCase()} overseas players and at least one wicketkeeper.`,
   "Batting numbers are at that slot's positions; bowling is the whole season. A batter who bowls also joins your attack when he's among its two busiest bowlers in a phase. Bowlers bat 8-11, which isn't scored.",
   "A card's cost comes from how good that season was for its time, discounted for small samples.",
-  "Lock in, and your XI plays every IPL season against that year's real sides: each pick measured against his own season, so eras compare, and each game more likely to go to the stronger side. Top four makes the playoffs; 19-0 is the perfect run.",
+  `Lock in, and your XI plays every ${g.league} season against that year's real sides: each pick measured against his own season, so eras compare, and each game more likely to go to the stronger side. Top four makes the playoffs; ${g.name} is the perfect run.`,
   'A game, not a prediction.',
 ];
-const HowItWorks = ({ open, onClose }) => (
+const HowItWorks = ({ open, onClose, g }) => (
   <Sheet open={open} onClose={onClose}>
-    <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>How 19-0 works</Box>
-    {HOW.map((t) => <Box key={t.slice(0, 24)} sx={{ fontSize: 14, color: colors.textMed, lineHeight: 1.5 }}>{t}</Box>)}
+    <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{`How ${g.name} works`}</Box>
+    {HOW(g).map((t) => <Box key={t.slice(0, 24)} sx={{ fontSize: 14, color: colors.textMed, lineHeight: 1.5 }}>{t}</Box>)}
   </Sheet>
 );
 
 const pulse = keyframes`0% { background-color: ${colors.surface2}; } 30% { background-color: ${colors.accent}; } 100% { background-color: ${colors.surface2}; }`;
 
 // The pretend calculation: the 19 seasons light up in turn while the counter runs through the years.
-const Simulating = ({ seasons }) => {
+const Simulating = ({ seasons, g }) => {
   const [i, setI] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setI((x) => Math.min(x + 1, seasons.length - 1)), SIM_MS / seasons.length);
@@ -135,7 +142,7 @@ const Simulating = ({ seasons }) => {
   return (
     <Box sx={{ minHeight: 420, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 2, textAlign: 'center' }}>
       <Box sx={{ fontSize: 13, color: colors.textLo, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Playing your XI through</Box>
-      <Box sx={{ ...mono, fontSize: 48 }}>{`IPL ${seasons[i].season}`}</Box>
+      <Box sx={{ ...mono, fontSize: 48 }}>{`${g.league} ${seasons[i].season}`}</Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(10, 22px)', gap: '6px' }}>
         {seasons.map((s, n) => (
           <Box key={s.season} sx={{ width: 22, height: 22, borderRadius: '5px', bgcolor: colors.surface2,
@@ -147,27 +154,28 @@ const Simulating = ({ seasons }) => {
   );
 };
 
-const Result = ({ picks, table, results, best, edges, onReplay, onSameDeal, onHow }) => {
+const Result = ({ g, picks, table, results, best, edges, onReplay, onSameDeal, onHow }) => {
   const [sel, setSel] = useState(null);
   const made = results.filter((r) => r.made).length;
   const topped = results.filter((r) => r.topped).length;
   const bestMade = best.filter((r) => r.made).length;
-  const line = made === 0 ? 'Missed the playoffs in all 19 seasons'
-    : `Playoffs in ${made} of 19${topped ? ` · topped the table ${topped === 1 ? 'once' : `${topped} times`}` : ''}`;
+  const N = g.n;
+  const line = made === 0 ? `Missed the playoffs in all ${N} seasons`
+    : `Playoffs in ${made} of ${N}${topped ? ` · topped the table ${topped === 1 ? 'once' : topped === 2 ? 'twice' : `${topped} times`}` : ''}`;
   const share = () => {
     const url = window.location.href;
-    const text = `${GAME_NAME}: my IPL XI went ${made}-${19 - made}. Same deal, can you beat it?`;
-    if (navigator.share) navigator.share({ title: GAME_NAME, text, url }).catch(() => {}); else navigator.clipboard?.writeText(`${text} ${url}`);
+    const text = `${g.name}: my ${g.league} XI went ${made}-${N - made}. Same deal, can you beat it?`;
+    if (navigator.share) navigator.share({ title: g.name, text, url }).catch(() => {}); else navigator.clipboard?.writeText(`${text} ${url}`);
   };
   const s = sel != null ? results[sel] : null;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.85 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{GAME_NAME}</Box>
+        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{`${g.name} · ${g.league}`}</Box>
         <Box sx={{ fontSize: 11.5, color: colors.textLo }}>hindsightcricket.com</Box>
       </Box>
       <Box>
-        <Box sx={{ ...mono, fontSize: 58, lineHeight: 1, color: colors.accent }}>{`${made}-${19 - made}`}</Box>
+        <Box sx={{ ...mono, fontSize: 58, lineHeight: 1, color: colors.accent }}>{`${made}-${N - made}`}</Box>
         <Box sx={{ fontSize: 14.5, color: colors.textHi, mt: 0.75, ...oneLine }}>{line}</Box>
         <Box sx={{ fontSize: 13, color: colors.textMed, mt: 0.25, ...oneLine }}>
           {`Strongest: ${ROLE_NAMES[edges.strongest]} · Weakest: ${ROLE_NAMES[edges.weakest]}`}
@@ -185,7 +193,7 @@ const Result = ({ picks, table, results, best, edges, onReplay, onSameDeal, onHo
         ))}
       </Box>
       <Box sx={{ fontSize: 12.5, color: s ? colors.textHi : colors.textLo, ...oneLine }}>
-        {s ? `IPL ${s.season}: finished ${ordinal(s.rank)} of ${s.of}, won ${s.wins} of ${s.games}` : 'Tap a season for where your XI finished'}
+        {s ? `${g.league} ${s.season}: finished ${ordinal(s.rank)} of ${s.of}, won ${s.wins} of ${s.games}` : 'Tap a season for where your XI finished'}
       </Box>
       <Box sx={{ display: 'flex', gap: 1.5, fontSize: 11, color: colors.textLo }}>
         {[[colors.accent, 'playoffs', false], [GOLD, 'top of the table', true], [colors.surface2, 'missed', false]].map(([c, l, star]) => (
@@ -209,7 +217,7 @@ const Result = ({ picks, table, results, best, edges, onReplay, onSameDeal, onHo
         ))}
       </Box>
       <Box sx={{ fontSize: 12.5, color: colors.textMed, ...oneLine }}>
-        {bestMade > made ? `The best XI this deal allowed went ${bestMade}-${19 - bestMade}.` : 'No XI from this deal does better.'}
+        {bestMade > made ? `The best XI this deal allowed went ${bestMade}-${N - bestMade}.` : 'No XI from this deal does better.'}
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <Box component="button" type="button" onClick={onReplay}
@@ -230,7 +238,7 @@ const Result = ({ picks, table, results, best, edges, onReplay, onSameDeal, onHo
   );
 };
 
-const SeasonDraftGame = () => {
+const SeasonDraftGame = ({ league = 'IPL' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const q = new URLSearchParams(location.search);
@@ -243,10 +251,11 @@ const SeasonDraftGame = () => {
   const [how, setHow] = useState(false);
   const [simulating, setSimulating] = useState(false);
   useEffect(() => {
-    document.title = `${GAME_NAME} · Hindsight`;
-    fetch(`${config.API_URL}/games/season-draft/data?v=${DATA_VERSION}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    fetch(`${config.API_URL}/games/season-draft/data?league=${league}&v=${DATA_VERSION[league] || ''}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(setData).catch(() => setError(true));
-  }, []);
+  }, [league]);
+  const g = useMemo(() => gameOf(league, data), [league, data]);
+  useEffect(() => { document.title = `${g.name} · ${league} · Hindsight`; }, [g.name, league]);
   // A new draft gets its own deal, written into the URL so the draft is a link.
   useEffect(() => { if (!d) navigate({ search: `?d=${newDeal()}` }, { replace: true }); }, [d, navigate]);
   // Results, on purpose (13 Nov 2026): game_start when a deal opens with no picks (a fresh deal, or "try this same
@@ -254,10 +263,10 @@ const SeasonDraftGame = () => {
   // here carry no query (analytics.js QUIET_QUERY_PATHS). A shared result being viewed counts as neither.
   const started = useRef(null);
   useEffect(() => {
-    if (!d || locked || started.current === d || /[0-9]/.test(pStr)) return;
+    if (!data || !d || locked || started.current === d || /[0-9]/.test(pStr)) return;
     started.current = d;
-    track('game_start', { game: '19-0', d }, '/games/19-0');
-  }, [d, locked, pStr]);
+    track('game_start', { game: g.name, league, d }, g.path);
+  }, [d, locked, pStr, data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!simulating) return undefined;
     const t = setTimeout(() => setSimulating(false), SIM_MS + 300);
@@ -273,28 +282,28 @@ const SeasonDraftGame = () => {
       const card = /[0-9]/.test(ch) ? dealt[i]?.[Number(ch)] : null;
       if (!card) return;
       const trial = out.slice(); trial[i] = card;
-      if (checkPicks(trial, table).ok) out[i] = card;
+      if (checkPicks(trial, table, g.max).ok) out[i] = card;
     });
     return out;
-  }, [dealt, pStr, table]);
-  const state = table && dealt ? checkPicks(picks, table) : null;
+  }, [dealt, pStr, table, g.max]);
+  const state = table && dealt ? checkPicks(picks, table, g.max) : null;
   const showResult = locked && !!state?.complete;
   const results = useMemo(() => (showResult ? seasonResults(profile(picks), data.seasons, data.roles, d) : null), [showResult, picks, data, d]);
   const edges = useMemo(() => (showResult ? roleEdges(profile(picks), data.seasons, data.roles) : null), [showResult, picks, data]);
-  const best = useMemo(() => (showResult ? seasonResults(profile(bestFromDeal(dealt, data.roles, table)), data.seasons, data.roles, d) : null),
-    [showResult, dealt, data, d, table]);
+  const best = useMemo(() => (showResult ? seasonResults(profile(bestFromDeal(dealt, data.roles, table, g.max)), data.seasons, data.roles, d) : null),
+    [showResult, dealt, data, d, table, g.max]);
 
   if (error) return <Box sx={{ p: 2, color: colors.textLo }}>The draft couldn't load just now. Try again shortly.</Box>;
   if (!dealt) return <Box sx={{ p: 2, color: colors.textLo }}>Dealing…</Box>;
   const wrap = (child) => (
     <Box sx={{ maxWidth: 560, mx: 'auto', px: 2, pt: 1.5, pb: 4, color: colors.textHi, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       {child}
-      <HowItWorks open={how} onClose={() => setHow(false)} />
+      <HowItWorks open={how} onClose={() => setHow(false)} g={g} />
     </Box>
   );
-  if (showResult && simulating) return wrap(<Simulating seasons={data.seasons} />);
+  if (showResult && simulating) return wrap(<Simulating seasons={data.seasons} g={g} />);
   if (showResult) {
-    return wrap(<Result picks={picks} table={table} results={results} best={best} edges={edges} onHow={() => setHow(true)}
+    return wrap(<Result g={g} picks={picks} table={table} results={results} best={best} edges={edges} onHow={() => setHow(true)}
       onReplay={() => navigate({ search: `?d=${newDeal()}` })} onSameDeal={() => navigate({ search: `?d=${d}` })} />);
   }
 
@@ -307,8 +316,8 @@ const SeasonDraftGame = () => {
   const lockIn = () => {
     const res = seasonResults(profile(picks), data.seasons, data.roles, d);
     const made = res.filter((r) => r.made).length;
-    track('game_result', { game: '19-0', d, p: pStr, made, topped: res.filter((r) => r.topped).length, spent: state.spent,
-      picks: picks.map((c) => `${c.name} ${c.season}`), data: DATA_VERSION }, '/games/19-0');
+    track('game_result', { game: g.name, league, d, p: pStr, made, topped: res.filter((r) => r.topped).length, spent: state.spent,
+      picks: picks.map((c) => `${c.name} ${c.season}`), data: DATA_VERSION[league] }, g.path);
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     setSimulating(!reduced);
     navigate({ search: `?d=${d}&p=${pStr}&r=1` });
@@ -319,8 +328,8 @@ const SeasonDraftGame = () => {
   const why = (card, slot) => {
     const others = picks.map((c, i) => (i === slot ? null : c));
     if (others.some((c) => c && c.name === card.name)) return 'Already in your XI';
-    const st = checkPicks(others, table);
-    if (card.overseas && st.overseas >= OVERSEAS_MAX) return 'Four overseas already';
+    const st = checkPicks(others, table, g.max);
+    if (card.overseas && st.overseas >= g.max) return `${WORDS[g.max]} overseas already`;
     const empty = others.filter((c, i) => !c && i !== slot).length;
     if (costOf(card, slot, table) > st.left - COST_MIN * empty) return 'Over the budget';
     return null;
@@ -337,11 +346,11 @@ const SeasonDraftGame = () => {
   return wrap(
     <>
       <Box>
-        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26 }}>{GAME_NAME}</Box>
-        <Box sx={{ color: colors.textMed, fontSize: 13.5, ...oneLine }}>Draft an IPL XI from 19 seasons. Can it go 19-0?</Box>
+        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26 }}>{`${g.name} · ${league}`}</Box>
+        <Box sx={{ color: colors.textMed, fontSize: 13.5, ...oneLine }}>{`Draft a${league === 'IPL' ? 'n' : ''} ${league} XI from ${g.n} seasons. Can it go ${g.name}?`}</Box>
         <Box sx={{ display: 'flex', gap: 0.75, mt: 1, flexWrap: 'wrap', alignItems: 'center' }}>
           <Box sx={chip}>{`${BUDGET} credits`}</Box>
-          <Box sx={chip}><OverseasMark size={12} sx={{ ml: 0 }} />4 max</Box>
+          <Box sx={chip}><OverseasMark size={12} sx={{ ml: 0 }} />{g.max} max</Box>
           <Box sx={chip}><GloveIcon sx={{ fontSize: 13 }} />1 keeper</Box>
           <Box component="button" type="button" onClick={() => setHow(true)}
             sx={{ all: 'unset', ...chip, height: 32, cursor: 'pointer', color: colors.accent, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>How it works</Box>
@@ -351,7 +360,7 @@ const SeasonDraftGame = () => {
       <Box sx={{ display: 'flex', gap: 1 }}>
         {[
           [`${state.left}`, <>credits left</>],
-          [`${state.overseas}/${OVERSEAS_MAX}`, <><OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} />overseas</>],
+          [`${state.overseas}/${g.max}`, <><OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} />overseas</>],
           [`${filled}/11`, <>picked</>, keeperNote],
         ].map(([v, l, extra], n) => (
           <Box key={n} sx={{ flex: 1, minWidth: 0, bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 0.9 }}>
@@ -395,7 +404,7 @@ const SeasonDraftGame = () => {
                 <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{SLOTS[open].label}</Box>
                 <Box sx={{ fontSize: 12, color: colors.textMed, display: 'flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap' }}>
                   {`${state.left} credits left ·`}
-                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}><OverseasMark size={12} sx={{ ml: 0, mr: 0.3 }} />{`${state.overseas}/${OVERSEAS_MAX}`}</Box>·
+                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}><OverseasMark size={12} sx={{ ml: 0, mr: 0.3 }} />{`${state.overseas}/${g.max}`}</Box>·
                   {keeperNote}
                 </Box>
               </Box>

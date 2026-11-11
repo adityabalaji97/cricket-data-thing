@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pin the Season Draft's data (XI_BUILDER_PLAN.md X10) to services/pinned/season_draft_IPL.json: every IPL player-season
+Pin the 19-0 game's data (XI_BUILDER_PLAN.md X10) to services/pinned/season_draft_<LEAGUE>.json: every player-season
 as a card, every team-season's role profile, each season era-adjusted.
 
 Era adjustment: each role's number is a ratio to that season's league rate for the role (openers' average, the 3-4s'
@@ -8,7 +8,7 @@ and 5-7s' strike rate, powerplay pace and middle-overs spin wickets per four ove
 and a 2009 opener compare. A team-season's role ratio is its busiest holders' pooled number over the league rate
 (services/squad_grade.role_value, the template's rule); a card's is his own.
 
-    python scripts/build_season_draft.py
+    python scripts/build_season_draft.py [--league=BBL] [--refresh-overseas]
 """
 import json
 import logging
@@ -37,13 +37,24 @@ def measure(m, t):
 
 INDIAN_COMPS = ("Indian Premier League", "IPL", "Syed Mushtaq Ali Trophy", "SMAT", "SMA TROPHY", "SMA TROPHY FINAL")
 
+# The leagues the game runs for (13 Nov 2026): home country (overseas = internationals for anyone else), the XI's
+# overseas cap, and whether "a league abroad before 2019" counts as overseas evidence (true of Indians, who didn't play
+# abroad; not of Australians, who did). "Made the playoffs" is top four in the simulated table for every league.
+LEAGUES = {
+    "IPL": {"home": "India", "overseas_max": 4, "abroad_signal": True},
+    "BBL": {"home": "Australia", "overseas_max": 3, "abroad_signal": False},
+    "CPL": {"home": "West Indies", "overseas_max": 4, "abroad_signal": False},
+    "PSL": {"home": "Pakistan", "overseas_max": 4, "abroad_signal": False},
+}
+
 
 FULL_MEMBERS = ("Australia", "England", "South Africa", "New Zealand", "Pakistan", "Sri Lanka", "West Indies", "Bangladesh",
                 "Zimbabwe", "Afghanistan", "Ireland")
 
 
-def overseas_years(db):
-    """{display name: years with evidence he was an overseas player} (12 Nov 2026). Evidence, any of:
+def overseas_years(db, home: str = "India", abroad_signal: bool = True):
+    """Outside the IPL (abroad_signal off) only full-member internationals count: a local can play for an associate
+    first (Tim David, Singapore, then Australia; a BBL local throughout). {display name: years with evidence he was an overseas player} (12 Nov 2026). Evidence, any of:
       - an international for a side other than India, by player id on the ball-by-ball feed (2015 on): ids, because
         names collide (a Mandeep Singh plays for Norway);
       - on the older scorecards (names only), an international for a full-member side (Chaminda Vaas);
@@ -59,21 +70,21 @@ def overseas_years(db):
     rows = db.execute(text("""
         SELECT p.display_name, x.y FROM player_identity p JOIN (
             SELECT p_bat AS pid, SUBSTRING(match_date, 1, 4)::int y FROM delivery_details WHERE competition IN ('T20I', 'ODI')
-                AND team_bat <> 'India' AND team_bat NOT ILIKE '%XI%' AND p_bat IS NOT NULL
+                AND team_bat <> :home AND team_bat NOT ILIKE '%XI%' AND p_bat IS NOT NULL AND (:any_side OR team_bat = ANY(:full))
             UNION SELECT p_bowl, SUBSTRING(match_date, 1, 4)::int FROM delivery_details WHERE competition IN ('T20I', 'ODI')
-                AND team_bowl <> 'India' AND team_bowl NOT ILIKE '%XI%' AND p_bowl IS NOT NULL
-            UNION SELECT pid, year FROM auction_lots WHERE pid IS NOT NULL AND country IS NOT NULL AND country <> 'India') x
-        ON x.pid = p.pid""")).fetchall()
+                AND team_bowl <> :home AND team_bowl NOT ILIKE '%XI%' AND p_bowl IS NOT NULL AND (:any_side OR team_bowl = ANY(:full))
+            UNION SELECT pid, year FROM auction_lots WHERE pid IS NOT NULL AND country IS NOT NULL AND country <> :home AND (:any_side OR country = ANY(:full))) x
+        ON x.pid = p.pid"""), {"home": home, "any_side": abroad_signal, "full": list(FULL_MEMBERS)}).fetchall()
     rows += db.execute(text("""
         SELECT d.batter, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
             WHERE m.match_type = 'international' AND d.batting_team = ANY(:full)
         UNION SELECT d.bowler, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
             WHERE m.match_type = 'international' AND d.bowling_team = ANY(:full)
         UNION SELECT d.batter, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
-            WHERE m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))
+            WHERE :abroad AND m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))
         UNION SELECT d.bowler, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
-            WHERE m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))"""),
-        {"full": list(FULL_MEMBERS), "ind": list(INDIAN_COMPS)}).fetchall()
+            WHERE :abroad AND m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))"""),
+        {"full": [t for t in FULL_MEMBERS if t != home], "ind": list(INDIAN_COMPS), "abroad": abroad_signal}).fetchall()
     alias = aliases(db)
     for name, y in rows:
         years[name].add(int(y))
@@ -116,7 +127,7 @@ CARD_WINDOW = (10, 3)  # overseas evidence from 10 years before a season to 3 af
 
 
 def is_overseas(years, name, season):
-    s = int(season)
+    s = int(str(season)[:4])  # "2024-25" (a BBL season): its first year
     return any(s - CARD_WINDOW[0] <= y <= s + CARD_WINDOW[1] for y in years.get(name, ()))
 
 
@@ -128,7 +139,7 @@ def is_keeper(keepers, name, season):
     auctions (young keepers with few stumpings: Porel, Rawat); or, for a newcomer, the label in the latest auction for
     that same season (Kartik Sharma 2026). Not the label once on its own (Shahbaz Ahmed, 2020)."""
     stumps, label = keepers
-    s = int(season)
+    s = int(str(season)[:4])
     near = sum(1 for y in stumps.get(name, ()) if abs(s - y) <= KEEPER_WINDOW)
     labels = {y for y in label.get(name, ()) if abs(s - y) <= KEEPER_WINDOW + 1}
     latest = max((y for ys in label.values() for y in ys), default=None)
@@ -136,25 +147,31 @@ def is_keeper(keepers, name, season):
             or (labels == {s} and s == latest and len(label.get(name, ())) == 1))
 
 
-def write_version(path):
-    """src/utils/draftDataVersion.js: a hash of the pinned data. The app and the link previews put it in the data URL,
-    so a rebuild reaches phones at once (the response is cached for up to a week). 13 Nov 2026."""
+def write_version(path=None):
+    """src/utils/draftDataVersion.js: a hash of each league's pinned data. The app and the link previews put it in the
+    data URL, so a rebuild reaches phones at once (the response is cached for up to a week). 13 Nov 2026."""
     import hashlib
 
-    v = hashlib.sha1(path.read_bytes()).hexdigest()[:10]
+    vs = {}
+    for f in sorted((ROOT / "services/pinned").glob("season_draft_*.json")):
+        vs[f.stem.replace("season_draft_", "")] = hashlib.sha1(f.read_bytes()).hexdigest()[:10]
+    body = ", ".join(f"{k}: '{v}'" for k, v in vs.items())
     (ROOT / "src/utils/draftDataVersion.js").write_text(
-        f"// Written by scripts/build_season_draft.py: the pinned Season Draft data's version (a hash). Don't edit.\nexport default '{v}';\n")
-    print(f"data version {v}")
+        "// Written by scripts/build_season_draft.py: each league's pinned 19-0 data version (a hash). Don't edit.\n"
+        f"export default {{ {body} }};\n")
+    print(f"data versions {vs}")
 
 
 def main() -> int:
+    league = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--league=")), "IPL").upper()
+    cfg = LEAGUES[league]
+    path = ROOT / f"services/pinned/season_draft_{league}.json"
     if "--refresh-overseas" in sys.argv:  # just the overseas and keeper flags on the pinned file
         from database import get_session
 
-        path = ROOT / "services/pinned/season_draft_IPL.json"
         data = json.loads(path.read_text())
         db = next(get_session())
-        ov, wk = overseas_years(db), keeper_years(db)
+        ov, wk = overseas_years(db, cfg["home"], cfg["abroad_signal"]), keeper_years(db)
         before = sum(c["overseas"] for c in data["cards"])
         for c in data["cards"]:
             c["overseas"] = is_overseas(ov, c["name"], c["season"])
@@ -172,8 +189,8 @@ def main() -> int:
     from services.team_roles import bat_slot, league_roles
 
     db = next(get_session())
-    data = league_roles(db, "IPL")
-    overseas = overseas_years(db)
+    data = league_roles(db, league)
+    overseas = overseas_years(db, cfg["home"], cfg["abroad_signal"])
     keepers = keeper_years(db)
     roles = [r for r in ROLES if r[2] != "depth"]
     seasons, cards = [], []
@@ -233,9 +250,8 @@ def main() -> int:
                 cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]), "wk": is_keeper(keepers, name, s["season"]),
                               "roles": ratios, "bat": bat, "bowl": bowl})
         print(s["season"], len(teams), "teams,", sum(1 for c in cards if c["season"] == str(s["season"])), "cards")
-    out = {"league": "IPL", "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],
+    out = {"league": league, "rules": {"overseas_max": cfg["overseas_max"], "home": cfg["home"]}, "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],
            "seasons": seasons, "cards": cards}
-    path = ROOT / "services/pinned/season_draft_IPL.json"
     path.write_text(json.dumps(out, separators=(",", ":")))
     print(f"{len(cards)} cards, {len(seasons)} seasons -> {path} ({path.stat().st_size // 1024} KB)")
     write_version(path)

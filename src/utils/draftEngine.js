@@ -18,7 +18,7 @@ export const SLOTS = [
   { key: 'pace', label: 'Pace', roles: ['pp_pace', 'death_pace'] }, { key: 'pace', label: 'Pace', roles: ['pp_pace', 'death_pace'] },
   { key: 'spin', label: 'Spin', roles: ['mid_spin'] }, { key: 'spin', label: 'Spin', roles: ['mid_spin'] },
 ];
-export const OVERSEAS_MAX = 4;
+export const OVERSEAS_MAX = 4;  // the IPL's; a league's own comes in its data (rules.overseas_max: the BBL's 3)
 
 /** A small seeded random generator (mulberry32) from a string: a draft's deal and its simulated seasons. */
 export const rng = (seed) => {
@@ -214,19 +214,19 @@ export const costOf = (card, slotIndex, table) => {
 
 /** A set of picks (a card or null per slot) against the rules: the budget, the overseas cap, no player twice; and
  * whether it can be locked in (eleven picks, one of them a wicketkeeper). */
-export const checkPicks = (picks, table) => {
+export const checkPicks = (picks, table, overseasMax = OVERSEAS_MAX) => {
   const chosen = picks.map((c, i) => (c ? { c, i } : null)).filter(Boolean);
   const spent = chosen.reduce((a, { c, i }) => a + costOf(c, i, table), 0);
   const overseas = chosen.filter(({ c }) => c.overseas).length;
   const names = chosen.map(({ c }) => c.name);
   const keeper = chosen.some(({ c }) => c.wk);
-  const ok = spent <= BUDGET && overseas <= OVERSEAS_MAX && new Set(names).size === names.length;
+  const ok = spent <= BUDGET && overseas <= overseasMax && new Set(names).size === names.length;
   return { spent, left: BUDGET - spent, overseas, keeper, ok, complete: ok && keeper && chosen.length === SLOTS.length };
 };
 
 /** The best XI the deal allowed under the rules (budget, overseas cap, a wicketkeeper): the most total value (what
  * prices are based on), by dynamic programming over (slot, credits spent, overseas used, keeper yet). */
-export const bestFromDeal = (dealt, roles, table) => {
+export const bestFromDeal = (dealt, roles, table, overseasMax = OVERSEAS_MAX) => {
   const half = (x) => Math.round(x * 2);
   const B = half(BUDGET);
   let states = new Map([['0,0,0', { score: 0, picks: [] }]]);
@@ -237,7 +237,7 @@ export const bestFromDeal = (dealt, roles, table) => {
       cards.forEach((c) => {
         if (st.picks.some((p) => p.name === c.name)) return;
         const cost = half(costOf(c, i, table)); const o = ov + (c.overseas ? 1 : 0);
-        if (sp + cost > B || o > OVERSEAS_MAX) return;
+        if (sp + cost > B || o > overseasMax) return;
         const k = `${sp + cost},${o},${wk || (c.wk ? 1 : 0)}`; const sc = st.score + priceValue(c, SLOTS[i]);
         if (!next.has(k) || next.get(k).score < sc) next.set(k, { score: sc, picks: [...st.picks, c] });
       });
