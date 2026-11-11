@@ -21,10 +21,10 @@ reader can swap players in and out, slot by slot, and watch the score move. Thre
    shows how far over you are, and Save / Share stay off until it fits.
 2. **Slot-based, not squad-based.** A player goes in *instead of* someone in a role ("at the death, instead of
    Avesh"), so every move changes the score. Adding a name to a 25-man list would often change nothing.
-3. **No playoff claims until tested.** The wording is "roles at playoff level". Only if X2 shows the score tracks
-   real finishes do we say "squads scored like this made the playoffs N times in 10".
-4. **One headline score, the template as the why.** The score should be continuous and hard to game (projected runs
-   per match, small samples pulled toward average); the seven template rows explain where it comes from. Single
+3. **No playoff predictions.** X2 (XI_SCORE_CHECK.md, 11 Nov 2026) found the grade doesn't predict a season (no
+   better than chance out of sample; Elo barely better). The wording is "roles at playoff level", as description.
+4. **No headline score.** Neither candidate predicts (X2), so the seven template rows are the picture: where the squad
+   sits on each role against playoff sides. Single
    measures alone (openers on average, spin on wickets) are gameable and noisy: suggestions never rank on one raw
    number.
 5. **Suggestions are fit, not verdicts.** "Fills the gap at the death: 8.4 an over across 310 balls" with the sample
