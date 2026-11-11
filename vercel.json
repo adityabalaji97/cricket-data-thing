@@ -111,7 +111,7 @@
       "includeFiles": "api/_lib/fonts/**"
     },
     "api/og.mjs": {
-      "includeFiles": "{api/_lib/fonts/**,api/_lib/draftEngine.mjs,src/utils/teamPalette.json}"
+      "includeFiles": "{api/_lib/fonts/**,api/_lib/draftEngine.mjs,api/_lib/xiEngine.mjs,src/utils/teamPalette.json}"
     },
     "api/embed.mjs": {
       "includeFiles": "mcp_server/widget.html"
