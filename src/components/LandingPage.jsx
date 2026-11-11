@@ -1205,12 +1205,13 @@ const playedToday = (game) => {
 
 export const TodaysGamesSection = () => {
   const number = dailyNumber();
+  // 19-0 isn't daily (every draft is its own deal): it sits under the daily four as "Anytime", with no played tick.
+  const anytime = [{ key: 'nineteen_oh', to: '/games/19-0', title: '19-0', blurb: 'Draft an IPL XI from 19 seasons. Can it make the playoffs in all 19?' }];
   const games = [
     { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Did they win it?' },
     { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Tap the player-season with the higher Impact. Ten pairs a day.' },
     { key: 'player_journeys', to: '/games/player-journeys', title: 'Player Journeys', blurb: 'Name the IPL player from their franchise path.' },
     { key: 'guess_innings', to: '/games/guess-innings', title: 'Guess the Innings', blurb: 'Whose innings was it? A score line and a wagon wheel.' },
-    { key: 'season_draft', to: '/games/19-0', title: '19-0', blurb: 'An XI of IPL player-seasons through all 19 seasons. Can it make the playoffs every time?' },
   ];
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
@@ -1234,6 +1235,19 @@ export const TodaysGamesSection = () => {
             </Box>
           );
         })}
+      </Box>
+      <Box sx={{ mt: 2.5 }}><Kicker>Anytime</Kicker></Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.25 }}>
+        {anytime.map((game) => (
+          <Box key={game.key} component={Link} to={game.to}
+            sx={{ p: 2, borderRadius: 2.5, bgcolor: C.surface, border: '1px solid rgba(182,242,74,0.35)', textDecoration: 'none', display: 'block', '&:hover': { bgcolor: C.raised } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{game.title}</Typography>
+              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12 }}>Play →</Typography>
+            </Box>
+            <Typography sx={{ color: C.soft, fontSize: 13.5, mt: 0.5 }}>{game.blurb}</Typography>
+          </Box>
+        ))}
       </Box>
     </Box>
   );

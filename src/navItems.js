@@ -57,6 +57,8 @@ const UNLISTED_TITLES = [
   { match: (path) => path === '/games/higher-lower', title: 'Higher or Lower' },
   { match: (path) => path === '/games/guess-innings', title: 'Guess the Innings' },
   { match: (path) => path === '/games/player-journeys', title: 'Player Journeys' },
+  { match: (path) => path === '/games/19-0', title: '19-0' },
+  { match: (path) => path === '/team-builder', title: 'Fix my team' },
   { match: (path) => path === '/credits', title: 'Credits & Acknowledgements' },
   { match: (path) => path.startsWith('/scorecard'), title: 'Match Scorecard' },
   { match: (path) => path.startsWith('/wrapped'), title: '2025 Wrapped' },

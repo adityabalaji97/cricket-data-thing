@@ -239,20 +239,22 @@ async function draftSummary(params) {
   if (!dealId || !/^[0-9]{11}$/.test(picksStr)) return plain;
   const data = await getJSON('/games/season-draft/data', 8000);
   if (!data) return plain;
-  const { deal, profile, seasonResults, costTable, checkPicks, SLOTS } = await import('./draftEngine.mjs');
+  const { deal, profile, seasonResults, costTable, checkPicks, SLOTS, roleEdges, ROLE_NAMES } = await import('./draftEngine.mjs');
   const dealt = deal(data.cards, `season-draft-${dealId}`);
   const chosen = picksStr.split('').map(Number).map((n, i) => dealt[i]?.[n] || null);
   if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards)).complete) return plain;
   const res = seasonResults(profile(chosen), data.seasons, data.roles, dealId);
+  const edges = roleEdges(profile(chosen), data.seasons, data.roles);
+  const why = `Strongest: ${ROLE_NAMES[edges.strongest]} · Weakest: ${ROLE_NAMES[edges.weakest]}`;
   const made = res.filter((r) => r.made).length;
   const topped = res.filter((r) => r.topped).length;
-  const line = made ? `Made the playoffs in ${made} of 19 IPL seasons${topped ? `, topped the table in ${topped}` : ''}.`
-    : 'Missed the playoffs in all 19 IPL seasons.';
+  const line = made ? `Playoffs in ${made} of 19${topped ? ` · topped the table ${topped === 1 ? 'once' : `${topped} times`}` : ''}`
+    : 'Missed the playoffs in all 19 seasons';
   return {
     kind: 'draft',
     title: `${DRAFT_NAME}: my IPL XI went ${made}-${19 - made} | ${SITE_NAME}`,
-    description: `${line} ${chosen.slice(0, 3).map((c) => `${c.name} ${c.season}`).join(', ')} and eight more. Same deal, can you beat it?`,
-    card: { made, line, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })),
+    description: `${line}. ${why}. ${chosen.slice(0, 3).map((c) => `${c.name} ${c.season}`).join(', ')} and eight more. Same deal, can you beat it?`,
+    card: { made, line, why, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })),
       xi: chosen.map((c, i) => ({ slot: SLOTS[i].label, name: `${c.name} ${c.season}`, overseas: !!c.overseas, wk: !!c.wk })) },
   };
 }

@@ -218,7 +218,7 @@ def main() -> int:
                     continue
                 v = measure(meas, t)
                 if v is not None and rate[key]:
-                    ratios[key] = {"r": round(v / rate[key], 4), "v": round(v, 2), "balls": int(t["balls"])}
+                    ratios[key] = {"r": round(v / rate[key], 4), "balls": int(t["balls"])}  # the ratio scores; cards show bat/bowl
             if ratios:
                 bowled = sum(t["balls"] for t in m["bowl"].values())
                 # The card's headline numbers (what the player sees; the ratios are what's scored): batting in each band
@@ -231,7 +231,7 @@ def main() -> int:
                     bowl = {"runs": int(sum(t["runs"] for t in m["bowl"].values())), "balls": int(bowled),
                             "wkts": int(sum(t["wickets"] for t in m["bowl"].values()))}
                 cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]), "wk": is_keeper(keepers, name, s["season"]),
-                              "roles": ratios, "regular": bowled >= 120, "bat": bat, "bowl": bowl})
+                              "roles": ratios, "bat": bat, "bowl": bowl})
         print(s["season"], len(teams), "teams,", sum(1 for c in cards if c["season"] == str(s["season"])), "cards")
     out = {"league": "IPL", "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],
            "seasons": seasons, "cards": cards}

@@ -1,8 +1,9 @@
 """The venue and team pages (TEAM_VENUE_PLAN.md): one cached call each, for the page's window."""
 from datetime import date
+from functools import lru_cache
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from database import get_session
@@ -115,16 +116,28 @@ def xi_builder_score_route(response: Response, team: str = Query(...), add: str 
 
 
 @router.get("/games/season-draft/data")
-def season_draft_data(response: Response):
-    """The Season Draft's cards and seasons (services/pinned/season_draft_IPL.json, scripts/build_season_draft.py)."""
-    import json
+def season_draft_data(request: Request):
+    """The 19-0 game's cards and seasons (services/pinned/season_draft_IPL.json, scripts/build_season_draft.py), gzipped
+    when the client accepts it (~490 KB -> ~110 KB). The app asks with ?v=<data version>, so the week-long cache is
+    safe: a rebuild changes the URL. Only this route is compressed (no app-wide gzip: it would wrap the MCP stream)."""
     from pathlib import Path as P
 
     path = P(__file__).resolve().parents[1] / "services/pinned/season_draft_IPL.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Season Draft data not built")
-    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
-    return json.loads(path.read_text())
+    raw, packed = _draft_bytes(str(path), path.stat().st_mtime)
+    headers = {"Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800", "Vary": "Accept-Encoding"}
+    if "gzip" in (request.headers.get("accept-encoding") or ""):
+        return Response(content=packed, media_type="application/json", headers={**headers, "Content-Encoding": "gzip"})
+    return Response(content=raw, media_type="application/json", headers=headers)
+
+
+@lru_cache(maxsize=2)
+def _draft_bytes(path: str, mtime: float):
+    import gzip
+
+    raw = open(path, "rb").read()
+    return raw, gzip.compress(raw, 6)
 
 
 @router.get("/query-recent")
