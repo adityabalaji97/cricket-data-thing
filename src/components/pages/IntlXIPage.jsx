@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { colors, fonts } from '../../theme/hindsightDark';
-import { PageFooter, PageSkeleton, usePageData } from '../pageKit/pageKit';
 import PlayerLink from '../common/PlayerLink';
 
 // Pick your XI for the top 10 T20I sides (XI_BUILDER_PLAN.md stage 3a; the India opener mockup, signed off 13 Nov 2026):
@@ -37,7 +36,7 @@ const Case = ({ c }) => (
   </Box>
 );
 
-const Slot = ({ data, slot }) => {
+export const Slot = ({ data, slot }) => {
   const [open, setOpen] = useState(null);
   useEffect(() => { setOpen(null); }, [slot.n]);
   const cols = COLS[slot.kind] || [];
@@ -103,44 +102,13 @@ const Slot = ({ data, slot }) => {
   );
 };
 
+// /pick-xi is now the team page's The XI card (13 Nov 2026): old links land there, on the last XI, with the slot's sheet up.
 const IntlXIPage = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const q = new URLSearchParams(location.search);
-  const team = q.get('team') || 'India';
-  const { status, data } = usePageData('/intl-xi', `team=${encodeURIComponent(team)}`);
-  useEffect(() => { document.title = `${team} XI · Hindsight`; }, [team]);
-  const slots = data?.slots || [];
-  const n = Number(q.get('slot')) || 2;
-  const slot = slots.find((s) => s.n === n) || slots[0];
-  const pick = (k) => { const p = new URLSearchParams(location.search); p.set('slot', String(k)); navigate({ search: `?${p.toString()}` }, { replace: true }); };
-
-  return (
-    <Box sx={{ maxWidth: 560, mx: 'auto', px: 2, pt: 1.5, pb: 4, color: colors.textHi, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      <Box>
-        <Box component={Link} to={`/team?team=${encodeURIComponent(team)}`} sx={{ color: colors.textLo, fontSize: 13, textDecoration: 'none' }}>← {team}</Box>
-        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26, mt: 0.5 }}>{`Pick ${team}'s XI`}</Box>
-        <Box sx={{ color: colors.textMed, fontSize: 13.5, ...oneLine }}>The last T20I XI, slot by slot: who else fits, and the case.</Box>
-      </Box>
-      {(status === 'loading' || status === 'building') && <PageSkeleton note={status === 'building' ? 'Building this XI. It takes under a minute the first time.' : null} />}
-      {status === 'empty' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>Pick your XI covers the top 10 T20I sides.</Box>}
-      {status === 'error' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>This XI couldn't load just now. Try again shortly.</Box>}
-      {status === 'ready' && slot && (
-        <>
-          <Box role="tablist" aria-label="Slots" sx={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: '3px' }}>
-            {slots.map((s) => (
-              <Box key={s.n} component="button" type="button" role="tab" aria-selected={s.n === slot.n} aria-label={`Slot ${s.n}: ${s.holder}`} onClick={() => pick(s.n)}
-                sx={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', height: 32, borderRadius: '6px', ...mono, fontSize: 11.5, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', bgcolor: s.n === slot.n ? colors.accent : colors.surface2,
-                  color: s.n === slot.n ? colors.bg : colors.textLo, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>{s.n}</Box>
-            ))}
-          </Box>
-          <Slot data={data} slot={slot} />
-        </>
-      )}
-      <PageFooter />
-    </Box>
-  );
+  const t = new URLSearchParams({ team: q.get('team') || 'India', xi: 'last' });
+  if (q.get('slot')) t.set('slot', q.get('slot'));
+  return <Navigate to={`/team?${t.toString()}`} replace />;
 };
 
 export default IntlXIPage;

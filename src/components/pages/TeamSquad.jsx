@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
-import { Link } from 'react-router-dom';
+
 import config from '../../config';
 import { colors } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
@@ -96,11 +96,8 @@ const TeamSquad = ({ team }) => {
   const asOf = new Date(data.as_of).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+      {/* Fix my team is The XI card's header action (13 Nov 2026), not a banner here. */}
       <Eyebrow right={<Box component="span" sx={{ fontSize: 11, color: colors.textLo }}>{`as of ${asOf}`}</Box>}>IPL 2027 squad</Eyebrow>
-      <Box component={Link} to={`/team-builder?team=${encodeURIComponent(data.code)}`}
-        sx={{ display: 'block', textAlign: 'center', py: 1.1, px: 2, borderRadius: '12px', bgcolor: colors.accent, color: colors.bg, fontWeight: 600, textDecoration: 'none' }}>
-        Fix my team: swap players in and out
-      </Box>
       {data.cards.map((c) => {
         const Visual = POST_VISUALS[c.visual];
         if (!Visual) return null;

@@ -8,6 +8,7 @@ import { getTeamAbbr } from '../../utils/teamAbbreviations';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import ProfileFilters from '../playerProfile/cards/ProfileFilters';
 import TeamSquad from './TeamSquad';
+import XICard from './XICard';
 import {
   Eyebrow, PageFooter, PageHeader, PageSkeleton, SummaryRows, ValueList, ordinal, readWindow, signed, usePageData, windowChip,
   windowQuery, writeSearch,
@@ -127,53 +128,6 @@ const PhaseCard = ({ team, phases }) => {
           </Box>
         );
       })}
-    </ProfileCard>
-  );
-};
-
-const OrderCard = ({ team, order, win }) => {
-  if (!order?.length) return null;
-  const par = order.some((o) => o.raa_per_100 != null);  // ODIs have no par yet: strike rate instead
-  const rows = order.map((o) => ({
-    key: `${o.position}`, lead: o.position, name: o.batter, player: o.batter, win, detail: `${o.share}% of inns`,
-    value: par ? (o.raa_per_100 == null ? '–' : signed(o.raa_per_100)) : `${o.strike_rate}`,
-    tone: par ? (o.raa_per_100 > 0 ? 'pos' : o.raa_per_100 < 0 ? 'neg' : null) : null,
-  }));
-  return (
-    <ProfileCard id="batting-order" title="Who bats where" player={team}
-      note={par ? "Each spot's regular · runs v par per 100 balls" : "Each spot's regular · strike rate"}>
-      <ValueList rows={rows} label="Batting order" />
-    </ProfileCard>
-  );
-};
-
-const OversCard = ({ team, grid }) => {
-  if (!grid?.bowlers?.length) return null;
-  const { overs, bowlers } = grid;
-  const W = 340; const L = 84; const T = 16; const ch = 18;
-  const cw = (W - L - 2) / Math.max(20, overs.length);
-  const H = T + ch * bowlers.length + 4;
-  const marks = overs.length >= 20 ? [1, 6, 7, 15, 16, 20] : [overs[0], overs[overs.length - 1]];
-  return (
-    <ProfileCard id="bowling-overs" title="Who bowls when" player={team} note="Share of each over's balls · brighter is more">
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Who bowls which over" sx={{ width: '100%', display: 'block' }}>
-        {marks.map((o) => (
-          <text key={o} x={L + (o - 0.5) * cw} y={10} textAnchor="middle" style={{ fontFamily: fonts.mono, fontSize: 11, fill: colors.textLo }}>{o}</text>
-        ))}
-        {bowlers.map((b, j) => (
-          <g key={b.name}>
-            <text x={L - 6} y={T + j * ch + 12.5} textAnchor="end" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textMed }}>
-              {b.name.split(' ').length > 1 ? `${b.name[0]} ${b.name.split(' ').slice(-1)[0]}` : b.name}
-            </text>
-            {overs.map((o, i) => (b.shares[i] > 0.02 ? (
-              <rect key={o} x={L + (o - 1) * cw} y={T + j * ch} width={cw - 1.5} height={ch - 2.5} rx="2"
-                fill={colors.accent} fillOpacity={Math.min(1, 0.15 + b.shares[i] * 1.6)}>
-                <title>{`${b.name}, over ${o}: ${Math.round(b.shares[i] * 100)}% of its balls`}</title>
-              </rect>
-            ) : null))}
-          </g>
-        ))}
-      </Box>
     </ProfileCard>
   );
 };
@@ -313,22 +267,11 @@ const TeamPage = () => {
           <>
             {data.rating && <RatingCard team={team} rating={data.rating} />}
             {data.phases && <PhaseCard team={team} phases={data.phases} />}
-            <OrderCard team={team} order={data.batting_order} win={win} />
-            <OversCard team={team} grid={data.bowling_overs} />
+            <XICard team={data.team || team} win={win} order={data.batting_order} bowlGrid={data.bowling_overs} batGrid={data.batting_overs}
+              intl={PICK_XI.includes(data.team || team)} ipl={data.scope?.kind !== 'international' && /IPL|Indian Premier/.test(data.scope?.competition || '')} />
             <TopCard team={team} top={data.top} win={win} />
             {data.results && <WhereCard team={team} res={data.results} />}
             <AgainstCard team={team} against={data.results?.against} />
-            {PICK_XI.includes(data.team || team) && (
-              <Box component={Link} to={`/pick-xi?team=${encodeURIComponent(data.team || team)}`}
-                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: colors.surface1, border: `1px solid ${colors.border}`,
-                  borderRadius: '14px', px: 2, py: 1.5, textDecoration: 'none', color: colors.textHi, '&:hover': { borderColor: colors.accent } }}>
-                <Box>
-                  <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18 }}>{`Pick ${data.team || team}'s XI`}</Box>
-                  <Box sx={{ fontSize: 13, color: colors.textMed }}>Slot by slot: who else fits, and the case for each.</Box>
-                </Box>
-                <Box sx={{ color: colors.accent, fontFamily: fonts.mono, fontSize: 13 }}>Open →</Box>
-              </Box>
-            )}
             <TeamSquad team={data.team || team} />
           </>
         )}

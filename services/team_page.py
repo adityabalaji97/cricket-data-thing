@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-PAGE_VERSION = "v5"
+PAGE_VERSION = "v6"  # 13 Nov 2026: batting_overs (The XI card)
 PEER_MIN_BALLS = 600          # a side needs this many balls in a phase to be ranked in it
 TOP_BAT_BALLS, TOP_BOWL_BALLS = 60, 120
 POSITIONS = 8
@@ -205,6 +205,26 @@ def bowling_overs(db, team: str, scope) -> Dict[str, Any]:
         for b in bowlers]}
 
 
+GRID_BATTERS = 16
+
+
+def batting_overs(db, team: str, scope) -> Dict[str, Any]:
+    """When each batter is at the crease: for the side's most-used batters, each over's share of the balls faced (overs
+    from 1). With bowling_overs, The XI card's two strips per player (13 Nov 2026): the innings, over by over."""
+    rows = _q(db, scope["filters"], batting_teams=[team], group_by=["over", "batter"], metrics_perspective="batting")
+    balls = Counter()
+    for r in rows:
+        balls[r["batter"]] += r["balls"] or 0
+    batters = [b for b, _ in balls.most_common(GRID_BATTERS)]
+    per_over = defaultdict(Counter)
+    for r in rows:
+        per_over[int(r["over"]) + 1][r["batter"]] += r["balls"] or 0
+    overs = sorted(per_over)
+    return {"overs": overs, "batters": [
+        {"name": b, "balls": balls[b], "shares": [round(per_over[o][b] / max(1, sum(per_over[o].values())), 3) for o in overs]}
+        for b in batters]}
+
+
 def top_players(db, team: str, scope) -> Dict[str, Any]:
     f = scope["filters"]
     bat = _q(db, f, batting_teams=[team], group_by=["batter"], metrics_perspective="batting", min_balls=TOP_BAT_BALLS)
@@ -240,6 +260,7 @@ def build_page(db, team: str, fmt: str = "T20", period: str = "recent", start_da
             "rating": rating(db, team, ph["peers"], start, end, fmt),
             "phases": ph["phases"], "results": res,
             "batting_order": batting_order(db, team, scope), "bowling_overs": bowling_overs(db, team, scope),
+            "batting_overs": batting_overs(db, team, scope),
             "top": top_players(db, team, scope)}
 
 
