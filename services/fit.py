@@ -20,6 +20,7 @@ START, END = date(2024, 1, 1), date(2026, 10, 31)
 MIN_BALLS = {"bat": 120, "bowl": 120}     # balls in the role to be listed
 SHRINK = {"bat": 120, "bowl": 240}        # balls of the league's rate added to his own
 SHOW = 3
+OUTSIDE_MIN = 180                         # balls in the role across all T20s for the "outside the IPL" list
 
 
 def _measure(tot: Dict[str, float], measure: str) -> Optional[float]:
@@ -66,8 +67,9 @@ def _league_rates(players: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
 
 
 def fits(db, code: str, gaps: List[Dict[str, Any]], season: int = 2027) -> List[Dict[str, Any]]:
-    """For each gap ({key, value, playoff_level, ...} from the grade, depth aside): the best fits not in a squad and at
-    other sides, each with his shrunk value, raw value, balls in the role, and his 2027 side (None: not in a squad)."""
+    """For each gap ({key, value, playoff_level, ...} from the grade, depth aside): two proven holders elsewhere as the
+    profile's examples; the auction pool's best on their IPL record (shrunk; improvements only); and the auction pool's
+    best on all T20s for those the IPL hasn't seen enough of (unadjusted until X4d)."""
     from services.ipl_squads import squad
     from services.squad_view import TEAMS
 
@@ -85,6 +87,12 @@ def fits(db, code: str, gaps: List[Dict[str, Any]], season: int = 2027) -> List[
         WHERE a.tournament = 'ipl' AND a.year = :y AND a.status = 'unsold'
         UNION SELECT player_name FROM squad_moves WHERE league = 'ipl' AND season = :s AND kind = 'released'"""),
         {"y": season - 1, "s": season}).scalars().all())
+    # The auction pool's records in every T20 we hold (SMAT, other leagues, T20Is), for players the IPL hasn't seen
+    # enough of in a role. Not adjusted for strength yet (X4d): shown as such, after the IPL-proven.
+    from services.query_cache import cached_run
+
+    wide = cached_run(db, {"kind": "fit_available_all_t20", "v": 1, "day": date.today(), "n": len(available)},
+                      lambda: squad_players(db, None, sorted(available), START, END)) if available else []
     roles = {r[0]: r for r in ROLES}
     out = []
     for g in gaps:
@@ -113,8 +121,20 @@ def fits(db, code: str, gaps: List[Dict[str, Any]], season: int = 2027) -> List[
         if mine is not None:  # only players who'd improve the role, on the squad's own number
             rows = [x for x in rows if (x["shrunk"] < mine if lower else x["shrunk"] > mine)]
         rows.sort(key=lambda x: x["shrunk"] if lower else -x["shrunk"])
+        ipl_balls = {x["name"]: x["balls"] for x in rows}
+        outside = []
+        for p in wide:
+            if p["name"] in ipl_balls or (side == "bat" and main_bat_slot(p) != slot):
+                continue
+            r = _slot_rows(p, side, slot)
+            v = _measure(r, measure)
+            if r["balls"] >= OUTSIDE_MIN and v is not None:
+                outside.append({"name": p["name"], "value": round(v, 2), "balls": int(r["balls"])})
+        outside.sort(key=lambda x: x["value"] if lower else -x["value"])
         out.append({"key": key, "label": label, "measure": measure, "lower_is_better": lower,
                     "squad_value": g.get("value"), "playoff_level": g.get("playoff_level"),
+                    # The profile (X4a): the best proven holders elsewhere, as examples of what fits, not options.
+                    "examples": [{"name": x["name"], "value": x["value"]} for x in rows if x["side"]][:2],
                     "free": [x for x in rows if not x["side"]][:SHOW],
-                    "elsewhere": [x for x in rows if x["side"]][:SHOW]})
+                    "outside": outside[:SHOW]})
     return out
