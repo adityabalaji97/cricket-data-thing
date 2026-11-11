@@ -68,6 +68,31 @@ one can sign. The builder's pool has to be players a side could actually get, ju
 | X7 | **Save and share.** A short link and an image: the XI, the score, roles at playoff level, "plays most like KKR 2024". | share card, `/xi/<id>` |
 | X8 | **Retention and auction days.** 17 Nov: retained / released states, purse left, the pool becomes real. 16 Dec: buys appear with prices; "how close was your XI to what they built". | loaders, a results post |
 
+### Stage 2b: the XI tab (agreed 12 Nov 2026)
+
+The squad view grades each role by the squad's busiest holders, and a batter counts in one batting role only (his usual
+slot), so adding Will Jacks to MI didn't move the 5-7 row. The XI tab scores an actual team instead:
+
+- **Twelve players:** a batting order 1-11 and an impact sub who comes in for a named player (he bats and the other
+  bowls, or the reverse), as the real rule works; the batting and bowling elevens follow from that.
+- **Batting roles from the order:** openers = slots 1-2, top order = 3-4, middle and finishers = 5-7. Each player's
+  number in a role is his record at those slots if he has 60+ balls there, else his overall batting, flagged "out of
+  his usual role".
+- **Bowling from history:** the 20 overs (6 powerplay, 9 middle, 5 death; 4 a bowler) go to the bowling eleven by
+  where each has bowled most; shown on screen, tap a bowler to change his phase. Each phase's role (powerplay pace,
+  middle-overs spin, death pace) is the overs-weighted record of whoever bowls it (his phase record if 60+ balls there,
+  else his overall bowling, flagged); no spinner in the middle overs is a gap.
+- **Depth:** regular bowlers in the bowling eleven.
+- **Overseas:** at most four in the twelve (warned, and Save off, as with the purse).
+- **Two tabs:** Squad (the 25 and the purse, as now) and XI (twelve from that squad). The Season Draft (X10) scores its
+  XI with the same function.
+
+| # | Chunk | Output |
+|---|---|---|
+| X6b | Payload: each player's batting by slot group and bowling by phase and kind (not just his main role) | `services/xi_engine.py` |
+| X6c | `scoreXI()` in the browser (order, sub, auto overs, flags) with tests; the Python mirror when an XI is shared | `src/utils/xiEngine.js` |
+| X6d | The XI tab: the default XI from the squad, reorder, sub, bowling allocation, the template rows live | `XIBuilderPage.jsx` |
+
 ### Stage 3: the other modes
 
 | # | Chunk | Output |

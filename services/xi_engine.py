@@ -38,6 +38,22 @@ def _roles_of(p: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
     return out
 
 
+def _record(p: Dict[str, Any]) -> Dict[str, Any]:
+    """His full record for the XI tab (XI_BUILDER_PLAN.md stage 2b): batting by slot group (openers 1-2, top 3-4,
+    middle 5-7, lower 8-11) and overall; bowling by phase and kind and overall."""
+    from services.team_roles import bat_slot
+
+    bat: Dict[str, Dict[str, float]] = {}
+    for pos, r in (p.get("bat") or {}).items():
+        g = bat.setdefault(bat_slot(int(pos)), {k: 0.0 for k in KEYS})
+        for k in KEYS:
+            g[k] += r.get(k) or 0
+    bowl = {slot: {k: float(r.get(k) or 0) for k in KEYS} for slot, r in (p.get("bowl") or {}).items()}
+    tot = lambda d: {k: round(sum(x[k] for x in d.values()), 1) for k in KEYS}  # noqa: E731
+    return {"bat": {k: {kk: round(v, 1) for kk, v in g.items()} for k, g in bat.items()}, "bat_all": tot(bat) if bat else None,
+            "bowl": {k: {kk: round(v, 1) for kk, v in g.items()} for k, g in bowl.items()}, "bowl_all": tot(bowl) if bowl else None}
+
+
 def score(players: List[Dict[str, Any]], bench: Dict[str, Dict[str, Any]], pins: Dict[str, List[str]] = None) -> Dict[str, Any]:
     """The template rows for these players, from compact role totals ({name, roles: {key: {balls, runs, wickets, w}},
     best_season_balls}): the busiest N holders per role pooled (pinned players first: a reader's "in for X"); place
@@ -116,7 +132,7 @@ def payload(db, code: str, season: int = 2027) -> Dict[str, Any]:
             p = ipl.get(name) or extra.get(name) or {"name": name, "bat": {}, "bowl": {}}
             return {"name": name, "price": meta.get("price"), "overseas": bool(meta.get("overseas")),
                     "role": meta.get("role") or "", "roles": _roles_of(p),
-                    "best_season_balls": p.get("best_season_balls", 0)}
+                    "best_season_balls": p.get("best_season_balls", 0), **_record(p)}
 
         squad = [compact(n, m) for n, m in sq.items()]
         avail = set(db.execute(text("""
@@ -146,7 +162,7 @@ def payload(db, code: str, season: int = 2027) -> Dict[str, Any]:
                           for k, v in tmpl["benchmarks"].items()},
                 "roles": [{"key": r[0], "label": r[1], "side": r[2], "measure": r[4], "n": r[5], "lower": r[6]}
                           for r in ROLES]}
-    return cached_run(db, {"kind": "xi_payload", "v": 1, "code": code, "day": date.today(), "moves": moves}, run)
+    return cached_run(db, {"kind": "xi_payload", "v": 2, "code": code, "day": date.today(), "moves": moves}, run)
 
 
 def score_link(db, code: str, add: List[str], drop: List[str], pin: List[str]) -> Dict[str, Any]:
