@@ -1210,7 +1210,7 @@ export const TodaysGamesSection = () => {
     { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Tap the player-season with the higher Impact. Ten pairs a day.' },
     { key: 'player_journeys', to: '/games/player-journeys', title: 'Player Journeys', blurb: 'Name the IPL player from their franchise path.' },
     { key: 'guess_innings', to: '/games/guess-innings', title: 'Guess the Innings', blurb: 'Whose innings was it? A score line and a wagon wheel.' },
-    { key: 'season_draft', to: '/games/season-draft', title: 'Season Draft', blurb: 'Pick eleven IPL player-seasons. Would they have made the playoffs?' },
+    { key: 'season_draft', to: '/games/19-0', title: '19-0', blurb: 'An XI of IPL player-seasons through all 19 seasons. Can it make the playoffs every time?' },
   ];
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>

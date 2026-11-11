@@ -188,8 +188,8 @@ function draftCard(card) {
   if (!card) {
     return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
       top('Game'),
-      h('div', { fontFamily: DISPLAY, fontSize: 72, fontWeight: 700, marginTop: 40 }, 'Season Draft'),
-      h('div', { fontSize: 32, color: C.mid, marginTop: 12, width: 900 }, 'Build an XI from 19 years of IPL player-seasons on a budget. How many seasons does it make the playoffs?'));
+      h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, marginTop: 30, lineHeight: 1 }, '19-0'),
+      h('div', { fontSize: 32, color: C.mid, marginTop: 12, width: 900 }, 'Build an XI from 19 years of IPL player-seasons on a budget. It plays all 19 seasons: can it make the playoffs every time?'));
   }
   const row = (p) => h('div', { alignItems: 'center', gap: 10, height: 34 },
     h('div', { width: 120, fontSize: 18, color: C.low }, p.slot.replace('Number ', 'No. ').replace(' bowler', '')),
@@ -197,10 +197,10 @@ function draftCard(card) {
     p.overseas ? PLANE : null,
     p.wk ? h('div', { fontSize: 14, color: C.mid, fontFamily: MONO, border: `1px solid ${C.border}`, borderRadius: 4, padding: '1px 5px' }, 'WK') : null);
   return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '40px 56px', fontFamily: 'Barlow' },
-    top('Season Draft'),
+    top('19-0 · IPL draft'),
     h('div', { marginTop: 22, gap: 40 },
       h('div', { flexDirection: 'column', width: 430 },
-        h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}/19`),
+        h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}-${19 - card.made}`),
         h('div', { fontFamily: DISPLAY, fontSize: 34, fontWeight: 700, lineHeight: 1.15, marginTop: 14 }, card.line),
         h('div', { fontSize: 22, color: C.low, marginTop: 14 }, 'Same deal, can you beat it?')),
       h('div', { flexDirection: 'column' }, card.xi.map(row))),

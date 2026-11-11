@@ -10,15 +10,16 @@ import {
   BUDGET, COST_MIN, OVERSEAS_MAX, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, isBatSlot, profile, seasonResults,
 } from '../../utils/draftEngine';
 
-// Season Draft (XI_BUILDER_PLAN.md X10). Three stages, all in the URL (d = the deal, p = the picks, r = locked in):
+// 19-0, formerly Season Draft (XI_BUILDER_PLAN.md X10), at /games/19-0. Three stages, all in the URL (d = the deal, p = the picks, r = locked in):
 //   draft     fill eleven slots in any order, five cards a slot, on a budget, four overseas at most, a wicketkeeper;
 //             no score shown while drafting
 //   simulate  after "Lock in": a short "playing 19 seasons" screen (skipped with reduced motion, or on a shared link)
 //   result    one screen, made to be screenshotted and shared: the score, a one-line summary, the 19 seasons, the XI,
 //             play again. The same URL unfurls as a card (api/_lib/share.mjs draftSummary).
-// "Made the playoffs in N of 19" is the game's rule, not a prediction.
+// The score is a record: seasons it made the playoffs v seasons it missed ("13-6"; 19-0 is the perfect run). The game's
+// rule, not a prediction.
 
-export const GAME_NAME = 'Season Draft';
+export const GAME_NAME = '19-0';  // 13 Nov 2026: the score is a record, playoffs reached v missed (13-6)
 const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums' };
 const newDeal = () => Math.random().toString(36).slice(2, 10);
 const BOWL_ROLES = ['pp_pace', 'mid_spin', 'death_pace'];
@@ -117,7 +118,7 @@ const Result = ({ picks, table, results, best, onReplay, onSameDeal }) => {
     : `Made the playoffs in ${made} of 19 IPL seasons${topped ? `, and topped the table in ${topped}` : ''}.`;
   const share = () => {
     const url = window.location.href;
-    const text = `${GAME_NAME}: my XI made the IPL playoffs in ${made} of 19 seasons. Same deal, can you beat it?`;
+    const text = `${GAME_NAME}: my XI went ${made}-${19 - made}, the IPL playoffs in ${made} of 19 seasons. Same deal, can you beat it?`;
     if (navigator.share) navigator.share({ title: GAME_NAME, text, url }).catch(() => {}); else navigator.clipboard?.writeText(`${text} ${url}`);
   };
   return (
@@ -127,7 +128,7 @@ const Result = ({ picks, table, results, best, onReplay, onSameDeal }) => {
         <Box sx={{ fontSize: 11.5, color: colors.textLo }}>hindsightcricket.com</Box>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25 }}>
-        <Box sx={{ ...mono, fontSize: 56, lineHeight: 1, color: colors.accent }}>{`${made}/19`}</Box>
+        <Box sx={{ ...mono, fontSize: 56, lineHeight: 1, color: colors.accent, whiteSpace: 'nowrap' }}>{`${made}-${19 - made}`}</Box>
         <Box sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.3 }}>{summary}</Box>
       </Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '4px' }}>
@@ -266,7 +267,7 @@ const SeasonDraftGame = () => {
       <Box>
         <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26 }}>{GAME_NAME}</Box>
         <Box sx={{ color: colors.textMed, fontSize: 13.5 }}>
-          {`Build an XI from 19 years of IPL seasons: ${BUDGET} credits, up to four overseas, a wicketkeeper. Then see how many seasons it makes the playoffs.`}
+          {`Build an XI from 19 years of IPL seasons: ${BUDGET} credits, up to four overseas, a wicketkeeper. It plays all 19 seasons: playoffs reached v missed. Can it go 19-0?`}
         </Box>
       </Box>
 
