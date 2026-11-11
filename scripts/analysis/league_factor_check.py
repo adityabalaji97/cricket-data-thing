@@ -56,6 +56,10 @@ def main() -> int:
           AND bowl_kind IN ('pace bowler', 'spin bowler')
         GROUP BY 1, 2, 3, 4, 5""")).fetchall()
 
+    # One name per competition (the site's aliases: SMAT is stored under four names).
+    from services.competition_aliases import canonical_competition as canonical
+    bat = [(pid, canonical(c) or c, *rest) for pid, c, *rest in bat]
+    bowl = [(pid, canonical(c) or c, *rest) for pid, c, *rest in bowl]
     # rec[(measure_group, pid)][(comp, year)] = {balls, a, b}: measure = a / b (scaled)
     rec = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
     for pid, comp, y, balls, runs, outs in bat:
