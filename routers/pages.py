@@ -116,15 +116,16 @@ def xi_builder_score_route(response: Response, team: str = Query(...), add: str 
 
 
 @router.get("/games/season-draft/data")
-def season_draft_data(request: Request):
+def season_draft_data(request: Request, league: str = Query(default="IPL", pattern="^[A-Za-z0-9]{2,6}$")):
     """The 19-0 game's cards and seasons (services/pinned/season_draft_IPL.json, scripts/build_season_draft.py), gzipped
     when the client accepts it (~490 KB -> ~110 KB). The app asks with ?v=<data version>, so the week-long cache is
     safe: a rebuild changes the URL. Only this route is compressed (no app-wide gzip: it would wrap the MCP stream)."""
     from pathlib import Path as P
 
-    path = P(__file__).resolve().parents[1] / "services/pinned/season_draft_IPL.json"
+    # One pinned file per league (scripts/build_season_draft.py --league=BBL): /games/19-0 is the IPL, /games/15-0 the BBL.
+    path = P(__file__).resolve().parents[1] / f"services/pinned/season_draft_{league.upper()}.json"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="Season Draft data not built")
+        raise HTTPException(status_code=404, detail=f"No 19-0 data for {league}")
     raw, packed = _draft_bytes(str(path), path.stat().st_mtime)
     headers = {"Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800", "Vary": "Accept-Encoding"}
     if "gzip" in (request.headers.get("accept-encoding") or ""):

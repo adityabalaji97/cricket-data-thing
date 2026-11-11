@@ -230,31 +230,34 @@ async function builderSummary(params) {
 // checked copy of the app's), from the pinned data the API serves.
 // A locked-in 19-0 draft (/games/19-0?d=&p=&r=1; formerly /games/season-draft): the same deal and score as the game
 // (api/_lib/draftEngine.mjs, a checked copy of the app's), from the pinned data the API serves.
-const DRAFT_NAME = '19-0';  // the game's name, also GAME_NAME in SeasonDraftGame.jsx
-async function draftSummary(params) {
+// The league comes from the path: /games/19-0 the IPL, /games/15-0 the BBL (/games/season-draft: the IPL, as before).
+const DRAFT_LEAGUE = { '19-0': 'IPL', '15-0': 'BBL', 'season-draft': 'IPL' };
+async function draftSummary(params, slug) {
+  const league = DRAFT_LEAGUE[slug] || 'IPL';
   const dealId = params.get('d'); const picksStr = params.get('p') || '';
-  const plain = { kind: 'draft', title: `${DRAFT_NAME}: can your IPL XI make the playoffs in all 19 seasons? | ${SITE_NAME}`,
-    description: 'Build an XI from 19 years of IPL player-seasons on a budget, then see how many seasons it makes the playoffs.',
-    card: null };
-  if (!dealId || !/^[0-9]{11}$/.test(picksStr)) return plain;
-  const data = await getJSON('/games/season-draft/data', 8000);
-  if (!data) return plain;
+  const data = await getJSON(`/games/season-draft/data?league=${league}`, 8000);
+  const n = data?.seasons?.length || 19; const name = `${n}-0`;
+  const plain = { kind: 'draft', title: `${name}: can your ${league} XI make the playoffs in all ${n} seasons? | ${SITE_NAME}`,
+    description: `Build an XI from ${n} years of ${league} player-seasons on a budget, then see how many seasons it makes the playoffs.`,
+    card: { plain: true, name, league, n } };
+  if (!data || !dealId || !/^[0-9]{11}$/.test(picksStr)) return plain;
   const { deal, profile, seasonResults, costTable, checkPicks, SLOTS, roleEdges, ROLE_NAMES } = await import('./draftEngine.mjs');
+  const max = data.rules?.overseas_max || 4;
   const dealt = deal(data.cards, `season-draft-${dealId}`);
-  const chosen = picksStr.split('').map(Number).map((n, i) => dealt[i]?.[n] || null);
-  if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards)).complete) return plain;
+  const chosen = picksStr.split('').map(Number).map((k, i) => dealt[i]?.[k] || null);
+  if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards), max).complete) return plain;
   const res = seasonResults(profile(chosen), data.seasons, data.roles, dealId);
   const edges = roleEdges(profile(chosen), data.seasons, data.roles);
   const why = `Strongest: ${ROLE_NAMES[edges.strongest]} · Weakest: ${ROLE_NAMES[edges.weakest]}`;
   const made = res.filter((r) => r.made).length;
   const topped = res.filter((r) => r.topped).length;
-  const line = made ? `Playoffs in ${made} of 19${topped ? ` · topped the table ${topped === 1 ? 'once' : `${topped} times`}` : ''}`
-    : 'Missed the playoffs in all 19 seasons';
+  const line = made ? `Playoffs in ${made} of ${n}${topped ? ` · topped the table ${topped === 1 ? 'once' : topped === 2 ? 'twice' : `${topped} times`}` : ''}`
+    : `Missed the playoffs in all ${n} seasons`;
   return {
     kind: 'draft',
-    title: `${DRAFT_NAME}: my IPL XI went ${made}-${19 - made} | ${SITE_NAME}`,
+    title: `${name}: my ${league} XI went ${made}-${n - made} | ${SITE_NAME}`,
     description: `${line}. ${why}. ${chosen.slice(0, 3).map((c) => `${c.name} ${c.season}`).join(', ')} and eight more. Same deal, can you beat it?`,
-    card: { made, line, why, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })),
+    card: { name, league, n, made, line, why, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })),
       xi: chosen.map((c, i) => ({ slot: SLOTS[i].label, name: `${c.name} ${c.season}`, overseas: !!c.overseas, wk: !!c.wk })) },
   };
 }
@@ -418,7 +421,7 @@ export async function summarize(pathname, search) {
   if (pathname.startsWith('/player') && params.get('name')) return playerSummary(params.get('name'));
   if (/^\/team\/?$/.test(pathname) && params.get('team')) return teamSummary(params.get('team'));
   if (/^\/team-builder\/?$/.test(pathname)) return builderSummary(params);
-  if (/^\/games\/(19-0|season-draft)\/?$/.test(pathname)) return draftSummary(params);
+  { const m = pathname.match(/^\/games\/(19-0|15-0|season-draft)\/?$/); if (m) return draftSummary(params, m[1]); }
   if (pathname.startsWith('/venue')) return venueSummary(params);
   if (pathname.startsWith('/query')) return querySummary(params);
   const note = pathname.match(/^\/notes\/([a-z0-9-]+)\/?$/);

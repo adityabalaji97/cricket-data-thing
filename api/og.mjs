@@ -191,11 +191,12 @@ const STAR = { type: 'svg', props: { width: 14, height: 14, viewBox: '0 0 24 24'
   d: 'M12 17.27l4.15 2.51c.76.46 1.69-.22 1.49-1.08l-1.1-4.72 3.67-3.18c.67-.58.31-1.68-.57-1.75l-4.83-.41-1.89-4.46c-.34-.81-1.5-.81-1.84 0L9.19 8.63l-4.83.41c-.88.07-1.24 1.17-.57 1.75l3.67 3.18-1.1 4.72c-.2.86.73 1.54 1.49 1.08l4.15-2.5z' } } } };
 
 function draftCard(card) {
-  if (!card) {
+  if (!card || card.plain) {
+    const name = card?.name || '19-0'; const league = card?.league || 'IPL'; const n = card?.n || 19;
     return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
       top('Game'),
-      h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, marginTop: 30, lineHeight: 1 }, '19-0'),
-      h('div', { fontSize: 32, color: C.mid, marginTop: 12, width: 900 }, 'Build an XI from 19 years of IPL player-seasons on a budget. It plays all 19 seasons: can it make the playoffs every time?'));
+      h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, marginTop: 30, lineHeight: 1 }, name),
+      h('div', { fontSize: 32, color: C.mid, marginTop: 12, width: 900 }, `Build an XI from ${n} years of ${league} player-seasons on a budget. It plays all ${n} seasons: can it make the playoffs every time?`));
   }
   const row = (p) => h('div', { alignItems: 'center', gap: 10, height: 31 },
     h('div', { width: 90, fontSize: 18, color: C.low }, p.slot),
@@ -203,10 +204,10 @@ function draftCard(card) {
     p.overseas ? PLANE : null,
     p.wk ? GLOVE : null);
   return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '40px 56px', fontFamily: 'Barlow' },
-    top('19-0 · IPL draft'),
+    top(`${card.name} · ${card.league} draft`),
     h('div', { marginTop: 22, gap: 16 },
       h('div', { flexDirection: 'column', width: 540 },
-        h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}-${19 - card.made}`),
+        h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}-${card.n - card.made}`),
         h('div', { fontFamily: DISPLAY, fontSize: 27, fontWeight: 700, lineHeight: 1.15, marginTop: 14 }, card.line),
         card.why ? h('div', { fontSize: 21, color: C.mid, marginTop: 10 }, card.why) : null,
         h('div', { fontSize: 22, color: C.low, marginTop: 14 }, 'Same deal, can you beat it?')),

@@ -99,7 +99,7 @@ export const track = (event, props, path) => {
 
 // Pages whose query changes as you use them (19-0: every pick rewrites ?p=): one page view per visit, logged without the
 // query. What happened there is its own event (19-0's game_start / game_result). 13 Nov 2026.
-export const QUIET_QUERY_PATHS = ['/games/19-0'];
+export const QUIET_QUERY_PATHS = ['/games/19-0', '/games/15-0'];
 const quiet = (pathname) => QUIET_QUERY_PATHS.some((p) => pathname.startsWith(p));
 export const pageViewKey = (location) => (quiet(location.pathname) ? location.pathname : `${location.pathname}${location.search}`);
 

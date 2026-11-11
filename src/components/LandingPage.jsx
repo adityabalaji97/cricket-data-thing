@@ -1206,7 +1206,8 @@ const playedToday = (game) => {
 export const TodaysGamesSection = () => {
   const number = dailyNumber();
   // 19-0 isn't daily (every draft is its own deal): it sits under the daily four as "Anytime", with no played tick.
-  const anytime = [{ key: 'nineteen_oh', to: '/games/19-0', title: '19-0', blurb: 'Draft an IPL XI from 19 seasons. Can it make the playoffs in all 19?' }];
+  const anytime = [{ key: 'nineteen_oh', to: '/games/19-0', title: '19-0', blurb: 'Draft an IPL XI from 19 seasons. Can it make the playoffs in all 19?' },
+    { key: 'fifteen_oh', to: '/games/15-0', title: '15-0', blurb: 'The BBL version: an XI from 15 seasons of the Big Bash. Can it go 15-0?' }];
   const games = [
     { key: 'call_it', to: '/games/call-it', title: 'Call It', blurb: 'Five real chases, frozen mid-game. Did they win it?' },
     { key: 'higher_lower', to: '/games/higher-lower', title: 'Higher or Lower', blurb: 'Tap the player-season with the higher Impact. Ten pairs a day.' },

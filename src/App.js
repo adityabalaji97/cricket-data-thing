@@ -742,7 +742,8 @@ const AppContent = () => {
         <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame /></MensT20Scope>} />
         <Route path="/games/call-it" element={<MensT20Scope><CallItGame /></MensT20Scope>} />
         <Route path="/games/higher-lower" element={<MensT20Scope><HigherLowerGame /></MensT20Scope>} />
-        <Route path="/games/19-0" element={<SeasonDraftGame />} />
+        <Route path="/games/19-0" element={<SeasonDraftGame key="IPL" league="IPL" />} />
+        <Route path="/games/15-0" element={<SeasonDraftGame key="BBL" league="BBL" />} />
         <Route path="/games/season-draft" element={<KeepQueryRedirect to="/games/19-0" />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
