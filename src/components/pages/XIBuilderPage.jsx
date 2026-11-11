@@ -5,6 +5,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { limitsState, score } from '../../utils/xiEngine';
 import { Eyebrow } from '../pageKit/pageKit';
+import XITab from './XITab';
 
 // Fix my team (XI_BUILDER_PLAN.md X6): an IPL squad against the winners' template, role by role. Tap a role to see
 // who holds it and who in the auction pool could; add a player or put him in "instead of" a holder (a pin); drop
@@ -53,14 +54,18 @@ const XIBuilderPage = () => {
     return () => { cancelled = true; };
   }, [team]);
 
-  const set = (patch) => {
-    const next = { add: added, drop: dropped, pin: Object.entries(pins).flatMap(([k, ns]) => ns.map((n) => `${k}:${n}`)), ...patch };
-    const p = new URLSearchParams({ team });
-    if (next.add.length) p.set('add', enc(next.add));
-    if (next.drop.length) p.set('drop', enc(next.drop));
-    if (next.pin.length) p.set('pin', enc(next.pin));
+  // Every other parameter (the tab, the XI) is kept when the squad changes.
+  const setParams = (obj) => {
+    const p = new URLSearchParams(location.search);
+    Object.entries(obj).forEach(([k, v]) => { if (v) p.set(k, v); else p.delete(k); });
     navigate({ search: `?${p.toString()}` }, { replace: true });
   };
+  const set = (patch) => {
+    const next = { add: added, drop: dropped, pin: Object.entries(pins).flatMap(([k, ns]) => ns.map((n) => `${k}:${n}`)), ...patch };
+    setParams({ add: next.add.length ? enc(next.add) : '', drop: next.drop.length ? enc(next.drop) : '',
+      pin: next.pin.length ? enc(next.pin) : '' });
+  };
+  const tab = q.get('tab') === 'xi' ? 'xi' : 'squad';
 
   const squad = useMemo(() => {
     if (!data) return [];
@@ -112,7 +117,7 @@ const XIBuilderPage = () => {
         <Box sx={{ color: colors.textMed, fontSize: 13.5 }}>Swap players in and watch each role against what IPL playoff sides had.</Box>
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      {tab === 'squad' && <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
         {[[`${now.at_level} of ${now.of}`, 'roles at playoff level', base.at_level !== now.at_level ? `was ${base.at_level}` : null],
           [crore(Math.abs(lim.left)), lim.left >= 0 ? 'left in the purse' : 'over the purse', null],
           [`${lim.overseas}/${data.limits.overseas_max}`, 'overseas', null], [`${lim.size}`, 'players', null]].map(([v, l, was]) => {
@@ -125,10 +130,36 @@ const XIBuilderPage = () => {
           </Box>
           );
         })}
+      </Box>}
+
+      <Box role="tablist" aria-label="View" sx={{ display: 'flex', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '3px' }}>
+        {[['squad', 'Squad'], ['xi', 'XI']].map(([k, l]) => (
+          <Box key={k} component="button" type="button" role="tab" aria-selected={tab === k} onClick={() => setParams({ tab: k === 'xi' ? 'xi' : '' })}
+            sx={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', py: 0.6, borderRadius: '999px', fontFamily: fonts.display, fontWeight: 600,
+              bgcolor: tab === k ? colors.accent : 'transparent', color: tab === k ? colors.bg : colors.textMed }}>{l}</Box>
+        ))}
       </Box>
 
-      <Eyebrow>Tap a role</Eyebrow>
-      {now.roles.map((r) => {
+      {tab === 'xi' && <XITab data={data} squad={squad} q={q} setParams={setParams} RoleRows={({ rows }) => rows.map((r) => {
+        const rr = data.roles.find((x) => x.key === r.key);
+        return (
+          <Box key={r.key} sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.75, py: 1.1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
+              <Box sx={{ fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap' }}>{r.label}</Box>
+              <Pill status={r.status} />
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mt: 0.25 }}>
+              <Box sx={{ fontSize: 12, color: colors.textLo, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {r.holders.length ? r.holders.join(', ') : 'nobody in the XI does it'}
+              </Box>
+              <Box sx={{ ...mono, fontSize: 12.5, whiteSpace: 'nowrap', color: colors.textMed }}>{`${fmt(rr, r.value)} · playoff ${fmt(rr, r.playoff)}`}</Box>
+            </Box>
+          </Box>
+        );
+      })} />}
+
+      {tab === 'squad' && <Eyebrow>Tap a role</Eyebrow>}
+      {tab === 'squad' && now.roles.map((r) => {
         const rr = data.roles.find((x) => x.key === r.key);
         const before = base.roles.find((x) => x.key === r.key);
         return (
