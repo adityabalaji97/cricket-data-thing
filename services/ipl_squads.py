@@ -73,7 +73,8 @@ def deals(db, code: str, season: int = 2027, as_of: Optional[date] = None, repor
         if m["kind"] == "trade":
             by.setdefault(m["deal"] or f"m{m['id']}", []).append(m)
     out = []
-    for ms in by.values():
+    # Newest dated deal first (the day's news leads the copy), undated ones after.
+    for ms in sorted(by.values(), key=lambda ms: (ms[0]["announced"] is None, -(ms[0]["announced"] or date.min).toordinal())):
         others = {t for m in ms for t in (m["from_team"], m["to_team"]) if t and t != code}
         out.append({"other": sorted(others)[0] if others else None,
                     "ins": [m["player_name"] for m in ms if m["to_team"] == code],
