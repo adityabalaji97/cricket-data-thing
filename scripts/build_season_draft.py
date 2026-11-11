@@ -35,7 +35,72 @@ def measure(m, t):
     return 6 * t["runs"] / t["balls"]
 
 
+INDIAN_COMPS = ("Indian Premier League", "IPL", "Syed Mushtaq Ali Trophy", "SMAT", "SMA TROPHY", "SMA TROPHY FINAL")
+
+
+FULL_MEMBERS = ("Australia", "England", "South Africa", "New Zealand", "Pakistan", "Sri Lanka", "West Indies", "Bangladesh",
+                "Zimbabwe", "Afghanistan", "Ireland")
+
+
+def overseas_years(db):
+    """{display name: years with evidence he was an overseas player} (12 Nov 2026). Evidence, any of:
+      - an international for a side other than India, by player id on the ball-by-ball feed (2015 on): ids, because
+        names collide (a Mandeep Singh plays for Norway);
+      - on the older scorecards (names only), an international for a full-member side (Chaminda Vaas);
+      - an IPL auction entry, by id, with a country other than India;
+      - a domestic or franchise league outside India before 2019 (Shane Warne, BBL; Dimitri Mascarenhas, county T20).
+    Composite sides (World XI) don't count (Dinesh Karthik). A card is overseas only if the evidence is near its season
+    (CARD_WINDOW): players who emigrated later (Harmeet Singh, USA from 2024; Unmukt Chand) were Indian then."""
+    from collections import defaultdict
+
+    from sqlalchemy import text
+
+    years = defaultdict(set)
+    rows = db.execute(text("""
+        SELECT p.display_name, x.y FROM player_identity p JOIN (
+            SELECT p_bat AS pid, SUBSTRING(match_date, 1, 4)::int y FROM delivery_details WHERE competition IN ('T20I', 'ODI')
+                AND team_bat <> 'India' AND team_bat NOT ILIKE '%XI%' AND p_bat IS NOT NULL
+            UNION SELECT p_bowl, SUBSTRING(match_date, 1, 4)::int FROM delivery_details WHERE competition IN ('T20I', 'ODI')
+                AND team_bowl <> 'India' AND team_bowl NOT ILIKE '%XI%' AND p_bowl IS NOT NULL
+            UNION SELECT pid, year FROM auction_lots WHERE pid IS NOT NULL AND country IS NOT NULL AND country <> 'India') x
+        ON x.pid = p.pid""")).fetchall()
+    rows += db.execute(text("""
+        SELECT d.batter, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
+            WHERE m.match_type = 'international' AND d.batting_team = ANY(:full)
+        UNION SELECT d.bowler, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
+            WHERE m.match_type = 'international' AND d.bowling_team = ANY(:full)
+        UNION SELECT d.batter, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
+            WHERE m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))
+        UNION SELECT d.bowler, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
+            WHERE m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))"""),
+        {"full": list(FULL_MEMBERS), "ind": list(INDIAN_COMPS)}).fetchall()
+    for name, y in rows:
+        years[name].add(int(y))
+    return years
+
+
+CARD_WINDOW = (10, 3)  # evidence from 10 years before a season to 3 after makes that season's card overseas
+
+
+def is_overseas(years, name, season):
+    s = int(season)
+    return any(s - CARD_WINDOW[0] <= y <= s + CARD_WINDOW[1] for y in years.get(name, ()))
+
+
 def main() -> int:
+    if "--refresh-overseas" in sys.argv:  # just the overseas flags on the pinned file
+        from database import get_session
+
+        path = ROOT / "services/pinned/season_draft_IPL.json"
+        data = json.loads(path.read_text())
+        ov = overseas_years(next(get_session()))
+        before = sum(c["overseas"] for c in data["cards"])
+        for c in data["cards"]:
+            c["overseas"] = is_overseas(ov, c["name"], c["season"])
+        path.write_text(json.dumps(data, separators=(",", ":")))
+        print(f"overseas cards {before} -> {sum(c['overseas'] for c in data['cards'])}")
+        return 0
+
     from sqlalchemy import text
 
     from database import get_session
@@ -44,10 +109,7 @@ def main() -> int:
 
     db = next(get_session())
     data = league_roles(db, "IPL")
-    # Overseas: anyone who has played a men's international for a side other than India.
-    overseas = set(db.execute(text("""
-        SELECT DISTINCT bat FROM delivery_details WHERE competition IN ('T20I', 'ODI') AND team_bat <> 'India'
-        UNION SELECT DISTINCT bowl FROM delivery_details WHERE competition IN ('T20I', 'ODI') AND team_bowl <> 'India'""")).scalars().all())
+    overseas = overseas_years(db)
     roles = [r for r in ROLES if r[2] != "depth"]
     seasons, cards = [], []
     for s in data["seasons"]:
@@ -78,7 +140,7 @@ def main() -> int:
                 m = merged[p["name"]]
                 m["teams"].append(team)
                 for pos, r in p["bat"].items():
-                    for k in ("balls", "runs", "wickets"):
+                    for k in ("balls", "runs", "wickets", "innings_count"):
                         m["bat"][bat_slot(int(pos))][k] += r.get(k) or 0
                 for slot, r in p["bowl"].items():
                     for k in ("balls", "runs", "wickets"):
@@ -94,8 +156,17 @@ def main() -> int:
                     ratios[key] = {"r": round(v / rate[key], 4), "v": round(v, 2), "balls": int(t["balls"])}
             if ratios:
                 bowled = sum(t["balls"] for t in m["bowl"].values())
-                cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": name in overseas,
-                              "roles": ratios, "regular": bowled >= 120})
+                # The card's headline numbers (what the player sees; the ratios are what's scored): batting in each band
+                # he did enough of (runs, balls, outs, innings), bowling over the whole season (runs, balls, wickets).
+                bat = {key: {"runs": int(m["bat"][slot]["runs"]), "balls": int(m["bat"][slot]["balls"]),
+                             "outs": int(m["bat"][slot]["wickets"]), "inns": int(m["bat"][slot]["innings_count"])}
+                       for key, _l, side, slot, *_r in roles if side == "bat" and key in ratios}
+                bowl = None
+                if bowled >= 24:
+                    bowl = {"runs": int(sum(t["runs"] for t in m["bowl"].values())), "balls": int(bowled),
+                            "wkts": int(sum(t["wickets"] for t in m["bowl"].values()))}
+                cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]),
+                              "roles": ratios, "regular": bowled >= 120, "bat": bat, "bowl": bowl})
         print(s["season"], len(teams), "teams,", sum(1 for c in cards if c["season"] == str(s["season"])), "cards")
     out = {"league": "IPL", "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],
            "seasons": seasons, "cards": cards}

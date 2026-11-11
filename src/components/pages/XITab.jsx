@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Box, Drawer } from '@mui/material';
 import { colors, fonts } from '../../theme/hindsightDark';
+import OverseasMark from '../common/OverseasMark';
 import { defaultXI, scoreXI } from '../../utils/xiEngine';
 import { Eyebrow } from '../pageKit/pageKit';
 
@@ -64,7 +65,7 @@ const XITab = ({ data, squad, q, setParams, RoleRows }) => {
           [`${s.unassigned}`, 'overs with no bowler', s.unassigned > 0]].map(([v, l, bad]) => (
           <Box key={l} sx={{ flex: 1, bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 1 }}>
             <Box sx={{ ...mono, fontSize: 19, color: bad ? colors.red : colors.textHi }}>{v}</Box>
-            <Box sx={{ fontSize: 11, color: colors.textLo }}>{l}</Box>
+            <Box sx={{ fontSize: 11, color: colors.textLo }}>{l.startsWith('overseas') ? <OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} /> : null}{l}</Box>
           </Box>
         ))}
       </Box>
@@ -77,9 +78,12 @@ const XITab = ({ data, squad, q, setParams, RoleRows }) => {
             <Box sx={{ ...mono, fontSize: 13, color: colors.textLo }}>{i + 1}</Box>
             <Box component="button" type="button" onClick={() => setPickFor(xi.twelve.indexOf(n))}
               sx={{ all: 'unset', cursor: 'pointer', minWidth: 0 }}>
-              <Box sx={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n}</Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                <Box sx={{ fontSize: 14.5, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n}</Box>
+                {players[n]?.overseas && <OverseasMark />}
+              </Box>
               <Box sx={{ fontSize: 11, color: s.flags[n] ? '#f0b429' : colors.textLo, whiteSpace: 'nowrap' }}>
-                {`${SLOT(i)}${s.flags[n] ? ` · ${s.flags[n]}` : ''}${players[n]?.overseas ? ' · overseas' : ''}`}
+                {`${SLOT(i)}${s.flags[n] ? ` · ${s.flags[n]}` : ''}`}
               </Box>
             </Box>
             <Box sx={{ display: 'flex', gap: 0.25 }}>
@@ -136,8 +140,8 @@ const XITab = ({ data, squad, q, setParams, RoleRows }) => {
             {bench.map((p) => (
               <Box key={p.name} component="button" type="button" onClick={() => replace(pickFor, p.name)}
                 sx={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', width: '100%', py: 0.9, borderTop: `1px solid ${colors.border}` }}>
-                <Box sx={{ fontSize: 14.5 }}>{p.name}</Box>
-                <Box sx={{ fontSize: 12, color: colors.textLo }}>{[p.role, p.overseas ? 'overseas' : null].filter(Boolean).join(' · ')}</Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', fontSize: 14.5 }}>{p.name}{p.overseas && <OverseasMark />}</Box>
+                <Box sx={{ fontSize: 12, color: colors.textLo }}>{p.role}</Box>
               </Box>
             ))}
           </Box>

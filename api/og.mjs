@@ -178,6 +178,19 @@ function xiCard(card) {
         h('div', { fontSize: 22, color: C.mid }, r.label)))));
 }
 
+// A finished Season Draft: the score, three of the picks, the 19 seasons as a strip (made / topped / missed).
+function draftCard(card) {
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
+    top('Season Draft'),
+    h('div', { alignItems: 'baseline', gap: 18, marginTop: 18 },
+      h('div', { fontFamily: MONO, fontSize: 96, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}/${card.of}`),
+      h('div', { fontFamily: DISPLAY, fontSize: 40, fontWeight: 700, lineHeight: 1.1 }, 'IPL seasons this XI made the playoffs')),
+    h('div', { fontSize: 26, color: C.mid, marginTop: 12 }, `${card.stars.join(' · ')} and eight more`),
+    h('div', { marginTop: 'auto', gap: 6 },
+      card.strip.map((x) => h('div', { width: 50, height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 20,
+        background: x.topped ? '#c9a227' : x.made ? C.lime : C.surface, color: x.made ? C.bg : C.low }, x.s))));
+}
+
 function homeCard(card) {
   const tiles = h('div', { flexWrap: 'wrap', gap: 14, marginTop: 24, width: card.latest ? 620 : 1080 },
     card.features.map(([name, what]) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 20px', width: card.latest ? 300 : 520 },
@@ -219,6 +232,7 @@ export default async function handler(req, res) {
     : summary?.kind === 'player' ? playerCard(card)
     : summary?.kind === 'team' ? teamCard(card)
     : summary?.kind === 'xi' ? xiCard(card)
+    : summary?.kind === 'draft' ? draftCard(card)
       : textCard(card);
 
   const image = new ImageResponse(element, { width: 1200, height: 630, fonts: FONTS });

@@ -3,6 +3,7 @@ import { Box, Drawer } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
+import OverseasMark from '../common/OverseasMark';
 import { limitsState, score } from '../../utils/xiEngine';
 import { Eyebrow } from '../pageKit/pageKit';
 import XITab from './XITab';
@@ -126,7 +127,7 @@ const XIBuilderPage = () => {
           return (
           <Box key={l} sx={{ flex: '1 1 40%', bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.5, py: 1 }}>
             <Box sx={{ ...mono, fontSize: 20, color: bad ? colors.red : colors.textHi }}>{v}</Box>
-            <Box sx={{ fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{l}{was ? ` · ${was}` : ''}</Box>
+            <Box sx={{ fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{l.startsWith('overseas') ? <OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} /> : null}{l}{was ? ` · ${was}` : ''}</Box>
           </Box>
           );
         })}
