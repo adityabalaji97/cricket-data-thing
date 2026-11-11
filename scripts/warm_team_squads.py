@@ -17,12 +17,14 @@ logging.disable(logging.INFO)
 def main() -> int:
     from database import get_session
     from services.squad_view import TEAMS, team_squad
+    from services.xi_engine import payload
 
     db = next(get_session())
     for code in TEAMS:
         t = time.time()
         try:
             team_squad(db, code)
+            payload(db, code)  # the builder's data (XI_BUILDER_PLAN.md X5)
             print(f"{code}: {time.time() - t:.0f}s")
         except Exception as exc:  # one side failing doesn't stop the rest
             db.rollback()

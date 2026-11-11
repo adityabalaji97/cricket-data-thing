@@ -205,6 +205,27 @@ async function teamSummary(team) {
   };
 }
 
+// A built squad (/team-builder?team=&add=&drop=&pin=, XI_BUILDER_PLAN.md X7): scored by the server the way the page
+// scores it, so the preview and the page agree.
+async function builderSummary(params) {
+  const team = params.get('team');
+  if (!team) return null;
+  const q = new URLSearchParams({ team, add: params.get('add') || '', drop: params.get('drop') || '', pin: params.get('pin') || '' });
+  const s = await getJSON(`/xi-builder/score?${q.toString()}`, 8000);
+  if (!s) return null;
+  const surname = (n) => n.split(' ').slice(-1)[0];
+  const moves = [s.added.length ? `In: ${s.added.map(surname).join(', ')}` : null,
+    s.dropped.length ? `Out: ${s.dropped.map(surname).join(', ')}` : null].filter(Boolean).join(' · ');
+  return {
+    kind: 'xi',
+    title: `${s.team}, rebuilt: ${s.at_level} of ${s.of} roles at playoff level | ${SITE_NAME}`,
+    description: `${s.team} as a reader rebuilt them: ${s.at_level} of ${s.of} roles at IPL playoff sides' level (the real squad: ${s.was}).`
+      + `${moves ? ` ${moves}.` : ''} Build your own on Hindsight.`,
+    card: { team: s.team, colour: teamColour(s.team), at: s.at_level, was: s.was, of: s.of, moves,
+      roles: s.roles.map((r) => ({ label: r.label, status: r.status })) },
+  };
+}
+
 function venueSummary(params) {
   const venue = params.get('venue');
   if (!venue) return null;
@@ -363,6 +384,7 @@ export async function summarize(pathname, search) {
   if (scorecard) return scorecardSummary(decodeURIComponent(scorecard[1]));
   if (pathname.startsWith('/player') && params.get('name')) return playerSummary(params.get('name'));
   if (/^\/team\/?$/.test(pathname) && params.get('team')) return teamSummary(params.get('team'));
+  if (/^\/team-builder\/?$/.test(pathname)) return builderSummary(params);
   if (pathname.startsWith('/venue')) return venueSummary(params);
   if (pathname.startsWith('/query')) return querySummary(params);
   const note = pathname.match(/^\/notes\/([a-z0-9-]+)\/?$/);
