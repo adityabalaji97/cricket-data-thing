@@ -10,7 +10,10 @@ import { Eyebrow } from '../pageKit/pageKit';
 // (GET /team-squad, services/squad_view.py), so the page and the post never disagree. IPL sides only; hidden otherwise.
 
 const NAMES = { board: 'Squad', template: "Against the winners' template", value: 'Price v wins added', cases: 'Three calls' };
-const surname = (n) => n.split(' ').slice(-1)[0];
+// What the copy calls a player: the surname, or the first name where the surname is shared by many (the retention
+// posts' called(): "Arshdeep", not "Singh").
+const COMMON = new Set(['Ahmed', 'Ahmad', 'Khan', 'Singh', 'Sharma', 'Kumar', 'Yadav', 'Patel', 'Pandya', 'Iyer']);
+const surname = (n) => { const w = n.split(' '); return w.length > 1 && COMMON.has(w[w.length - 1]) ? w[0] : w[w.length - 1]; };
 
 const dealLine = (d) => `${d.ins.map(surname).join(', ')} in, ${d.outs.map(surname).join(', ')} out`
   + (/awaiting/.test(d.source || '') ? ' · awaiting BCCI' : '');
@@ -34,11 +37,17 @@ const TeamSquad = ({ team }) => {
       {data.cards.map((c) => {
         const Visual = POST_VISUALS[c.visual];
         if (!Visual) return null;
-        const trades = c.id === 'board' && data.deals?.length ? data.deals.map(dealLine).join(' · ') : null;
+        // The squad card's note is one line on the page: the trades, else how many have barely played (the slide's
+        // longer note, with names, wrapped at phone width).
+        const board = c.id === 'board';
+        const quiet = board ? (c.payload.note || '').match(/Barely played since 2025 \(under 10 balls\): (\d+)/) : null;
+        const note = board
+          ? (data.deals?.length ? data.deals.map(dealLine).join(' · ') : quiet ? `${quiet[1]} have barely played since 2025` : c.sample)
+          : c.sample;
+        const payload = board ? { ...c.payload, note: null } : c.payload;
         return (
-          <ProfileCard key={c.id} id={`squad-${c.id}`} title={NAMES[c.id] || c.kicker} player={team}
-            note={trades || c.sample}>
-            <Box sx={{ mx: -0.5 }}><Visual payload={c.payload} /></Box>
+          <ProfileCard key={c.id} id={`squad-${c.id}`} title={NAMES[c.id] || c.kicker} player={team} note={note}>
+            <Box sx={{ mx: -0.5 }}><Visual payload={payload} /></Box>
           </ProfileCard>
         );
       })}
