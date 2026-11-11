@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import OverseasMark from '../common/OverseasMark';
+import OutsideIplTag from '../common/OutsideIplTag';
 import { limitsState, score } from '../../utils/xiEngine';
 import { Eyebrow } from '../pageKit/pageKit';
 import XITab from './XITab';
@@ -229,11 +230,14 @@ const XIBuilderPage = () => {
             {role.side !== 'depth' && (
               <>
                 <Box sx={{ mt: 1.5 }}><Eyebrow>Could hold it</Eyebrow></Box>
-                {cands.length === 0 && <Box sx={{ fontSize: 13.5, color: colors.textLo, py: 1 }}>Nobody else with 60+ IPL balls in this role.</Box>}
+                {cands.length === 0 && <Box sx={{ fontSize: 13.5, color: colors.textLo, py: 1 }}>Nobody else with 60+ balls in this role.</Box>}
                 {cands.map((p) => (
                   <Box key={p.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 1, alignItems: 'center', py: 0.75, borderTop: `1px solid ${colors.border}` }}>
                     <Box sx={{ minWidth: 0 }}>
-                      <Box sx={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                        <Box sx={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</Box>
+                        {p.overseas && <OverseasMark />}{p.outside && <OutsideIplTag />}
+                      </Box>
                       <Box sx={{ fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>
                         {`${FMT[role.measure](p.v)} ${UNIT[role.measure]} · ${p.roles[open].balls} balls · ${p.inSquad ? 'in the squad' : `auction pool · ${crore(p.price)}`}`}
                       </Box>
