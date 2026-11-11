@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { PageFooter, PageSkeleton, usePageData } from '../pageKit/pageKit';
+import PlayerLink from '../common/PlayerLink';
 
 // Pick your XI for the top 10 T20I sides (XI_BUILDER_PLAN.md stage 3a; the India opener mockup, signed off 13 Nov 2026):
 // the side's last T20I XI as eleven slots. Each slot: who has had it lately, what moved last match, the contenders ranked
@@ -12,6 +13,8 @@ import { PageFooter, PageSkeleton, usePageData } from '../pageKit/pageKit';
 const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums' };
 const oneLine = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 const FLAG = '#f0b429';
+// Names open the profile on the window the measures use: all T20s since Jan 2025, all opposition.
+const XI_WINDOW = { start: '2025-01-01', scope: 'all' };
 const GRID = '16px minmax(0, 1fr) 34px 36px 34px 34px';
 const COLS = {
   bat: [['sr', 'SR', (v) => v.toFixed(0)], ['bnd', 'Bnd%', (v) => v.toFixed(1)], ['ctl', 'Ctrl%', (v) => v.toFixed(0)], ['bpd', 'BpD', (v) => v.toFixed(1)]],
@@ -26,7 +29,7 @@ const head = (slot) => (slot.kind === 'bat' ? ROLE_HEAD[slot.role] : slot.label)
 const Case = ({ c }) => (
   <Box sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.6, py: 1.2, display: 'flex', flexDirection: 'column', gap: 0.6 }}>
     <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', gap: 0.75 }}>
-      {c.name}
+      <PlayerLink name={c.name} win={XI_WINDOW} />
       {c.holder && <Box component="span" sx={{ ...mono, fontSize: 10, border: `1px solid ${colors.accent}`, color: colors.accent, borderRadius: '4px', px: '4px' }}>In XI</Box>}
     </Box>
     <Box sx={{ fontSize: 13.5, color: colors.textMed }}><Box component="strong" sx={{ color: colors.textHi }}>For:</Box> {c.for}.</Box>
@@ -50,7 +53,7 @@ const Slot = ({ data, slot }) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.4 }}>
       <Box>
         <Box sx={{ ...mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.accent }}>{`Slot ${slot.n} · ${slot.label}`}</Box>
-        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 24, lineHeight: 1.15, mt: 0.25 }}>{slot.holder}</Box>
+        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 24, lineHeight: 1.15, mt: 0.25 }}><PlayerLink name={slot.holder} win={XI_WINDOW} /></Box>
         <Box sx={{ fontSize: 13, color: colors.textMed, ...oneLine }}>{sub}</Box>
       </Box>
       <Box sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.5, py: 1.1 }}>

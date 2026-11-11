@@ -4,6 +4,7 @@ import { SERIES } from '../../theme/chartDefaults';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 import { InningsClue } from '../games/GuessInningsGame';
+import PlayerLink from '../common/PlayerLink';
 
 /**
  * Visuals for Instagram post cards (services/ig_posts): one question answered from several angles. Same contract as
@@ -1658,7 +1659,7 @@ const CaseBoard = ({ payload }) => (
           <Typography sx={{ ...mono, fontSize: pfs(payload, 10), letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{c.tag}</Typography>
           <Typography sx={{ ...mono, fontSize: 11.5, color: colors.textMed, ml: 'auto' }}>{c.price}</Typography>
         </Box>
-        <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2 }}>{c.name}</Typography>
+        <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2 }}>{payload.page ? <PlayerLink name={c.name} /> : c.name}</Typography>
         {payload.page ? (
           // On the page: one fact a line under a label column, not a sentence wrapping at 390px (13 Nov 2026 audit).
           [['For', c.for, colors.accent], ['Against', c.against, colors.red]].map(([l, text, col]) => (

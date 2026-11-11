@@ -3,6 +3,7 @@ import { Box, IconButton, Skeleton, Tooltip } from '@mui/material';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import { Link } from 'react-router-dom';
 import config from '../../config';
+import PlayerLink from '../common/PlayerLink';
 import { colors, fonts } from '../../theme/hindsightDark';
 import ShareButton from '../ui/ShareButton';
 
@@ -173,11 +174,13 @@ export const PageSkeleton = ({ note }) => (
 export const ValueList = ({ rows, label }) => (
   <Box component="ul" aria-label={label} sx={{ listStyle: 'none', m: 0, p: 0 }}>
     {rows.map((r) => (
-      <Box component="li" key={r.key || r.name}
+      <Box component="li" key={r.key || r.player || r.name}
         sx={{ display: 'grid', gridTemplateColumns: r.lead ? '18px minmax(0, 1fr) auto 48px' : 'minmax(0, 1fr) auto 48px', alignItems: 'baseline',
           columnGap: 1, py: 0.75, borderBottom: `1px solid ${colors.border}`, whiteSpace: 'nowrap' }}>
         {r.lead && <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textLo }}>{r.lead}</Box>}
-        <Box component="span" sx={{ fontWeight: 600, fontSize: 14, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</Box>
+        <Box component="span" sx={{ fontWeight: 600, fontSize: 14, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {r.player ? <PlayerLink name={r.player} win={r.win} /> : r.name}
+        </Box>
         <Box component="span" sx={{ fontSize: 12, color: colors.textLo }}>{r.detail}</Box>
         <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 13, textAlign: 'right',
           color: r.tone === 'pos' ? colors.accent : r.tone === 'neg' ? colors.red : colors.textHi }}>{r.value}</Box>

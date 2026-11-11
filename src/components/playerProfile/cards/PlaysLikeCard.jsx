@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Skeleton } from '@mui/material';
-import { Link } from 'react-router-dom';
+import PlayerLink from '../../common/PlayerLink';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import config from '../../../config';
 import { colors, fonts } from '../../../theme/hindsightDark';
@@ -62,9 +62,8 @@ const PlaysLikeCard = ({ player, unit }) => {
           return (
             <Box component="li" key={t.player} sx={{ borderBottom: `1px solid ${colors.border}`, py: 1 }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto 32px', alignItems: 'center', columnGap: 1 }}>
-                <Box component={Link} to={`/player?name=${encodeURIComponent(t.player)}`}
-                  sx={{ fontWeight: 600, fontSize: 15, color: colors.textHi, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minHeight: 32, display: 'flex', alignItems: 'center' }}>
-                  {t.player}
+                <Box sx={{ fontWeight: 600, fontSize: 15, color: colors.textHi, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minHeight: 32, display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                  <PlayerLink name={t.player} sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }} />
                 </Box>
                 <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{`${t.gap_points} pts apart`}</Box>
                 <Box component="button" type="button" aria-expanded={expanded} aria-label={`Compare with ${t.player}`}

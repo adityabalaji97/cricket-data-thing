@@ -5,6 +5,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import OverseasMark from '../common/OverseasMark';
 import OutsideIplTag from '../common/OutsideIplTag';
+import PlayerLink from '../common/PlayerLink';
 import { limitsState, score } from '../../utils/xiEngine';
 import { Eyebrow } from '../pageKit/pageKit';
 import XITab from './XITab';
@@ -231,7 +232,7 @@ const XIBuilderPage = () => {
             <Eyebrow>{role.side === 'depth' ? 'Regular bowlers' : 'Holding it'}</Eyebrow>
             {row.holders.map((h) => (
               <Box key={h} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.75 }}>
-                <Box sx={{ fontSize: 14.5 }}>{h}</Box>
+                <Box sx={{ fontSize: 14.5 }}><PlayerLink name={h} /></Box>
                 <Box component="button" type="button" onClick={() => dropPlayer(h)}
                   sx={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, color: colors.textLo }}>Drop from squad</Box>
               </Box>
@@ -244,7 +245,7 @@ const XIBuilderPage = () => {
                   <Box key={p.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 1, alignItems: 'center', py: 0.75, borderTop: `1px solid ${colors.border}` }}>
                     <Box sx={{ minWidth: 0 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                        <Box sx={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</Box>
+                        <Box sx={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><PlayerLink name={p.name} /></Box>
                         {p.overseas && <OverseasMark />}{p.outside && <OutsideIplTag />}
                       </Box>
                       <Box sx={{ fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>
