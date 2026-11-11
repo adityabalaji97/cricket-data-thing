@@ -128,9 +128,11 @@ def payload(db, code: str, season: int = 2027) -> Dict[str, Any]:
             SELECT DISTINCT ON (p.display_name) p.display_name, a.price_lakh, a.base_lakh, a.overseas, a.role
             FROM auction_lots a JOIN player_identity p ON p.pid = a.pid
             WHERE a.tournament = 'ipl' ORDER BY p.display_name, a.year DESC"""))}
+        # Anyone in a squad (bought at the auction, or retained) has left the pool, whichever team.
+        taken = {name for c in TEAMS for name in squad_of(db, c, season)}
         pool_rows = []
         for n in sorted(avail):
-            if n in sq:
+            if n in taken:
                 continue
             lot = lots.get(n)
             # A stand-in price until the auction: his last price, else his base (rule 6), labelled on the screen.

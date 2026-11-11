@@ -45,7 +45,7 @@ const FitCard = ({ team, fit }) => {
       <Box sx={{ fontSize: 13, color: colors.textMed, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', mb: 1 }}>
         {`Playoff sides ${f(fit.playoff_level)} ${u}${like ? ` · like ${like}` : ''}`}
       </Box>
-      {fit.free.length > 0 && <><Eyebrow>In the auction pool · IPL</Eyebrow>{fit.free.map((x) => row(x, ' in the IPL'))}</>}
+      {fit.free.length > 0 && <><Eyebrow>In the auction pool · IPL record</Eyebrow>{fit.free.map((x) => row(x, ' in the IPL'))}</>}
       {(fit.outside || []).length > 0 && (
         <Box sx={{ mt: fit.free.length ? 1 : 0 }}><Eyebrow>In the auction pool · all T20s</Eyebrow>{fit.outside.map((x) => row(x, ' in T20s'))}</Box>
       )}
