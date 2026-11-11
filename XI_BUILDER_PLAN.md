@@ -101,6 +101,35 @@ slot), so adding Will Jacks to MI didn't move the 5-7 row. The XI tab scores an 
 | X10 | **Season Draft: "made the playoffs in N of 19".** Three player-season cards dealt per slot (the deal is the constraint; a salary cap was ruled out on 11 Nov 2026: before 2018 only 8–55 of a season's 130–170 players have an auction price). Every player-season rated as a percentile within its own season on its slot's measures, so eras compare. The XI is placed among each of the 19 seasons' real sides on the same percentiles: the reveal is a strip of all 19 seasons (made the playoffs / missed / would have topped the table), the best XI from the same deal, and where each pick's real team finished. Wording (user, 11 Nov 2026): the game's score may say "made the playoffs in N of 19" as a game rule, with a one-line "how scoring works" (out-ranking that season's playoff sides on the template). X2 found no predictive power, so the wording stays in the game; analysis pages and posts never present it as a prediction. Same deal for everyone each day; share card "14/19". | `/games/season-draft` |
 | X11 | **Other leagues.** A template per league (season ledger → roles → benchmarks, as for the IPL), then the same modes. | per-league pinned templates |
 
+
+### Stage 3a: Pick your XI, for the top 10 T20I sides (agreed 13 Nov 2026)
+
+Mockup signed off as proposed (https://claude.ai/artifact/SWHk3vaJ9DmGWSuJ1k4jvE, the India opener slot): D1 contenders,
+D2 measures, D3 order, D4 wording, D5 "what moved". Extended (user, 13 Nov) to the top 10 T20I sides (India, Australia,
+England, South Africa, New Zealand, Pakistan, West Indies, Sri Lanka, Afghanistan, Bangladesh), contenders = capped +
+home-league locals.
+
+- **Slots:** the side's last T20I XI in batting order. 1-2 openers, 3-4 top order, 5-7 middle and finishers (the
+  batting band), 8-11 by the bowling each did most in its recent T20Is (powerplay pace, middle-overs spin, death pace).
+  "Who's had it": who filled the slot in the last 8 T20Is.
+- **Contenders:** anyone who played T20Is for the side since Jan 2025, plus locals in its home leagues (India: IPL,
+  SMAT; Australia: BBL; England: Blast, Hundred; South Africa: SA20, CSA Pro20; New Zealand: Super Smash; Pakistan:
+  PSL, National T20 Cup; West Indies: CPL; Sri Lanka: LPL; Afghanistan: Shpageeza; Bangladesh: BPL, NCL T20) with
+  400+ balls in the band (batting) or 240+ in the phase (bowling) since Jan 2025. Local = not overseas by the 19-0
+  nationality rules for that home country.
+- **Measures (D2):** batting strike rate, boundary %, control %, balls per dismissal; bowling economy, dot %, false
+  shot %, balls per wicket. All T20s since Jan 2025 in the role (T20Is and every league), 150-ball floor, small-sample
+  flag under 300. Ranked by strike rate (batting) or economy (bowling) (D3).
+- **Case (D4):** one "for" (his best-ranked measure among the contenders) and one "against" (his worst, or a small
+  sample), both numbers, no verdict; handedness a tag only.
+- **What moved (D5):** after each T20I, the slot holder's line from the scorecard.
+
+| # | Chunk | Output |
+|---|---|---|
+| I1 | Service: slots, holders, contenders, cases, what moved, per side; cached per side and day | `services/intl_xi.py`, `GET /intl-xi?team=` |
+| I2 | The screen: XI strip, slot sheet as on the mockup, on the team page for the ten sides | `IntlXIPage.jsx`, link from `/team` |
+| I3 | Nightly warm after the feed, and the share card per slot | warm step, `api/og.mjs` |
+
 ## Risks
 
 - **The score fails X2.** Then the builder shows template rows only, with no headline number, until a better score

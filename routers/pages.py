@@ -115,6 +115,24 @@ def xi_builder_score_route(response: Response, team: str = Query(...), add: str 
     return score_link(db, code, split(add), split(drop), split(pin))
 
 
+@router.get("/intl-xi")
+def intl_xi_route(response: Response, team: str = Query(..., description="One of the top 10 T20I sides"),
+                  db: Session = Depends(get_session)):
+    """Pick your XI (XI_BUILDER_PLAN.md stage 3a): the side's last T20I XI as eleven slots, each with who has had it,
+    the contenders and their case, and what moved last match."""
+    from services.intl_xi import TEAMS, get_page
+    from services.page_builds import PageBuilding
+
+    if team not in TEAMS:
+        raise HTTPException(status_code=404, detail=f"Pick your XI covers {', '.join(TEAMS)}")
+    try:
+        page = get_page(db, team)
+    except PageBuilding:
+        raise HTTPException(status_code=503, detail="Building this XI; try again in a few seconds", headers=BUSY)
+    response.headers["Cache-Control"] = CACHE
+    return page
+
+
 @router.get("/games/season-draft/data")
 def season_draft_data(request: Request, league: str = Query(default="IPL", pattern="^[A-Za-z0-9]{2,6}$")):
     """The 19-0 game's cards and seasons (services/pinned/season_draft_IPL.json, scripts/build_season_draft.py), gzipped
