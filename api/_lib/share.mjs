@@ -228,24 +228,32 @@ async function builderSummary(params) {
 
 // A finished Season Draft (/games/season-draft?d=&p=): the same deal and score as the game (api/_lib/draftEngine.mjs, a
 // checked copy of the app's), from the pinned data the API serves.
+// A locked-in 19-0 draft (/games/19-0?d=&p=&r=1; formerly /games/season-draft): the same deal and score as the game
+// (api/_lib/draftEngine.mjs, a checked copy of the app's), from the pinned data the API serves.
+const DRAFT_NAME = '19-0';  // the game's name, also GAME_NAME in SeasonDraftGame.jsx
 async function draftSummary(params) {
   const dealId = params.get('d'); const picksStr = params.get('p') || '';
-  if (!dealId || !/^[0-9]{11}$/.test(picksStr)) return null;
+  const plain = { kind: 'draft', title: `${DRAFT_NAME}: can your IPL XI make the playoffs in all 19 seasons? | ${SITE_NAME}`,
+    description: 'Build an XI from 19 years of IPL player-seasons on a budget, then see how many seasons it makes the playoffs.',
+    card: null };
+  if (!dealId || !/^[0-9]{11}$/.test(picksStr)) return plain;
   const data = await getJSON('/games/season-draft/data', 8000);
-  if (!data) return null;
-  const { deal, profile, seasonResults, costTable, checkPicks } = await import('./draftEngine.mjs');
+  if (!data) return plain;
+  const { deal, profile, seasonResults, costTable, checkPicks, SLOTS } = await import('./draftEngine.mjs');
   const dealt = deal(data.cards, `season-draft-${dealId}`);
   const chosen = picksStr.split('').map(Number).map((n, i) => dealt[i]?.[n] || null);
-  if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards)).ok) return null;
+  if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards)).complete) return plain;
   const res = seasonResults(profile(chosen), data.seasons, data.roles, dealId);
   const made = res.filter((r) => r.made).length;
-  const stars = chosen.slice().sort((a, b) => Math.max(...Object.values(b.roles).map((x) => x.balls)) - Math.max(...Object.values(a.roles).map((x) => x.balls)))
-    .slice(0, 3).map((c) => `${c.name} ${c.season}`);
+  const topped = res.filter((r) => r.topped).length;
+  const line = made ? `Made the playoffs in ${made} of 19 IPL seasons${topped ? `, topped the table in ${topped}` : ''}.`
+    : 'Missed the playoffs in all 19 IPL seasons.';
   return {
     kind: 'draft',
-    title: `Season Draft: made the IPL playoffs in ${made} of 19 seasons | ${SITE_NAME}`,
-    description: `An XI of IPL player-seasons (${stars.join(', ')} and more) played through all 19 IPL seasons: playoffs in ${made}. Draft yours on Hindsight.`,
-    card: { made, of: res.length, topped: res.filter((r) => r.topped).length, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })), stars },
+    title: `${DRAFT_NAME}: my IPL XI went ${made}-${19 - made} | ${SITE_NAME}`,
+    description: `${line} ${chosen.slice(0, 3).map((c) => `${c.name} ${c.season}`).join(', ')} and eight more. Same deal, can you beat it?`,
+    card: { made, line, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })),
+      xi: chosen.map((c, i) => ({ slot: SLOTS[i].label, name: `${c.name} ${c.season}`, overseas: !!c.overseas, wk: !!c.wk })) },
   };
 }
 
@@ -408,7 +416,7 @@ export async function summarize(pathname, search) {
   if (pathname.startsWith('/player') && params.get('name')) return playerSummary(params.get('name'));
   if (/^\/team\/?$/.test(pathname) && params.get('team')) return teamSummary(params.get('team'));
   if (/^\/team-builder\/?$/.test(pathname)) return builderSummary(params);
-  if (/^\/games\/season-draft\/?$/.test(pathname)) return draftSummary(params);
+  if (/^\/games\/(19-0|season-draft)\/?$/.test(pathname)) return draftSummary(params);
   if (pathname.startsWith('/venue')) return venueSummary(params);
   if (pathname.startsWith('/query')) return querySummary(params);
   const note = pathname.match(/^\/notes\/([a-z0-9-]+)\/?$/);

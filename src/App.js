@@ -134,6 +134,12 @@ const BowlerRedirect = () => {
   return <Navigate to={`/player?${searchParams.toString()}`} replace />;
 };
 
+// A renamed route: the old path's links (with their query) land on the new one.
+const KeepQueryRedirect = ({ to }) => {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
+};
+
 const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -734,7 +740,8 @@ const AppContent = () => {
         <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame /></MensT20Scope>} />
         <Route path="/games/call-it" element={<MensT20Scope><CallItGame /></MensT20Scope>} />
         <Route path="/games/higher-lower" element={<MensT20Scope><HigherLowerGame /></MensT20Scope>} />
-        <Route path="/games/season-draft" element={<SeasonDraftGame />} />
+        <Route path="/games/19-0" element={<SeasonDraftGame />} />
+        <Route path="/games/season-draft" element={<KeepQueryRedirect to="/games/19-0" />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/credits" element={<CreditsPage />} />

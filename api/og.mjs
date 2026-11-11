@@ -178,16 +178,34 @@ function xiCard(card) {
         h('div', { fontSize: 22, color: C.mid }, r.label)))));
 }
 
-// A finished Season Draft: the score, three of the picks, the 19 seasons as a strip (made / topped / missed).
+// A locked-in Season Draft: the score and the one-line result, the drafted XI (plane: overseas, WK: keeper), and the
+// 19 seasons as a strip (made / topped / missed). With no valid draft in the link: the game's own card.
+// The overseas mark, as in the app (Material's Flight, tilted): drawn, as the card's fonts have no plane.
+const PLANE = { type: 'svg', props: { width: 22, height: 22, viewBox: '0 0 24 24', style: { transform: 'rotate(45deg)' },
+  children: { type: 'path', props: { fill: C.mid, d: 'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z' } } } };
+
 function draftCard(card) {
-  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
-    top('Season Draft'),
-    h('div', { alignItems: 'baseline', gap: 18, marginTop: 18 },
-      h('div', { fontFamily: MONO, fontSize: 96, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}/${card.of}`),
-      h('div', { fontFamily: DISPLAY, fontSize: 40, fontWeight: 700, lineHeight: 1.1 }, 'IPL seasons this XI made the playoffs')),
-    h('div', { fontSize: 26, color: C.mid, marginTop: 12 }, `${card.stars.join(' · ')} and eight more`),
+  if (!card) {
+    return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
+      top('Game'),
+      h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, marginTop: 30, lineHeight: 1 }, '19-0'),
+      h('div', { fontSize: 32, color: C.mid, marginTop: 12, width: 900 }, 'Build an XI from 19 years of IPL player-seasons on a budget. It plays all 19 seasons: can it make the playoffs every time?'));
+  }
+  const row = (p) => h('div', { alignItems: 'center', gap: 10, height: 34 },
+    h('div', { width: 120, fontSize: 18, color: C.low }, p.slot.replace('Number ', 'No. ').replace(' bowler', '')),
+    h('div', { fontSize: 23, color: C.text }, p.name),
+    p.overseas ? PLANE : null,
+    p.wk ? h('div', { fontSize: 14, color: C.mid, fontFamily: MONO, border: `1px solid ${C.border}`, borderRadius: 4, padding: '1px 5px' }, 'WK') : null);
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '40px 56px', fontFamily: 'Barlow' },
+    top('19-0 · IPL draft'),
+    h('div', { marginTop: 22, gap: 40 },
+      h('div', { flexDirection: 'column', width: 430 },
+        h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}-${19 - card.made}`),
+        h('div', { fontFamily: DISPLAY, fontSize: 34, fontWeight: 700, lineHeight: 1.15, marginTop: 14 }, card.line),
+        h('div', { fontSize: 22, color: C.low, marginTop: 14 }, 'Same deal, can you beat it?')),
+      h('div', { flexDirection: 'column' }, card.xi.map(row))),
     h('div', { marginTop: 'auto', gap: 6 },
-      card.strip.map((x) => h('div', { width: 50, height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 20,
+      card.strip.map((x) => h('div', { width: 50, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 18,
         background: x.topped ? '#c9a227' : x.made ? C.lime : C.surface, color: x.made ? C.bg : C.low }, x.s))));
 }
 
