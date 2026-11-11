@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import OverseasMark from '../common/OverseasMark';
+import PlayerLink, { seasonWindow } from '../common/PlayerLink';
 import { BallIcon, BatIcon, GloveIcon } from '../common/CricketIcons';
 import DATA_VERSION from '../../utils/draftDataVersion';
 import { track } from '../../utils/analytics';
@@ -209,7 +210,9 @@ const Result = ({ g, picks, table, results, best, edges, onReplay, onSameDeal, o
           <Box key={c.name} sx={{ display: 'grid', gridTemplateColumns: '58px 1fr auto', alignItems: 'center', gap: 1, py: '2px' }}>
             <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{SLOTS[i].label}</Box>
             <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-              <Box sx={{ fontSize: 13.5, ...oneLine }}>{`${c.name} ${c.season}`}</Box>
+              <Box sx={{ fontSize: 13.5, ...oneLine }}>
+                {c.profile ? <PlayerLink name={c.name} win={{ ...seasonWindow(c.season), scope: 'all' }}>{`${c.name} ${c.season}`}</PlayerLink> : `${c.name} ${c.season}`}
+              </Box>
               <Marks card={c} size={13} />
             </Box>
             <Box sx={{ ...mono, fontSize: 12, color: colors.textMed }}>{costOf(c, i, table)}</Box>

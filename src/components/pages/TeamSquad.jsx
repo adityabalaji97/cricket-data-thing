@@ -6,6 +6,7 @@ import { colors } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import { POST_VISUALS } from '../story/postVisuals';
 import { Eyebrow } from '../pageKit/pageKit';
+import PlayerLink from '../common/PlayerLink';
 
 // The team page's Squad group (XI_BUILDER_PLAN.md X3): the IPL retention post's four squad cards, from the same build
 // (GET /team-squad, services/squad_view.py), so the page and the post never disagree. IPL sides only; hidden otherwise.
@@ -31,7 +32,7 @@ const FitBody = ({ fit }) => {
   const row = (x, sub) => (
     <Box key={x.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'baseline', gap: 1, py: 0.5 }}>
       <Box sx={{ minWidth: 0 }}>
-        <Box sx={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</Box>
+        <Box sx={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><PlayerLink name={x.name} /></Box>
         <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{`${x.balls} balls${sub}`}</Box>
       </Box>
       <Box sx={{ fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{`${f(x.value)} ${u}`}</Box>

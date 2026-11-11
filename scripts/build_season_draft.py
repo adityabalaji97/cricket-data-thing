@@ -49,6 +49,14 @@ from services.nationality import (  # noqa: E402  (shared with Pick your XI)
     CARD_WINDOW, FULL_MEMBERS, INDIAN_COMPS, aliases, is_overseas, overseas_years)
 
 
+def profile_names(db):
+    """Names with a player profile (any ball-by-ball data): a card links to his profile only if he has one (Gilchrist
+    doesn't; Kohli 2012 does, with a 2012 window). 13 Nov 2026, player links."""
+    from sqlalchemy import text
+
+    return set(db.execute(text("SELECT DISTINCT bat FROM delivery_details UNION SELECT DISTINCT bowl FROM delivery_details")).scalars().all())
+
+
 def keeper_years(db):
     """({name: [stumping years, one entry per stumping]}, {name: auction WK-Batter years}) (13 Nov 2026). Only the keeper
     stumps, so stumpings in any men's match on the scorecards (under scorecard and display names) find keepers,
@@ -113,10 +121,12 @@ def main() -> int:
         data = json.loads(path.read_text())
         db = next(get_session())
         ov, wk = overseas_years(db, cfg["home"], cfg["abroad_signal"]), keeper_years(db)
+        prof = profile_names(db)
         before = sum(c["overseas"] for c in data["cards"])
         for c in data["cards"]:
             c["overseas"] = is_overseas(ov, c["name"], c["season"])
             c["wk"] = is_keeper(wk, c["name"], c["season"])
+            c["profile"] = c["name"] in prof
         print(f"keepers: {sum(c['wk'] for c in data['cards'])} cards")
         path.write_text(json.dumps(data, separators=(",", ":")))
         print(f"overseas cards {before} -> {sum(c['overseas'] for c in data['cards'])}")
@@ -133,6 +143,7 @@ def main() -> int:
     data = league_roles(db, league)
     overseas = overseas_years(db, cfg["home"], cfg["abroad_signal"])
     keepers = keeper_years(db)
+    prof = profile_names(db)
     roles = [r for r in ROLES if r[2] != "depth"]
     seasons, cards = [], []
     for s in data["seasons"]:
@@ -189,6 +200,7 @@ def main() -> int:
                     bowl = {"runs": int(sum(t["runs"] for t in m["bowl"].values())), "balls": int(bowled),
                             "wkts": int(sum(t["wickets"] for t in m["bowl"].values()))}
                 cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]), "wk": is_keeper(keepers, name, s["season"]),
+                              "profile": name in prof,
                               "roles": ratios, "bat": bat, "bowl": bowl})
         print(s["season"], len(teams), "teams,", sum(1 for c in cards if c["season"] == str(s["season"])), "cards")
     out = {"league": league, "rules": {"overseas_max": cfg["overseas_max"], "home": cfg["home"]}, "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],

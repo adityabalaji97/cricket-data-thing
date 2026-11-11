@@ -131,11 +131,11 @@ const PhaseCard = ({ team, phases }) => {
   );
 };
 
-const OrderCard = ({ team, order }) => {
+const OrderCard = ({ team, order, win }) => {
   if (!order?.length) return null;
   const par = order.some((o) => o.raa_per_100 != null);  // ODIs have no par yet: strike rate instead
   const rows = order.map((o) => ({
-    key: `${o.position}`, lead: o.position, name: o.batter, detail: `${o.share}% of inns`,
+    key: `${o.position}`, lead: o.position, name: o.batter, player: o.batter, win, detail: `${o.share}% of inns`,
     value: par ? (o.raa_per_100 == null ? '–' : signed(o.raa_per_100)) : `${o.strike_rate}`,
     tone: par ? (o.raa_per_100 > 0 ? 'pos' : o.raa_per_100 < 0 ? 'neg' : null) : null,
   }));
@@ -178,13 +178,13 @@ const OversCard = ({ team, grid }) => {
   );
 };
 
-const TopCard = ({ team, top }) => {
+const TopCard = ({ team, top, win }) => {
   const par = (top?.bat || []).some((r) => r.raa != null);
   const bat = (top?.bat || []).slice(0, 3).map((r) => (par
-    ? { name: r.name, detail: `${r.runs} runs · SR ${r.strike_rate}`, value: signed(r.raa), tone: r.raa > 0 ? 'pos' : r.raa < 0 ? 'neg' : null }
-    : { name: r.name, detail: `${r.balls} balls · SR ${r.strike_rate}`, value: `${r.runs}` }));
+    ? { name: r.name, player: r.name, win, detail: `${r.runs} runs · SR ${r.strike_rate}`, value: signed(r.raa), tone: r.raa > 0 ? 'pos' : r.raa < 0 ? 'neg' : null }
+    : { name: r.name, player: r.name, win, detail: `${r.balls} balls · SR ${r.strike_rate}`, value: `${r.runs}` }));
   const bowl = (top?.bowl || []).slice(0, 3).map((r) => ({
-    name: r.name, detail: `${r.wickets} wkts · ${r.dot_percentage}% dots`, value: r.economy.toFixed(2),
+    name: r.name, player: r.name, win, detail: `${r.wickets} wkts · ${r.dot_percentage}% dots`, value: r.economy.toFixed(2),
   }));
   if (!bat.length && !bowl.length) return null;
   return (
@@ -313,9 +313,9 @@ const TeamPage = () => {
           <>
             {data.rating && <RatingCard team={team} rating={data.rating} />}
             {data.phases && <PhaseCard team={team} phases={data.phases} />}
-            <OrderCard team={team} order={data.batting_order} />
+            <OrderCard team={team} order={data.batting_order} win={win} />
             <OversCard team={team} grid={data.bowling_overs} />
-            <TopCard team={team} top={data.top} />
+            <TopCard team={team} top={data.top} win={win} />
             {data.results && <WhereCard team={team} res={data.results} />}
             <AgainstCard team={team} against={data.results?.against} />
             {PICK_XI.includes(data.team || team) && (
