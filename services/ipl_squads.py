@@ -56,6 +56,8 @@ def squad(db, code: str, season: int = 2027, as_of: Optional[date] = None, repor
                                      "state": m["state"]}
         if m["to_team"] == code and m["kind"] == "retained" and key in out:
             out[key]["retained"] = True
+            if m["price_lakh"] is not None:  # the retention price replaces his auction price
+                out[key]["price"] = float(m["price_lakh"]) / 100
     return out
 
 
