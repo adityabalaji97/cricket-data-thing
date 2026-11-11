@@ -11,6 +11,8 @@ import {
   Eyebrow, PageFooter, PageHeader, PageSkeleton, SummaryRows, ValueList, ordinal, readWindow, signed, usePageData, windowChip,
   windowQuery, writeSearch,
 } from '../pageKit/pageKit';
+// The sides with Pick your XI (services/intl_xi.py TEAMS): the top 10 T20I sides.
+const PICK_XI = ['India', 'Australia', 'England', 'South Africa', 'New Zealand', 'Pakistan', 'West Indies', 'Sri Lanka', 'Afghanistan', 'Bangladesh'];
 
 // The team page (TEAM_VENUE_PLAN.md T3): a summary ranked against the sides of its competition (its league, or the
 // top 12 for an international side), the last 8, then seven cards: rating, by phase, who bats where, who bowls when,
@@ -315,6 +317,17 @@ const TeamPage = () => {
             <TopCard team={team} top={data.top} />
             {data.results && <WhereCard team={team} res={data.results} />}
             <AgainstCard team={team} against={data.results?.against} />
+            {PICK_XI.includes(data.team || team) && (
+              <Box component={Link} to={`/pick-xi?team=${encodeURIComponent(data.team || team)}`}
+                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: colors.surface1, border: `1px solid ${colors.border}`,
+                  borderRadius: '14px', px: 2, py: 1.5, textDecoration: 'none', color: colors.textHi, '&:hover': { borderColor: colors.accent } }}>
+                <Box>
+                  <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18 }}>{`Pick ${data.team || team}'s XI`}</Box>
+                  <Box sx={{ fontSize: 13, color: colors.textMed }}>Slot by slot: who else fits, and the case for each.</Box>
+                </Box>
+                <Box sx={{ color: colors.accent, fontFamily: fonts.mono, fontSize: 13 }}>Open →</Box>
+              </Box>
+            )}
             <TeamSquad team={data.team || team} />
           </>
         )}

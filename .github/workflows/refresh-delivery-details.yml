@@ -182,6 +182,12 @@ jobs:
         continue-on-error: true
         run: python scripts/warm_team_squads.py
 
+      # Pick your XI for the top 10 T20I sides (XI_BUILDER_PLAN.md stage 3a): 30-50 s a side cold, after the night's
+      # matches so "what moved" is current. Never blocks the rest of the run.
+      - name: Warm Pick your XI
+        continue-on-error: true
+        run: python scripts/warm_intl_xi.py
+
       # The venue and team pages (TEAM_VENUE_PLAN.md) are 15-30 s cold: build the likeliest ones (fixtures in the next
       # 48 hours, the IPL, then every ground and side with a T20 in the last month), capped at 40 minutes.
       - name: Warm venue and team pages
