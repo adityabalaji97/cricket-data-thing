@@ -184,6 +184,12 @@ function xiCard(card) {
 const PLANE = { type: 'svg', props: { width: 22, height: 22, viewBox: '0 0 24 24', style: { transform: 'rotate(45deg)' },
   children: { type: 'path', props: { fill: C.mid, d: 'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z' } } } };
 
+// The keeper's glove and the topped season's star, drawn like the app's icons (src/components/common/CricketIcons.jsx).
+const GLOVE = { type: 'svg', props: { width: 22, height: 22, viewBox: '0 0 24 24', children: { type: 'path', props: { fill: C.mid,
+  d: 'M7.5 21.5v-6.2L4.6 12a1.4 1.4 0 0 1 2.05-1.9L8 11.4V5.2a1.3 1.3 0 0 1 2.6 0v4.6h.6V3.8a1.3 1.3 0 0 1 2.6 0v6h.6V4.8a1.3 1.3 0 0 1 2.6 0v5.6h.6V6.9a1.3 1.3 0 0 1 2.6 0v8.1c0 3.6-2.9 6.5-6.5 6.5H7.5z' } } } };
+const STAR = { type: 'svg', props: { width: 14, height: 14, viewBox: '0 0 24 24', children: { type: 'path', props: { fill: C.bg,
+  d: 'M12 17.27l4.15 2.51c.76.46 1.69-.22 1.49-1.08l-1.1-4.72 3.67-3.18c.67-.58.31-1.68-.57-1.75l-4.83-.41-1.89-4.46c-.34-.81-1.5-.81-1.84 0L9.19 8.63l-4.83.41c-.88.07-1.24 1.17-.57 1.75l3.67 3.18-1.1 4.72c-.2.86.73 1.54 1.49 1.08l4.15-2.5z' } } } };
+
 function draftCard(card) {
   if (!card) {
     return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
@@ -191,22 +197,24 @@ function draftCard(card) {
       h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, marginTop: 30, lineHeight: 1 }, '19-0'),
       h('div', { fontSize: 32, color: C.mid, marginTop: 12, width: 900 }, 'Build an XI from 19 years of IPL player-seasons on a budget. It plays all 19 seasons: can it make the playoffs every time?'));
   }
-  const row = (p) => h('div', { alignItems: 'center', gap: 10, height: 34 },
-    h('div', { width: 120, fontSize: 18, color: C.low }, p.slot.replace('Number ', 'No. ').replace(' bowler', '')),
+  const row = (p) => h('div', { alignItems: 'center', gap: 10, height: 31 },
+    h('div', { width: 90, fontSize: 18, color: C.low }, p.slot),
     h('div', { fontSize: 23, color: C.text }, p.name),
     p.overseas ? PLANE : null,
-    p.wk ? h('div', { fontSize: 14, color: C.mid, fontFamily: MONO, border: `1px solid ${C.border}`, borderRadius: 4, padding: '1px 5px' }, 'WK') : null);
+    p.wk ? GLOVE : null);
   return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '40px 56px', fontFamily: 'Barlow' },
     top('19-0 · IPL draft'),
-    h('div', { marginTop: 22, gap: 40 },
-      h('div', { flexDirection: 'column', width: 430 },
+    h('div', { marginTop: 22, gap: 16 },
+      h('div', { flexDirection: 'column', width: 540 },
         h('div', { fontFamily: MONO, fontSize: 120, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}-${19 - card.made}`),
-        h('div', { fontFamily: DISPLAY, fontSize: 34, fontWeight: 700, lineHeight: 1.15, marginTop: 14 }, card.line),
+        h('div', { fontFamily: DISPLAY, fontSize: 27, fontWeight: 700, lineHeight: 1.15, marginTop: 14 }, card.line),
+        card.why ? h('div', { fontSize: 21, color: C.mid, marginTop: 10 }, card.why) : null,
         h('div', { fontSize: 22, color: C.low, marginTop: 14 }, 'Same deal, can you beat it?')),
       h('div', { flexDirection: 'column' }, card.xi.map(row))),
     h('div', { marginTop: 'auto', gap: 6 },
-      card.strip.map((x) => h('div', { width: 50, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 18,
-        background: x.topped ? '#c9a227' : x.made ? C.lime : C.surface, color: x.made ? C.bg : C.low }, x.s))));
+      card.strip.map((x) => h('div', { width: 50, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', gap: 2, fontFamily: MONO, fontSize: 18,
+        background: x.topped ? '#c9a227' : x.made ? C.lime : C.surface, color: x.made ? C.bg : C.low }, x.s, x.topped ? STAR : null))),
+    h('div', { marginTop: 10, fontSize: 17, color: C.low }, 'hindsightcricket.com · Data: Himanish Ganjoo & TechRadar, Cricsheet'));
 }
 
 function homeCard(card) {

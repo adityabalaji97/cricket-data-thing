@@ -12,11 +12,11 @@
 
 export const SLOTS = [
   { key: 'openers', label: 'Opener', roles: ['openers'] }, { key: 'openers', label: 'Opener', roles: ['openers'] },
-  { key: 'top', label: 'Number 3-4', roles: ['top'] }, { key: 'top', label: 'Number 3-4', roles: ['top'] },
-  { key: 'finishers', label: 'Number 5-7', roles: ['finishers'] }, { key: 'finishers', label: 'Number 5-7', roles: ['finishers'] },
-  { key: 'finishers', label: 'Number 5-7', roles: ['finishers'] },
-  { key: 'pace', label: 'Pace bowler', roles: ['pp_pace', 'death_pace'] }, { key: 'pace', label: 'Pace bowler', roles: ['pp_pace', 'death_pace'] },
-  { key: 'spin', label: 'Spinner', roles: ['mid_spin'] }, { key: 'spin', label: 'Spinner', roles: ['mid_spin'] },
+  { key: 'top', label: 'No. 3-4', roles: ['top'] }, { key: 'top', label: 'No. 3-4', roles: ['top'] },
+  { key: 'finishers', label: 'No. 5-7', roles: ['finishers'] }, { key: 'finishers', label: 'No. 5-7', roles: ['finishers'] },
+  { key: 'finishers', label: 'No. 5-7', roles: ['finishers'] },
+  { key: 'pace', label: 'Pace', roles: ['pp_pace', 'death_pace'] }, { key: 'pace', label: 'Pace', roles: ['pp_pace', 'death_pace'] },
+  { key: 'spin', label: 'Spin', roles: ['mid_spin'] }, { key: 'spin', label: 'Spin', roles: ['mid_spin'] },
 ];
 export const OVERSEAS_MAX = 4;
 
@@ -141,6 +141,26 @@ const strengths = (season, prof, roles) => {
   });
   Object.keys(s).forEach((t) => { s[t] /= roles.length; });
   return s;
+};
+
+/** What won and lost the seasons: each role's mean z-score for the XI across the 19 seasons (the strengths the
+ * simulation used), with the strongest and weakest role. For the result's "why" line (13 Nov 2026). */
+export const ROLE_NAMES = { openers: 'openers', top: 'No. 3-4', finishers: 'No. 5-7 hitting', pp_pace: 'powerplay pace',
+  mid_spin: 'middle-overs spin', death_pace: 'death bowling' };
+export const roleEdges = (prof, seasons, roles) => {
+  const z = Object.fromEntries(roles.map((r) => [r.key, 0]));
+  seasons.forEach((season) => {
+    const ents = [...Object.values(season.teams), prof];
+    roles.forEach((r) => {
+      const vals = ents.map((p) => p[r.key]).filter((v) => v != null);
+      const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const sd = Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length) || 1;
+      const v = prof[r.key];
+      z[r.key] += v == null ? -1.5 : Math.max(-3, Math.min(3, (r.lower ? m - v : v - m) / sd));
+    });
+  });
+  const ranked = Object.entries(z).map(([k, v]) => [k, v / seasons.length]).sort((a, b) => b[1] - a[1]);
+  return { z: Object.fromEntries(ranked), strongest: ranked[0][0], weakest: ranked[ranked.length - 1][0] };
 };
 
 /** Each season simulated with the XI in it (see the note at the top): rank, wins, made the playoffs, topped it. */

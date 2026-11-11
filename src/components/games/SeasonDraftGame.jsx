@@ -1,41 +1,47 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Drawer } from '@mui/material';
 import { keyframes } from '@mui/system';
+import StarRounded from '@mui/icons-material/StarRounded';
 import { useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import OverseasMark from '../common/OverseasMark';
+import { BallIcon, BatIcon, GloveIcon } from '../common/CricketIcons';
 import DATA_VERSION from '../../utils/draftDataVersion';
 import {
-  BUDGET, COST_MIN, OVERSEAS_MAX, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, isBatSlot, profile, seasonResults,
+  BUDGET, COST_MIN, OVERSEAS_MAX, ROLE_NAMES, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, isBatSlot, profile,
+  roleEdges, seasonResults,
 } from '../../utils/draftEngine';
 
-// 19-0, formerly Season Draft (XI_BUILDER_PLAN.md X10), at /games/19-0. Three stages, all in the URL (d = the deal, p = the picks, r = locked in):
+// 19-0, formerly Season Draft (XI_BUILDER_PLAN.md X10), at /games/19-0. Three stages, all in the URL (d = the deal,
+// p = the picks, r = locked in):
 //   draft     fill eleven slots in any order, five cards a slot, on a budget, four overseas at most, a wicketkeeper;
 //             no score shown while drafting
 //   simulate  after "Lock in": a short "playing 19 seasons" screen (skipped with reduced motion, or on a shared link)
-//   result    one screen, made to be screenshotted and shared: the score, a one-line summary, the 19 seasons, the XI,
-//             play again. The same URL unfurls as a card (api/_lib/share.mjs draftSummary).
+//   result    one phone screen, made to be screenshotted and shared: the record, one line, why, the 19 seasons
+//             (tap one for its finish), the XI, play again, the data credit. The URL unfurls as a card (share.mjs).
 // The score is a record: seasons it made the playoffs v seasons it missed ("13-6"; 19-0 is the perfect run). The game's
-// rule, not a prediction.
+// rule, not a prediction. Phone rules (13 Nov 2026 audit): one-line text at 390px, 11px+ text, 32px+ tap targets,
+// nothing told by colour alone, help in a sheet rather than on the screen.
 
-export const GAME_NAME = '19-0';  // 13 Nov 2026: the score is a record, playoffs reached v missed (13-6)
+export const GAME_NAME = '19-0';
 const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums' };
+const oneLine = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 const newDeal = () => Math.random().toString(36).slice(2, 10);
 const BOWL_ROLES = ['pp_pace', 'mid_spin', 'death_pace'];
 const f1 = (x) => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(1));
 const overs = (balls) => `${Math.floor(balls / 6)}${balls % 6 ? `.${balls % 6}` : ''}`;
+const ordinal = (n) => `${n}${['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) || n % 10 > 3 ? 0 : n % 10]}`;
+const GOLD = '#c9a227';
 const SIM_MS = 2600;
+const CREDIT = 'Data: Himanish Ganjoo & TechRadar, Cricsheet';
+const linkBtn = { all: 'unset', cursor: 'pointer', minHeight: 32, display: 'inline-flex', alignItems: 'center', fontSize: 13, color: colors.textMed,
+  textDecoration: 'underline', textUnderlineOffset: 3, '&:focus-visible': { outline: `2px solid ${colors.accent}` } };
 
-const WkMark = () => (
-  <Box component="span" role="img" aria-label="wicketkeeper" title="Wicketkeeper"
-    sx={{ ml: 0.5, flexShrink: 0, px: '4px', py: '1px', borderRadius: '4px', border: `1px solid ${colors.borderStrong}`,
-      fontFamily: fonts.mono, fontSize: 9.5, lineHeight: 1.2, letterSpacing: '0.04em', color: colors.textMed }}>WK</Box>
-);
-const Marks = ({ card, size }) => (
+const Marks = ({ card, size = 14 }) => (
   <>
     {card.overseas && <OverseasMark size={size} />}
-    {card.wk && <WkMark />}
+    {card.wk && <GloveIcon sx={{ fontSize: size + 1, ml: 0.5, flexShrink: 0, color: colors.textMed }} />}
   </>
 );
 
@@ -43,7 +49,7 @@ const Marks = ({ card, size }) => (
 // the whole season (a batter's too: it counts when he's among the XI's busiest bowlers). The era-adjusted ratios the
 // score uses stay behind the scenes.
 const batLines = (b) => [
-  `Avg ${b.outs ? f1(b.runs / b.outs) : '–'} · SR ${f1((100 * b.runs) / b.balls)} · BpD ${b.outs ? f1(b.balls / b.outs) : '–'}`,
+  b.outs ? `Avg ${f1(b.runs / b.outs)} · SR ${f1((100 * b.runs) / b.balls)} · BpD ${f1(b.balls / b.outs)}` : `Never out · SR ${f1((100 * b.runs) / b.balls)}`,
   `${b.runs} runs · ${b.inns} inns`,
 ];
 const bowlLines = (w) => [
@@ -51,40 +57,70 @@ const bowlLines = (w) => [
   `${w.wkts} wkts · ${overs(w.balls)} ov`,
 ];
 
-const Stat = ({ label, lines }) => (
-  <Box sx={{ display: 'grid', gridTemplateColumns: '38px 1fr', columnGap: 1, mt: 0.5 }}>
-    <Box sx={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.textLo, pt: '3px' }}>{label}</Box>
-    <Box>
-      <Box sx={{ ...mono, fontSize: 13.5, color: colors.textHi }}>{lines[0]}</Box>
+const Stat = ({ Icon, lines }) => (
+  <Box sx={{ display: 'grid', gridTemplateColumns: '22px 1fr', columnGap: 0.75, mt: 0.5 }}>
+    <Icon sx={{ fontSize: 16, color: colors.textLo, mt: '2px' }} />
+    <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ ...mono, ...oneLine, fontSize: 13.5, color: colors.textHi }}>{lines[0]}</Box>
       <Box sx={{ fontSize: 12, color: colors.textMed }}>{lines[1]}</Box>
     </Box>
   </Box>
 );
 
-const CardRow = ({ card, slotIndex, cost, onPick, why }) => {
+// A greyed card keeps its reason at full strength ("Four overseas already"): only the card's content fades.
+const CardRow = ({ card, slotIndex, cost, onPick, why, picked }) => {
   const slot = SLOTS[slotIndex];
   const bat = isBatSlot(slotIndex) ? card.bat?.[slot.key] : null;
   const bowls = card.bowl && Object.keys(card.roles).some((r) => BOWL_ROLES.includes(r));
+  const off = !!why;
+  const fade = { opacity: off && !picked ? 0.4 : 1 };
   return (
-    <Box component="button" type="button" disabled={!!why} onClick={onPick}
-      sx={{ all: 'unset', boxSizing: 'border-box', cursor: why ? 'default' : 'pointer', opacity: why ? 0.45 : 1, display: 'block', bgcolor: colors.surface1,
-        border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.5, py: 1.1, '&:hover': { borderColor: why ? colors.border : colors.accent },
-        '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-          <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {`${card.name} ${card.season}`}
+    <Box component="button" type="button" disabled={off} onClick={onPick}
+      sx={{ all: 'unset', boxSizing: 'border-box', cursor: off ? 'default' : 'pointer', display: 'block', bgcolor: colors.surface1,
+        border: `1px solid ${picked ? colors.accent : colors.border}`, borderRadius: '14px', px: 1.5, py: 1.1,
+        '&:hover': { borderColor: off ? undefined : colors.accent }, '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
+      <Box sx={fade}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+            <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, minWidth: 0, ...oneLine }}>{`${card.name} ${card.season}`}</Box>
+            <Marks card={card} size={16} />
           </Box>
-          <Marks card={card} size={16} />
+          <Box sx={{ ...mono, fontSize: 14, color: colors.accent, whiteSpace: 'nowrap' }}>{`${cost} credits`}</Box>
         </Box>
-        <Box sx={{ ...mono, fontSize: 15, color: colors.accent, whiteSpace: 'nowrap' }}>{`${cost} cr`}</Box>
+        <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{card.team}</Box>
       </Box>
-      <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{[card.team, why].filter(Boolean).join(' · ')}</Box>
-      {bat && <Stat label="Bat" lines={batLines(bat)} />}
-      {bowls && <Stat label="Bowl" lines={bowlLines(card.bowl)} />}
+      {why && <Box sx={{ fontSize: 12, fontWeight: 600, color: picked ? colors.accent : colors.textMed, mt: 0.25 }}>{why}</Box>}
+      <Box sx={fade}>
+        {bat && <Stat Icon={BatIcon} lines={batLines(bat)} />}
+        {bowls && <Stat Icon={BallIcon} lines={bowlLines(card.bowl)} />}
+      </Box>
     </Box>
   );
 };
+
+const Sheet = ({ open, onClose, children }) => (
+  <Drawer anchor="bottom" open={open} onClose={onClose}
+    PaperProps={{ sx: { bgcolor: colors.bg, color: colors.textHi, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85vh' } }}>
+    <Box sx={{ maxWidth: 560, mx: 'auto', width: '100%', boxSizing: 'border-box', p: 2, pb: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+      display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {children}
+    </Box>
+  </Drawer>
+);
+
+const HOW = [
+  `Fill eleven slots, in any order, from five cards each: IPL player-seasons from 2008 to 2026. You have ${BUDGET} credits, up to four overseas players and at least one wicketkeeper.`,
+  "Batting numbers are at that slot's positions; bowling is the whole season. A batter who bowls also joins your attack when he's among its two busiest bowlers in a phase. Bowlers bat 8-11, which isn't scored.",
+  "A card's cost comes from how good that season was for its time, discounted for small samples.",
+  "Lock in, and your XI plays every IPL season against that year's real sides: each pick measured against his own season, so eras compare, and each game more likely to go to the stronger side. Top four makes the playoffs; 19-0 is the perfect run.",
+  'A game, not a prediction.',
+];
+const HowItWorks = ({ open, onClose }) => (
+  <Sheet open={open} onClose={onClose}>
+    <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>How 19-0 works</Box>
+    {HOW.map((t) => <Box key={t.slice(0, 24)} sx={{ fontSize: 14, color: colors.textMed, lineHeight: 1.5 }}>{t}</Box>)}
+  </Sheet>
+);
 
 const pulse = keyframes`0% { background-color: ${colors.surface2}; } 30% { background-color: ${colors.accent}; } 100% { background-color: ${colors.surface2}; }`;
 
@@ -110,55 +146,69 @@ const Simulating = ({ seasons }) => {
   );
 };
 
-const Result = ({ picks, table, results, best, onReplay, onSameDeal }) => {
+const Result = ({ picks, table, results, best, edges, onReplay, onSameDeal, onHow }) => {
+  const [sel, setSel] = useState(null);
   const made = results.filter((r) => r.made).length;
   const topped = results.filter((r) => r.topped).length;
   const bestMade = best.filter((r) => r.made).length;
-  const summary = made === 0 ? 'Missed the playoffs in every one of the 19 IPL seasons.'
-    : `Made the playoffs in ${made} of 19 IPL seasons${topped ? `, and topped the table in ${topped}` : ''}.`;
+  const line = made === 0 ? 'Missed the playoffs in all 19 seasons'
+    : `Playoffs in ${made} of 19${topped ? ` · topped the table ${topped === 1 ? 'once' : `${topped} times`}` : ''}`;
   const share = () => {
     const url = window.location.href;
-    const text = `${GAME_NAME}: my XI went ${made}-${19 - made}, the IPL playoffs in ${made} of 19 seasons. Same deal, can you beat it?`;
+    const text = `${GAME_NAME}: my IPL XI went ${made}-${19 - made}. Same deal, can you beat it?`;
     if (navigator.share) navigator.share({ title: GAME_NAME, text, url }).catch(() => {}); else navigator.clipboard?.writeText(`${text} ${url}`);
   };
+  const s = sel != null ? results[sel] : null;
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.85 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{GAME_NAME}</Box>
         <Box sx={{ fontSize: 11.5, color: colors.textLo }}>hindsightcricket.com</Box>
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25 }}>
-        <Box sx={{ ...mono, fontSize: 56, lineHeight: 1, color: colors.accent, whiteSpace: 'nowrap' }}>{`${made}-${19 - made}`}</Box>
-        <Box sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.3 }}>{summary}</Box>
+      <Box>
+        <Box sx={{ ...mono, fontSize: 58, lineHeight: 1, color: colors.accent }}>{`${made}-${19 - made}`}</Box>
+        <Box sx={{ fontSize: 14.5, color: colors.textHi, mt: 0.75, ...oneLine }}>{line}</Box>
+        <Box sx={{ fontSize: 13, color: colors.textMed, mt: 0.25, ...oneLine }}>
+          {`Strongest: ${ROLE_NAMES[edges.strongest]} · Weakest: ${ROLE_NAMES[edges.weakest]}`}
+        </Box>
       </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '4px' }}>
-        {results.map((r) => (
-          <Box key={r.season} title={`${r.season}: finished ${r.rank} of ${r.of}, won ${r.wins} of ${r.games}`}
-            sx={{ ...mono, fontSize: 11.5, textAlign: 'center', py: '5px', borderRadius: '6px',
-              bgcolor: r.topped ? '#c9a227' : r.made ? colors.accent : colors.surface2, color: r.made ? colors.bg : colors.textLo }}>
-            {r.season.slice(-2)}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '3px' }}>
+        {results.map((r, n) => (
+          <Box key={r.season} component="button" type="button" onClick={() => setSel(n === sel ? null : n)}
+            aria-label={`${r.season}: finished ${ordinal(r.rank)} of ${r.of}`}
+            sx={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', ...mono, fontSize: 11.5, height: 32, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', gap: '1px', borderRadius: '6px', outline: n === sel ? `2px solid ${colors.textHi}` : 'none', outlineOffset: 1,
+              bgcolor: r.topped ? GOLD : r.made ? colors.accent : colors.surface2, color: r.made ? colors.bg : colors.textLo }}>
+            {r.season.slice(-2)}{r.topped && <StarRounded sx={{ fontSize: 11 }} />}
           </Box>
         ))}
       </Box>
+      <Box sx={{ fontSize: 12.5, color: s ? colors.textHi : colors.textLo, ...oneLine }}>
+        {s ? `IPL ${s.season}: finished ${ordinal(s.rank)} of ${s.of}, won ${s.wins} of ${s.games}` : 'Tap a season for where your XI finished'}
+      </Box>
       <Box sx={{ display: 'flex', gap: 1.5, fontSize: 11, color: colors.textLo }}>
-        {[[colors.accent, 'playoffs'], ['#c9a227', 'top of the table'], [colors.surface2, 'missed']].map(([c, l]) => (
-          <Box key={l} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Box sx={{ width: 9, height: 9, borderRadius: '2px', bgcolor: c }} />{l}</Box>
+        {[[colors.accent, 'playoffs', false], [GOLD, 'top of the table', true], [colors.surface2, 'missed', false]].map(([c, l, star]) => (
+          <Box key={l} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ width: 11, height: 11, borderRadius: '2px', bgcolor: c, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {star && <StarRounded sx={{ fontSize: 9, color: colors.bg }} />}
+            </Box>{l}
+          </Box>
         ))}
       </Box>
-      <Box sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 0.75 }}>
+      <Box sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 0.6 }}>
         {picks.map((c, i) => (
-          <Box key={c.name} sx={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', alignItems: 'center', gap: 1, py: '3px' }}>
-            <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{SLOTS[i].label.replace('Number ', 'No. ').replace(' bowler', '')}</Box>
+          <Box key={c.name} sx={{ display: 'grid', gridTemplateColumns: '58px 1fr auto', alignItems: 'center', gap: 1, py: '2px' }}>
+            <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{SLOTS[i].label}</Box>
             <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-              <Box sx={{ fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`${c.name} ${c.season}`}</Box>
+              <Box sx={{ fontSize: 13.5, ...oneLine }}>{`${c.name} ${c.season}`}</Box>
               <Marks card={c} size={13} />
             </Box>
             <Box sx={{ ...mono, fontSize: 12, color: colors.textMed }}>{costOf(c, i, table)}</Box>
           </Box>
         ))}
       </Box>
-      <Box sx={{ fontSize: 12.5, color: colors.textMed }}>
-        {bestMade > made ? `The best XI this deal allowed made ${bestMade}.` : 'No XI from this deal does better.'}
+      <Box sx={{ fontSize: 12.5, color: colors.textMed, ...oneLine }}>
+        {bestMade > made ? `The best XI this deal allowed went ${bestMade}-${19 - bestMade}.` : 'No XI from this deal does better.'}
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <Box component="button" type="button" onClick={onReplay}
@@ -170,14 +220,11 @@ const Result = ({ picks, table, results, best, onReplay, onSameDeal }) => {
           Share
         </Box>
       </Box>
-      <Box component="button" type="button" onClick={onSameDeal}
-        sx={{ all: 'unset', cursor: 'pointer', alignSelf: 'center', fontSize: 13, color: colors.textMed, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-        Try this same deal yourself
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+        <Box component="button" type="button" onClick={onSameDeal} sx={linkBtn}>Try this same deal</Box>
+        <Box component="button" type="button" onClick={onHow} sx={linkBtn}>How it works</Box>
       </Box>
-      <Box sx={{ fontSize: 10.5, color: colors.textLo }}>
-        Each pick's numbers are measured against his own season, so eras compare; the XI then plays each season against
-        that year's real sides. A game, not a prediction.
-      </Box>
+      <Box sx={{ fontSize: 11, color: colors.textLo, ...oneLine }}>{CREDIT}</Box>
     </Box>
   );
 };
@@ -192,6 +239,7 @@ const SeasonDraftGame = () => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
   const [open, setOpen] = useState(null);  // the slot whose cards are showing
+  const [how, setHow] = useState(false);
   const [simulating, setSimulating] = useState(false);
   useEffect(() => {
     document.title = `${GAME_NAME} · Hindsight`;
@@ -222,17 +270,21 @@ const SeasonDraftGame = () => {
   const state = table && dealt ? checkPicks(picks, table) : null;
   const showResult = locked && !!state?.complete;
   const results = useMemo(() => (showResult ? seasonResults(profile(picks), data.seasons, data.roles, d) : null), [showResult, picks, data, d]);
+  const edges = useMemo(() => (showResult ? roleEdges(profile(picks), data.seasons, data.roles) : null), [showResult, picks, data]);
   const best = useMemo(() => (showResult ? seasonResults(profile(bestFromDeal(dealt, data.roles, table)), data.seasons, data.roles, d) : null),
     [showResult, dealt, data, d, table]);
 
   if (error) return <Box sx={{ p: 2, color: colors.textLo }}>The draft couldn't load just now. Try again shortly.</Box>;
   if (!dealt) return <Box sx={{ p: 2, color: colors.textLo }}>Dealing…</Box>;
   const wrap = (child) => (
-    <Box sx={{ maxWidth: 560, mx: 'auto', px: 2, pt: 1.5, pb: 4, color: colors.textHi, display: 'flex', flexDirection: 'column', gap: 1.5 }}>{child}</Box>
+    <Box sx={{ maxWidth: 560, mx: 'auto', px: 2, pt: 1.5, pb: 4, color: colors.textHi, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      {child}
+      <HowItWorks open={how} onClose={() => setHow(false)} />
+    </Box>
   );
   if (showResult && simulating) return wrap(<Simulating seasons={data.seasons} />);
   if (showResult) {
-    return wrap(<Result picks={picks} table={table} results={results} best={best}
+    return wrap(<Result picks={picks} table={table} results={results} best={best} edges={edges} onHow={() => setHow(true)}
       onReplay={() => navigate({ search: `?d=${newDeal()}` })} onSameDeal={() => navigate({ search: `?d=${d}` })} />);
   }
 
@@ -252,31 +304,46 @@ const SeasonDraftGame = () => {
   // cost for each other empty slot, so the XI can always be finished).
   const why = (card, slot) => {
     const others = picks.map((c, i) => (i === slot ? null : c));
-    if (others.some((c) => c && c.name === card.name)) return 'already in your XI';
+    if (others.some((c) => c && c.name === card.name)) return 'Already in your XI';
     const st = checkPicks(others, table);
-    if (card.overseas && st.overseas >= OVERSEAS_MAX) return 'four overseas already';
+    if (card.overseas && st.overseas >= OVERSEAS_MAX) return 'Four overseas already';
     const empty = others.filter((c, i) => !c && i !== slot).length;
-    if (costOf(card, slot, table) > st.left - COST_MIN * empty) return 'over the budget';
+    if (costOf(card, slot, table) > st.left - COST_MIN * empty) return 'Over the budget';
     return null;
   };
-  const lockReason = filled < SLOTS.length ? `Pick ${SLOTS.length - filled} more`
-    : !state.keeper ? 'Your XI needs a wicketkeeper (WK)' : null;
+  const lockReason = filled < SLOTS.length ? `Pick ${SLOTS.length - filled} more` : !state.keeper ? 'Your XI needs a wicketkeeper' : null;
+  const keeperNote = (
+    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, color: state.keeper ? colors.accent : colors.textMed }}>
+      <GloveIcon sx={{ fontSize: 12 }} />{state.keeper ? '✓' : 'needed'}
+    </Box>
+  );
+  const chip = { display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: 12, color: colors.textMed, border: `1px solid ${colors.border}`,
+    borderRadius: '999px', px: 1, height: 28, boxSizing: 'border-box' };
 
   return wrap(
     <>
       <Box>
         <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26 }}>{GAME_NAME}</Box>
-        <Box sx={{ color: colors.textMed, fontSize: 13.5 }}>
-          {`Build an XI from 19 years of IPL seasons: ${BUDGET} credits, up to four overseas, a wicketkeeper. It plays all 19 seasons: playoffs reached v missed. Can it go 19-0?`}
+        <Box sx={{ color: colors.textMed, fontSize: 13.5, ...oneLine }}>Draft an IPL XI from 19 seasons. Can it go 19-0?</Box>
+        <Box sx={{ display: 'flex', gap: 0.75, mt: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Box sx={chip}>{`${BUDGET} credits`}</Box>
+          <Box sx={chip}><OverseasMark size={12} sx={{ ml: 0 }} />4 max</Box>
+          <Box sx={chip}><GloveIcon sx={{ fontSize: 13 }} />1 keeper</Box>
+          <Box component="button" type="button" onClick={() => setHow(true)}
+            sx={{ all: 'unset', ...chip, height: 32, cursor: 'pointer', color: colors.accent, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>How it works</Box>
         </Box>
       </Box>
 
       <Box sx={{ display: 'flex', gap: 1 }}>
-        {[[`${state.left}`, `of ${BUDGET} credits left`], [`${state.overseas}/${OVERSEAS_MAX}`, 'overseas'], [`${filled}/11`, 'picked']].map(([v, l]) => (
-          <Box key={l} sx={{ flex: 1, bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 0.9 }}>
+        {[
+          [`${state.left}`, <>credits left</>],
+          [`${state.overseas}/${OVERSEAS_MAX}`, <><OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} />overseas</>],
+          [`${filled}/11`, <>picked</>, keeperNote],
+        ].map(([v, l, extra], n) => (
+          <Box key={n} sx={{ flex: 1, minWidth: 0, bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 0.9 }}>
             <Box sx={{ ...mono, fontSize: 19 }}>{v}</Box>
-            <Box sx={{ fontSize: 11, color: colors.textLo }}>
-              {l === 'overseas' && <OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} />}{l}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 0.5, fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>
+              <span>{l}</span>{extra}
             </Box>
           </Box>
         ))}
@@ -287,13 +354,11 @@ const SeasonDraftGame = () => {
           const c = picks[i];
           return (
             <Box key={i} component="button" type="button" onClick={() => setOpen(i)}
-              sx={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '84px 1fr auto', alignItems: 'center', gap: 1,
-                py: 0.9, width: '100%', borderTop: i ? `1px solid ${colors.border}` : 'none', '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
+              sx={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '64px 1fr auto', alignItems: 'center', gap: 1,
+                minHeight: 40, width: '100%', borderTop: i ? `1px solid ${colors.border}` : 'none', '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
               <Box sx={{ fontSize: 12, color: colors.textLo, whiteSpace: 'nowrap' }}>{slot.label}</Box>
               <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                <Box sx={{ fontSize: 14.5, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: c ? colors.textHi : colors.accent }}>
-                  {c ? `${c.name} ${c.season}` : 'Pick'}
-                </Box>
+                <Box sx={{ fontSize: 14.5, minWidth: 0, ...oneLine, color: c ? colors.textHi : colors.accent }}>{c ? `${c.name} ${c.season}` : 'Pick'}</Box>
                 {c && <Marks card={c} />}
               </Box>
               <Box sx={{ ...mono, fontSize: 13, color: colors.textMed }}>{c ? `${costOf(c, i, table)}` : ''}</Box>
@@ -304,32 +369,35 @@ const SeasonDraftGame = () => {
 
       <Box component="button" type="button" disabled={!!lockReason} onClick={lockIn}
         sx={{ all: 'unset', boxSizing: 'border-box', cursor: lockReason ? 'default' : 'pointer', textAlign: 'center', py: 1.3, borderRadius: '12px', fontWeight: 600,
-          bgcolor: lockReason ? colors.surface2 : colors.accent, color: lockReason ? colors.textLo : colors.bg }}>
+          bgcolor: lockReason ? colors.surface2 : colors.accent, color: lockReason ? colors.textMed : colors.bg }}>
         {lockReason || 'Lock in XI'}
       </Box>
-      <Box sx={{ fontSize: 11.5, color: colors.textLo }}>
-        Tap any slot to see its five cards. Batters' numbers are at that slot's positions; bowling is the whole season. A
-        batter who bowls also joins your attack when he's among its busiest bowlers. A card's cost (in credits) comes from
-        how good that season was for its time.
-      </Box>
 
-      <Drawer anchor="bottom" open={open != null} onClose={() => setOpen(null)}
-        PaperProps={{ sx: { bgcolor: colors.bg, color: colors.textHi, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85vh' } }}>
+      <Sheet open={open != null} onClose={() => setOpen(null)}>
         {open != null && (
-          <Box sx={{ maxWidth: 560, mx: 'auto', width: '100%', boxSizing: 'border-box', p: 2, pb: 'calc(16px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{SLOTS[open].label}</Box>
+          <>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20 }}>{SLOTS[open].label}</Box>
+                <Box sx={{ fontSize: 12, color: colors.textMed, display: 'flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap' }}>
+                  {`${state.left} credits left ·`}
+                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}><OverseasMark size={12} sx={{ ml: 0, mr: 0.3 }} />{`${state.overseas}/${OVERSEAS_MAX}`}</Box>·
+                  {keeperNote}
+                </Box>
+              </Box>
               {picks[open] && (
-                <Box component="button" type="button" onClick={() => setPick(open, null)} sx={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: colors.textLo }}>Clear</Box>
+                <Box component="button" type="button" onClick={() => setPick(open, null)}
+                  sx={{ all: 'unset', cursor: 'pointer', minHeight: 32, minWidth: 48, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end',
+                    fontSize: 13.5, color: colors.textMed }}>Clear</Box>
               )}
             </Box>
             {dealt[open].map((c, n) => (
-              <CardRow key={c.name} card={c} slotIndex={open} cost={costOf(c, open, table)}
-                why={picks[open] === c ? 'picked' : why(c, open)} onPick={() => setPick(open, n)} />
+              <CardRow key={c.name} card={c} slotIndex={open} cost={costOf(c, open, table)} picked={picks[open] === c}
+                why={picks[open] === c ? 'In your XI' : why(c, open)} onPick={() => setPick(open, n)} />
             ))}
-          </Box>
+          </>
         )}
-      </Drawer>
+      </Sheet>
     </>,
   );
 };
