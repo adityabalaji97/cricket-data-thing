@@ -35,7 +35,8 @@ export const playerHref = (name, w = {}) => {
 const PlayerLink = ({ name, win, children, sx }) => (
   // A new page opens at its top (the router keeps the scroll position of the page you left).
   <Box component={Link} to={playerHref(name, win)} onClick={(e) => { e.stopPropagation(); window.scrollTo(0, 0); }}
-    sx={{ color: 'inherit', textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: colors.textLo,
+    // Vertical padding on an inline link widens the tap target to 32px without moving the line (13 Nov 2026 audit).
+    sx={{ color: 'inherit', py: '7.5px', textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: colors.textLo,
       textUnderlineOffset: '3px', '&:hover': { color: colors.accent, textDecorationColor: colors.accent },
       '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 }, ...sx }}>
     {children || name}
