@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Drawer } from '@mui/material';
 import { keyframes } from '@mui/system';
 import StarRounded from '@mui/icons-material/StarRounded';
@@ -8,6 +8,7 @@ import { colors, fonts } from '../../theme/hindsightDark';
 import OverseasMark from '../common/OverseasMark';
 import { BallIcon, BatIcon, GloveIcon } from '../common/CricketIcons';
 import DATA_VERSION from '../../utils/draftDataVersion';
+import { track } from '../../utils/analytics';
 import {
   BUDGET, COST_MIN, OVERSEAS_MAX, ROLE_NAMES, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, isBatSlot, profile,
   roleEdges, seasonResults,
@@ -248,6 +249,15 @@ const SeasonDraftGame = () => {
   }, []);
   // A new draft gets its own deal, written into the URL so the draft is a link.
   useEffect(() => { if (!d) navigate({ search: `?d=${newDeal()}` }, { replace: true }); }, [d, navigate]);
+  // Results, on purpose (13 Nov 2026): game_start when a deal opens with no picks (a fresh deal, or "try this same
+  // deal"); game_result once, on lock-in, with the deal, the picks (as indices and names) and the record. Page views
+  // here carry no query (analytics.js QUIET_QUERY_PATHS). A shared result being viewed counts as neither.
+  const started = useRef(null);
+  useEffect(() => {
+    if (!d || locked || started.current === d || /[0-9]/.test(pStr)) return;
+    started.current = d;
+    track('game_start', { game: '19-0', d }, '/games/19-0');
+  }, [d, locked, pStr]);
   useEffect(() => {
     if (!simulating) return undefined;
     const t = setTimeout(() => setSimulating(false), SIM_MS + 300);
@@ -295,6 +305,10 @@ const SeasonDraftGame = () => {
     setOpen(null);
   };
   const lockIn = () => {
+    const res = seasonResults(profile(picks), data.seasons, data.roles, d);
+    const made = res.filter((r) => r.made).length;
+    track('game_result', { game: '19-0', d, p: pStr, made, topped: res.filter((r) => r.topped).length, spent: state.spent,
+      picks: picks.map((c) => `${c.name} ${c.season}`), data: DATA_VERSION }, '/games/19-0');
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     setSimulating(!reduced);
     navigate({ search: `?d=${d}&p=${pStr}&r=1` });
