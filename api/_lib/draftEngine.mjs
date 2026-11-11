@@ -1,7 +1,8 @@
 // A copy of src/utils/draftEngine.js for the link previews (Vercel functions can't import the app's src as ESM).
 // Keep in step: scripts/dev/check_draft_copy.mjs compares the two on a deal.
-// The Season Draft (XI_BUILDER_PLAN.md X10): eleven picks from IPL player-seasons, three cards dealt per slot (the
-// same deal for everyone each day), scored against all 19 IPL seasons. Every number is era-adjusted: a ratio to that
+// The Season Draft (XI_BUILDER_PLAN.md X10): eleven picks from IPL player-seasons, five cards dealt per slot (each
+// draft its own deal, from a seed in the URL), slots filled in any order under a budget and four overseas, scored
+// against all 19 IPL seasons. Every number is era-adjusted: a ratio to that
 // season's league rate for the role (scripts/build_season_draft.py), so seasons compare.
 //
 // Scoring is a game rule, not a prediction (XI_SCORE_CHECK.md): each season is simulated. The XI joins that season's
@@ -21,7 +22,7 @@ export const SLOTS = [
 ];
 export const OVERSEAS_MAX = 4;
 
-/** A small seeded random generator (mulberry32) from a string: the day's deal. */
+/** A small seeded random generator (mulberry32) from a string: a draft's deal and its simulated seasons. */
 export const rng = (seed) => {
   let h = 1779033703;
   for (let i = 0; i < seed.length; i += 1) { h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
@@ -36,7 +37,7 @@ export const rng = (seed) => {
 
 const eligible = (card, slot) => slot.roles.some((r) => card.roles[r]);
 
-/** Three cards per slot, no player twice in a deal. Weighted toward recognisable seasons: how much he played, and
+/** Cards per slot (PER_SLOT), no player twice in a deal. Weighted toward recognisable seasons: how much he played, and
  * (gently: square root) how far above his season he was, so standout seasons come up often but not every card. */
 const LOWER = { death_pace: true };
 const quality = (c, slot) => Math.max(...slot.roles.map((r) => {
@@ -46,13 +47,32 @@ const quality = (c, slot) => Math.max(...slot.roles.map((r) => {
   return Math.sqrt(x.balls) * Math.sqrt(Math.max(0.35, good));
 }));
 
-export const deal = (cards, seed) => {
+/** How far above his season a card was in the slot's role (economy the other way): what wins the simulated seasons. */
+const goodness = (c, slot) => Math.max(...slot.roles.map((r) => {
+  const x = c.roles[r];
+  if (!x) return 0;
+  return LOWER[r] ? 1 / x.r : x.r;
+}));
+
+/** What a card costs is based on: his ratio to the season, pulled toward 1 (the league average) by PRICE_SHRINK
+ * balls, so a short hot streak isn't priced like a full great season. */
+const PRICE_SHRINK = 300;
+const priceValue = (c, slot) => Math.max(...slot.roles.map((r) => {
+  const x = c.roles[r];
+  if (!x) return 0;
+  const g = LOWER[r] ? 1 / x.r : x.r;
+  return (g * x.balls + PRICE_SHRINK) / (x.balls + PRICE_SHRINK);
+}));
+
+export const PER_SLOT = 5;
+
+export const deal = (cards, seed, perSlot = PER_SLOT) => {
   const rand = rng(seed);
   const used = new Set();
   return SLOTS.map((slot) => {
     const pool = cards.filter((c) => eligible(c, slot) && !used.has(c.name));
     const out = [];
-    for (let k = 0; k < 3 && pool.length; k += 1) {
+    for (let k = 0; k < perSlot && pool.length; k += 1) {
       const w = pool.map((c) => quality(c, slot));
       let x = rand() * w.reduce((a, b) => a + b, 0);
       let i = 0;
@@ -119,19 +139,64 @@ export const seasonResults = (prof, seasons, roles, seed = 'draft') => {
   });
 };
 
-/** The best XI the deal allowed: the best card per slot on its role (ratio; economy the other way), overseas-capped. */
-export const bestFromDeal = (dealt, roles) => {
-  const lower = Object.fromEntries(roles.map((r) => [r.key, r.lower]));
-  const value = (c, slot) => Math.max(...SLOTS[slot].roles.map((r) => (c.roles[r] ? (lower[r] ? 1 / c.roles[r].r : c.roles[r].r) : -1)));
-  let picks = dealt.map((cards, i) => cards.slice().sort((a, b) => value(b, i) - value(a, i))[0]);
-  // Over the overseas cap: swap the smallest losses to the slot's best local card.
-  const swapsFor = (current) => current.map((c, i) => (c?.overseas ? { i, alt: dealt[i].filter((d) => !d.overseas).sort((a, b) => value(b, i) - value(a, i))[0] } : null))
-    .filter((x) => x && x.alt).map((x) => ({ ...x, loss: value(current[x.i], x.i) - value(x.alt, x.i) })).sort((a, b) => a.loss - b.loss);
-  while (picks.filter((c) => c?.overseas).length > OVERSEAS_MAX) {
-    const swaps = swapsFor(picks);
-    if (!swaps.length) break;
-    const { i: at, alt } = swaps[0];
-    picks = picks.map((c, i) => (i === at ? alt : c));
-  }
-  return picks;
+// ---- the budget (12 Nov 2026: tight; a card's cost from the data, one scale for all 19 seasons) -------------------
+
+export const BUDGET = 100;           // credits for eleven (costs 4-12). Tuned 12 Nov 2026: the best a deal allows ~14 of 19 (10-17), a random legal XI ~9 (4-14)
+export const COST_MIN = 4;
+export const COST_MAX = 12;
+
+/** For each slot kind, every card's price value sorted, so a cost is the card's place among the cards of its kind. */
+export const costTable = (cards) => {
+  const t = {};
+  SLOTS.forEach((slot) => {
+    if (t[slot.key]) return;
+    t[slot.key] = cards.filter((c) => slot.roles.some((r) => c.roles[r])).map((c) => priceValue(c, slot)).sort((a, b) => a - b);
+  });
+  return t;
+};
+
+/** A card's cost in credits for a slot: 4 for the weakest of its kind to 12 for the best (by price value), in halves. */
+export const costOf = (card, slotIndex, table) => {
+  const slot = SLOTS[slotIndex];
+  const vals = table[slot.key];
+  const q = priceValue(card, slot);
+  let lo = 0; let hi = vals.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (vals[mid] < q) lo = mid + 1; else hi = mid; }
+  const pct = vals.length > 1 ? lo / (vals.length - 1) : 0.5;
+  return Math.round(2 * (COST_MIN + (COST_MAX - COST_MIN) * Math.min(1, pct))) / 2;
+};
+
+/** A set of picks (a card or null per slot) against the rules: the budget, the overseas cap, no player twice. */
+export const checkPicks = (picks, table) => {
+  const chosen = picks.map((c, i) => (c ? { c, i } : null)).filter(Boolean);
+  const spent = chosen.reduce((a, { c, i }) => a + costOf(c, i, table), 0);
+  const overseas = chosen.filter(({ c }) => c.overseas).length;
+  const names = chosen.map(({ c }) => c.name);
+  return { spent, left: BUDGET - spent, overseas, ok: spent <= BUDGET && overseas <= OVERSEAS_MAX && new Set(names).size === names.length };
+};
+
+/** The best XI the deal allowed under the budget and the overseas cap: the most total goodness, by dynamic programming
+ * over (slot, credits spent, overseas used). */
+export const bestFromDeal = (dealt, roles, table) => {
+  const half = (x) => Math.round(x * 2);
+  const B = half(BUDGET);
+  // state key: `${spent},${overseas}` -> {score, picks}
+  let states = new Map([['0,0', { score: 0, picks: [] }]]);
+  dealt.forEach((cards, i) => {
+    const next = new Map();
+    states.forEach((st, key) => {
+      const [sp, ov] = key.split(',').map(Number);
+      cards.forEach((c) => {
+        if (st.picks.some((p) => p.name === c.name)) return;
+        const cost = half(costOf(c, i, table)); const o = ov + (c.overseas ? 1 : 0);
+        if (sp + cost > B || o > OVERSEAS_MAX) return;
+        const k = `${sp + cost},${o}`; const sc = st.score + goodness(c, SLOTS[i]);
+        if (!next.has(k) || next.get(k).score < sc) next.set(k, { score: sc, picks: [...st.picks, c] });
+      });
+    });
+    states = next;
+  });
+  let best = null;
+  states.forEach((st) => { if (!best || st.score > best.score) best = st; });
+  return best ? best.picks : [];
 };

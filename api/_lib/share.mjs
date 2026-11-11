@@ -229,15 +229,15 @@ async function builderSummary(params) {
 // A finished Season Draft (/games/season-draft?d=&p=): the same deal and score as the game (api/_lib/draftEngine.mjs, a
 // checked copy of the app's), from the pinned data the API serves.
 async function draftSummary(params) {
-  const day = params.get('d'); const picksStr = params.get('p') || '';
-  if (!day || picksStr.length !== 11) return null;
+  const dealId = params.get('d'); const picksStr = params.get('p') || '';
+  if (!dealId || !/^[0-9]{11}$/.test(picksStr)) return null;
   const data = await getJSON('/games/season-draft/data', 8000);
   if (!data) return null;
-  const { deal, profile, seasonResults } = await import('./draftEngine.mjs');
-  const dealt = deal(data.cards, `season-draft-${day}`);
-  const chosen = picksStr.split('').map(Number).map((n, i) => dealt[i]?.[n]).filter(Boolean);
-  if (chosen.length !== 11) return null;
-  const res = seasonResults(profile(chosen), data.seasons, data.roles, `${day}|${picksStr}`);
+  const { deal, profile, seasonResults, costTable, checkPicks } = await import('./draftEngine.mjs');
+  const dealt = deal(data.cards, `season-draft-${dealId}`);
+  const chosen = picksStr.split('').map(Number).map((n, i) => dealt[i]?.[n] || null);
+  if (chosen.some((c) => !c) || !checkPicks(chosen, costTable(data.cards)).ok) return null;
+  const res = seasonResults(profile(chosen), data.seasons, data.roles, `${dealId}|${picksStr}`);
   const made = res.filter((r) => r.made).length;
   const stars = chosen.slice().sort((a, b) => Math.max(...Object.values(b.roles).map((x) => x.balls)) - Math.max(...Object.values(a.roles).map((x) => x.balls)))
     .slice(0, 3).map((c) => `${c.name} ${c.season}`);
@@ -245,7 +245,7 @@ async function draftSummary(params) {
     kind: 'draft',
     title: `Season Draft: made the IPL playoffs in ${made} of 19 seasons | ${SITE_NAME}`,
     description: `An XI of IPL player-seasons (${stars.join(', ')} and more) played through all 19 IPL seasons: playoffs in ${made}. Draft yours on Hindsight.`,
-    card: { day, made, of: res.length, topped: res.filter((r) => r.topped).length, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })), stars },
+    card: { made, of: res.length, topped: res.filter((r) => r.topped).length, strip: res.map((r) => ({ s: r.season.slice(-2), made: r.made, topped: r.topped })), stars },
   };
 }
 

@@ -181,7 +181,7 @@ function xiCard(card) {
 // A finished Season Draft: the score, three of the picks, the 19 seasons as a strip (made / topped / missed).
 function draftCard(card) {
   return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow' },
-    top(`Season Draft · ${card.day}`),
+    top('Season Draft'),
     h('div', { alignItems: 'baseline', gap: 18, marginTop: 18 },
       h('div', { fontFamily: MONO, fontSize: 96, fontWeight: 500, color: C.lime, lineHeight: 1 }, `${card.made}/${card.of}`),
       h('div', { fontFamily: DISPLAY, fontSize: 40, fontWeight: 700, lineHeight: 1.1 }, 'IPL seasons this XI made the playoffs')),
