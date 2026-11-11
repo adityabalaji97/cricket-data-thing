@@ -179,7 +179,9 @@ async function teamSummary(team) {
   const sides = p.scope?.label || 'sides';
   const rating = p.rating?.rank ? `rated ${ORD(p.rating.rank)} of ${p.rating.of} ${sides}` : null;
   const bat = [...(p.top?.bat || [])].sort((a, b) => (b.raa || 0) - (a.raa || 0))[0];
-  const bowl = [...(p.top?.bowl || [])].sort((a, b) => (b.wickets || 0) - (a.wickets || 0))[0];
+  // The team page ranks its bowlers by economy (services/team_page.py: wickets and runs above par don't repeat), so the
+  // card shows its best: the most wickets among the five most economical named Boult for RR in Nov 2026, long gone.
+  const bowl = (p.top?.bowl || [])[0];
   const PH = { powerplay: 'Powerplay', middle: 'Middle', death: 'Death' };
   const phases = Object.entries(PH).filter(([k]) => p.phases?.[k]).map(([k, label]) => ({
     label,
@@ -188,7 +190,7 @@ async function teamSummary(team) {
   }));
   const record = `Won ${p.won} of ${p.played}`;
   const best = [bat ? `${bat.name} ${signed(bat.raa, 0)} runs above par` : null,
-    bowl ? `${bowl.name} ${bowl.wickets} wickets at ${bowl.economy.toFixed(2)} an over` : null].filter(Boolean);
+    bowl ? `${bowl.name} the most economical at ${bowl.economy.toFixed(2)} an over` : null].filter(Boolean);
   return {
     kind: 'team',
     title: `${p.team}: ${comp} since ${since}, ${record.toLowerCase()} | ${SITE_NAME}`,
@@ -198,7 +200,7 @@ async function teamSummary(team) {
       kicker: `${comp} · since ${since}`, headline: p.team, colour: teamColour(p.team),
       sub: [record, rating].filter(Boolean).join(' · '), phases,
       best: [bat ? { role: 'Top batter', name: bat.name, value: `${signed(bat.raa, 0)} runs above par` } : null,
-        bowl ? { role: 'Top wicket-taker', name: bowl.name, value: `${bowl.wickets} wkts · ${bowl.economy.toFixed(2)} an over` } : null].filter(Boolean),
+        bowl ? { role: 'Best economy', name: bowl.name, value: `${bowl.economy.toFixed(2)} an over · ${bowl.wickets} wkts` } : null].filter(Boolean),
     },
   };
 }
