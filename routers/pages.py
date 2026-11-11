@@ -70,6 +70,20 @@ def query_suggestions(response: Response, db: Session = Depends(get_session)):
     return suggestions(db)
 
 
+@router.get("/team-squad")
+def team_squad_route(response: Response, team: str = Query(..., description="An IPL side's full name or code"),
+                     db: Session = Depends(get_session)):
+    """The team page's Squad group (XI_BUILDER_PLAN.md X3): the current squad with this window's trades, against the
+    winners' template, price v wins added and the three calls. 404 for a side without an IPL squad."""
+    from services.squad_view import team_squad
+
+    out = team_squad(db, team)
+    if not out:
+        raise HTTPException(status_code=404, detail=f"No IPL squad for {team}")
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
+    return out
+
+
 @router.get("/query-recent")
 def query_recent(response: Response, db: Session = Depends(get_session)):
     """What visitors recently asked the query builder, newest first: the empty screen's "Recently asked"."""
