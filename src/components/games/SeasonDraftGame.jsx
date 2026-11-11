@@ -3,6 +3,7 @@ import { Box, Drawer } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
+import OverseasMark from '../common/OverseasMark';
 import {
   BUDGET, COST_MIN, OVERSEAS_MAX, SLOTS, bestFromDeal, checkPicks, costOf, costTable, deal, isBatSlot, profile, seasonResults,
 } from '../../utils/draftEngine';
@@ -49,12 +50,15 @@ const CardRow = ({ card, slotIndex, cost, onPick, why }) => {
       sx={{ all: 'unset', boxSizing: 'border-box', cursor: why ? 'default' : 'pointer', opacity: why ? 0.45 : 1, display: 'block', bgcolor: colors.surface1,
         border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.5, py: 1.1, '&:hover': { borderColor: why ? colors.border : colors.accent } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-        <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {`${card.name} ${card.season}`}
+        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+          <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {`${card.name} ${card.season}`}
+          </Box>
+          {card.overseas && <OverseasMark size={16} />}
         </Box>
         <Box sx={{ ...mono, fontSize: 15, color: colors.accent, whiteSpace: 'nowrap' }}>{`${cost} cr`}</Box>
       </Box>
-      <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{[card.team, card.overseas ? 'overseas' : null, why].filter(Boolean).join(' · ')}</Box>
+      <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{[card.team, why].filter(Boolean).join(' · ')}</Box>
       {bat && <Stat label="Bat" lines={batLines(bat)} />}
       {bowls && <Stat label="Bowl" lines={bowlLines(card.bowl)} />}
     </Box>
@@ -141,7 +145,7 @@ const SeasonDraftGame = () => {
         {[[`${state.left}`, `of ${BUDGET} credits left`], [`${state.overseas}/${OVERSEAS_MAX}`, 'overseas'], [`${filled}/11`, 'picked']].map(([v, l]) => (
           <Box key={l} sx={{ flex: 1, bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 0.9 }}>
             <Box sx={{ ...mono, fontSize: 19 }}>{v}</Box>
-            <Box sx={{ fontSize: 11, color: colors.textLo }}>{l}</Box>
+            <Box sx={{ fontSize: 11, color: colors.textLo }}>{l.startsWith('overseas') ? <OverseasMark size={11} sx={{ ml: 0, mr: 0.4, color: colors.textLo, verticalAlign: '-1px' }} /> : null}{l}</Box>
           </Box>
         ))}
       </Box>
@@ -154,9 +158,11 @@ const SeasonDraftGame = () => {
               sx={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '84px 1fr auto', alignItems: 'center', gap: 1,
                 py: 0.9, width: '100%', borderTop: i ? `1px solid ${colors.border}` : 'none' }}>
               <Box sx={{ fontSize: 12, color: colors.textLo, whiteSpace: 'nowrap' }}>{slot.label}</Box>
-              <Box sx={{ fontSize: 14.5, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: c ? colors.textHi : colors.accent }}>
-                {c ? `${c.name} ${c.season}` : 'Pick'}
-                {c?.overseas && <Box component="span" sx={{ fontSize: 11, color: colors.textLo }}> · overseas</Box>}
+              <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                <Box sx={{ fontSize: 14.5, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: c ? colors.textHi : colors.accent }}>
+                  {c ? `${c.name} ${c.season}` : 'Pick'}
+                </Box>
+                {c?.overseas && <OverseasMark />}
               </Box>
               <Box sx={{ ...mono, fontSize: 13, color: colors.textMed }}>{c ? `${costOf(c, i, table)}` : ''}</Box>
             </Box>
