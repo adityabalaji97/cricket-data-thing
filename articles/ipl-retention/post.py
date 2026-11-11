@@ -36,8 +36,9 @@ TEAMS = {
     "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli"},
     "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Andre Russell"},
     # A player just traded in isn't a retention call, so a side's big name is one it already had (Pant, Kuldeep moved).
-    "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel"},  # captain
-    "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Nicholas Pooran"},
+    "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel",  # captain
+           "note": "Delhi say they've made their last trade: Axar Patel and Ashutosh Sharma stay (India Today, 10 Nov)."},
+    "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Nicholas Pooran", "hook": "big"},
     "SRH": {"name": "Sunrisers Hyderabad", "short": "Hyderabad", "tag": "#SRH", "big": "Pat Cummins"},
     "RR": {"name": "Rajasthan Royals", "short": "Rajasthan", "tag": "#RR", "big": "Yashasvi Jaiswal"},
     "PBKS": {"name": "Punjab Kings", "short": "Punjab", "tag": "#PBKS", "big": "Shreyas Iyer"},
@@ -48,7 +49,9 @@ TEAMS = {
 TRADES = [("Rishabh Pant", "LSG", "DC", 15.0), ("Kuldeep Yadav", "DC", "LSG", 13.5),
           ("T Natarajan", "DC", "SRH", 5.0), ("Zeeshan Ansari", "SRH", "DC", 0.4),
           ("Liam Livingstone", "SRH", "CSK", 6.0), ("Jack Edwards", "SRH", "CSK", 3.0),
-          ("Khaleel Ahmed", "CSK", "SRH", 4.8), ("Nathan Ellis", "CSK", "SRH", 2.0)]
+          ("Khaleel Ahmed", "CSK", "SRH", 4.8), ("Nathan Ellis", "CSK", "SRH", 2.0),
+          # Reported 7 Nov 2026 at their 2026 retention prices (fees not reported).
+          ("Hardik Pandya", "MI", "PBKS", 16.35), ("Arshdeep Singh", "PBKS", "MI", 18.0)]
 
 
 # The day's trade news, led with in the copy: (team, the date it was announced, source).
@@ -59,6 +62,9 @@ DEALS = [
      "players": ["Liam Livingstone", "Jack Edwards", "Khaleel Ahmed", "Nathan Ellis"]},
     {"sides": ("DC", "SRH"), "when": None, "source": "IPL trade tracker", "players": ["T Natarajan", "Zeeshan Ansari"]},
     {"sides": ("LSG", "DC"), "when": None, "source": "IPL trade tracker", "players": ["Rishabh Pant", "Kuldeep Yadav"]},
+    # Reported complete by an IPL source (Business Today, Deccan Herald, 7 Nov 2026); not yet announced by either side.
+    {"sides": ("PBKS", "MI"), "when": "7 Nov", "source": "agreed and reported, awaiting BCCI ratification",
+     "players": ["Hardik Pandya", "Arshdeep Singh"], "lead": "PBKS"},
 ]
 
 
@@ -159,7 +165,19 @@ def resolve(db, name):
         return all(max(SequenceMatcher(None, w, x).ratio() for x in long_) >= 0.75 for w in short_)
 
     fits = sorted(k for k in known if same(name, k))
-    return fits[0] if len(fits) == 1 else name
+    if len(fits) == 1:
+        return fits[0]
+    if not fits:
+        # No alias reaches him: try everyone sharing his first name or surname, same rule, one match only ("Digvesh
+        # Singh Rathi" -> "Digvesh Rathi", 8 Nov 2026: he was listed as yet to play since 2025).
+        # Words in any order and any spacing ("Ravichandran Smaran", "Raj<nbsp>Bawa", "Rasikh Dar" for "Rasikh Dar Salam").
+        w = name.split()
+        pool = db.execute(text("SELECT display_name FROM player_identity WHERE display_name ILIKE :a OR display_name ILIKE :b"),
+                          {"a": f"%{w[0]}%", "b": f"%{w[-1]}%"}).scalars().all()
+        fits = sorted({k for k in pool if same(name, k)})
+        if len(fits) == 1:
+            return fits[0]
+    return name
 
 
 def squad(code, db=None):
@@ -216,7 +234,7 @@ def build(db, code):
         spot = max(spots, key=lambda kv: kv[1])[0] if spots else None
         kinds = {k[1]: v for k, v in kind.items() if k[0] == n}
         spin = kinds.get("spin bowler", 0) > kinds.get("pace bowler", 0)
-        if bb < 10 and wb < 12:
+        if bb < 10 and wb < 12:  # the cover's note says "barely played (under 10 balls)": RR's Pretorius faced 8
             group = "Yet to play since 2025"
         elif bb >= MIN_BAT and wb >= MIN_BOWL:
             group = "All-rounders"
@@ -272,6 +290,11 @@ def build(db, code):
             for n in d_out:
                 trade["lines"].append(since(n, o_bat.get(n), o_bowl.get(n)))
                 trade["brief"].append(since(called(n), o_bat.get(n), o_bowl.get(n), one=True))
+            # A deal that is the team's story (DEALS "lead"): the hook leads with who went and who came.
+            if d.get("lead") == code and d_in and d_out and by_name.get(d_in[0]):
+                o = d_out[0]
+                trade["lead"] = {"out": o, "out_wpa": ((o_bat.get(o) or {}).get("wpa") or 0) + ((o_bowl.get(o) or {}).get("wpa") or 0),
+                                 "in": d_in[0], "in_wpa": by_name[d_in[0]]["wpa"]}
 
     # 1. Cover: the squad board.
     order = ["Openers", "Middle order", "Finishers", "All-rounders", "Pace", "Spin"]
@@ -283,20 +306,26 @@ def build(db, code):
     board_title = f"{T['short']}'s squad by wins added since the mega auction: {top['name']} leads ({sg(top['wpa'])})"
     if len(board_title) > 80:
         board_title = f"{T['short']}'s squad by wins added since the mega auction: {called(top['name'])} leads ({sg(top['wpa'])})"
+    if len(board_title) > 80:  # RR, 9 Nov 2026: "Sooryavanshi" is 2 too many
+        board_title = f"{T['short']}'s squad by wins added since 2025: {called(top['name'])} leads ({sg(top['wpa'])})"
     lead = card("board", "squad_board", board_title,
                 # Ink on the strongest chips: dark on a light colour (GT gold, CSK yellow), white on a deep one (MI blue).
                 {"colour": colour, "ink": BG if contrast(colour, BG) >= contrast(colour, "#ffffff") else "#ffffff",
                  "format": "signed2", "groups": groups,
                  "note": " · ".join(x for x in [
                      f"Traded in: {', '.join(short(p['name']) for p in ins)}" if ins else "",
-                     f"Yet to play since 2025: {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:3])}{'…' if len(unplayed) > 3 else ''})" if unplayed else "",
+                     f"Barely played since 2025 (under 10 balls): {len(unplayed)} ({', '.join(short(p['name']) for p in unplayed[:3])}{'…' if len(unplayed) > 3 else ''})" if unplayed else "",
                  ] if x) or None},
                 f"Wins added (T20 Primer), batting and bowling · IPL 2025-26, any side · {len(played)} of {len(players)} played")
 
     # 2. Who carried them.
     carried = sorted(played, key=lambda p: -p["wpa"])[:8]
+    pair = f"{short(carried[0]['name'])} {sg(carried[0]['wpa'])}, {short(carried[1]['name'])} {sg(carried[1]['wpa'])}"
+    # Two lines at most on the slide (RR, 9 Nov 2026: "V Sooryavanshi" ran it to three).
+    carried_title = (f"Most wins added in this squad since 2025: {pair}" if len(pair) <= 30
+                     else f"Most wins added since 2025: {pair}")
     c2 = card("carried", "metric_bars",
-              f"Most wins added in this squad since 2025: {short(carried[0]['name'])} {sg(carried[0]['wpa'])}, {short(carried[1]['name'])} {sg(carried[1]['wpa'])}",
+              carried_title,
               {"metric": {"label": "Wins added since the 2025 auction", "format": "signed2", "signed": True}, "label_width": 150,
                "rows": [{"name": p["name"], "value": round(p["wpa"], 2), "highlight": i == 0,
                          "detail": " · ".join(x for x in [f"bat RAA {sg(p['bat_raa'], 0)}" if p["bat_balls"] >= MIN_BAT else "",
@@ -348,10 +377,13 @@ def build(db, code):
     under = max([p for p in pool if p["wpa"] < 0] or pool, key=lambda p: p["price"])
     # The bargain: the most wins added for ₹1 crore or less; when nobody that cheap added any (GT, Nov 2026: Kushagra at
     # −0.07), the best for ₹4 crore or less, so "the bargain" is never a player the numbers argue against.
+    # A bargain also needs a real sample and a real number (LSG, 8 Nov 2026: Akash Singh's +0.32 came from 109 balls,
+    # Digvesh Rathi's +0.02 from 546): 300+ balls and +0.10 wins, else the ₹4 crore fallback.
     rest = [p for p in pool if p is not under]
-    bargain = max([p for p in rest if p["price"] <= 1.0] or rest, key=lambda p: p["wpa"])
-    if bargain["wpa"] <= 0:
-        bargain = max([p for p in rest if p["price"] <= 4.0] or rest, key=lambda p: p["wpa"])
+    real = [p for p in rest if (p["bat_balls"] or 0) + (p["bowl_balls"] or 0) >= 300] or rest
+    bargain = max([p for p in real if p["price"] <= 1.0] or real, key=lambda p: p["wpa"])
+    if bargain["wpa"] < 0.1:
+        bargain = max([p for p in real if p["price"] <= 4.0] or real, key=lambda p: p["wpa"])
     trio = [big, under, bargain]
     c5 = card("value", "scatter_plus",
               f"{short(under['name'])} cost {crore(under['price'])} for {sg(under['wpa'])} wins. {short(bargain['name'])}: {crore(bargain['price'])}, {sg(bargain['wpa'])}",
@@ -382,7 +414,9 @@ def build(db, code):
             (bits_for if (p["bat_raa"] or 0) > 0 else bits_against).append(f"{sg(p['bat_raa'], 0)} runs above par off {p['bat_balls']} balls")
         if p["bowl_balls"] >= MIN_BOWL:
             (bits_for if (p["bowl_raa"] or 0) > 0 else bits_against).append(f"{sg(p['bowl_raa'], 0)} runs saved, {p['wkts']} wickets")
-        (bits_for if p["wpa"] > 0 else bits_against).append(f"{sg(p['wpa'])} wins added")
+        balls = (p["bat_balls"] or 0) + (p["bowl_balls"] or 0)
+        small = f" off {balls} balls (a small sample)" if balls < 300 else ""
+        (bits_for if p["wpa"] > 0 else bits_against).append(f"{sg(p['wpa'])} wins added{small}")
         if p["price"] >= 8:
             bits_against.append(f"costs {crore(p['price'])}")
         elif p["price"] <= 1:
@@ -443,16 +477,25 @@ def gap_text(r):
 def copy(b):
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
-    hook = (f"{u['name']}: {crore(u['price'])}, {sg(u['wpa'])} wins since the mega auction. "
+    # The hook's player: the big price, or the big name where the big price's number rests on a small sample
+    # (TEAMS "hook": "big"; LSG, 8 Nov 2026: Mayank Yadav's −0.60 came from 144 balls).
+    h = big if T.get("hook") == "big" else u
+    hook = (f"{h['name']}: {crore(h['price'])}, {sg(h['wpa'])} wins since the mega auction. "
             f"{g['name']}: {crore(g['price'])}, {sg(g['wpa'])}.")
+    lead = (b.get("trade") or {}).get("lead")
+    if lead:
+        did = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
+        hook = (f"{lead['out']} {did} wins for {T['short']} since the mega auction. "
+                f"{lead['in']}, coming in: {sg(lead['in_wpa'])}.")
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
     tr = b.get("trade")
     def deal_text(d):
         when = f", {d['when']}" if d["when"] else ""
-        return (f"{T['short']} traded {' and '.join(d['outs'])} to {TEAMS[d['other']]['short']} for {' and '.join(d['ins'])} "
+        verb = "agreed to trade" if "awaiting" in d["source"] else "traded"
+        return (f"{T['short']} {verb} {' and '.join(d['outs'])} to {TEAMS[d['other']]['short']} for {' and '.join(d['ins'])} "
                 f"({d['source']}{when})")
     news = (["News first: " + "; ".join(deal_text(d) for d in tr["deals"]) + ". In the IPL since 2025: "
-             + "; ".join(tr["lines"]) + "."] if tr else [])
+             + "; ".join(tr["lines"]) + "."] if tr else []) + ([T["note"]] if T.get("note") else [])
     caption = "\n\n".join(news + [
         f"{b['team']} have until 17 November to name who they keep for IPL 2027. Here's the case, player by player, from "
         f"every IPL ball since the 2025 mega auction.",
@@ -472,21 +515,34 @@ def copy(b):
     return hook, caption
 
 
+def team_link(team):
+    from urllib.parse import quote
+
+    return f"https://hindsightcricket.com/team?team={quote(team)}"
+
+
 def thread(b, link):
     """One tweet per carousel slide, in slide order, each written about its own image (the tweets reuse the
     Instagram slides: 1 cover, 2 wins added, 3 batting, 4 bowling, 5 value, 6 three calls, 7 template, 8 end)."""
     T = TEAMS[b["code"]]
     u, g, big, top = b["under"], b["bargain"], b["big"], b["top"]
     bb, wb, bc = b["best_b"], b["worst_b"], b["best_c"]
+    h = big if T.get("hook") == "big" else u
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
     wins = f"Most wins added in this squad since 2025: {top['name']}, {sg(top['wpa'])}. {b['below']} of {len(b['played'])} added none or less."
     tr = b.get("trade")
     if tr:
         full, head = trade_tweet(tr), trade_tweet(tr).split(" Since 2025:")[0]
         wins = next((f"{t}\n\n{wins}" for t in (full, head) if len(f"{t}\n\n{wins}") <= 230), wins)
+    lead = (tr or {}).get("lead")
+    opener = (f"{T['short']} have until 17 November to name who they keep for IPL 2027. {h['name']} cost {crore(h['price'])} "
+              f"and added {sg(h['wpa'])} wins since the mega auction. The case, player by player 🧵")
+    if lead:
+        did = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
+        opener = (f"{T['short']} have agreed to trade {lead['out']} for {lead['in']} (awaiting BCCI ratification). Since the mega auction, {called(lead['out'])} {did} "
+                  f"wins for them; {called(lead['in'])}: {sg(lead['in_wpa'])}. The retention case, player by player 🧵")
     texts = [
-        (1, f"{T['short']} have until 17 November to name who they keep for IPL 2027. {u['name']} cost {crore(u['price'])} "
-            f"and added {sg(u['wpa'])} wins since the mega auction. The case, player by player 🧵"),
+        (1, opener),
         (2, wins),
         (3, f"Batting by role, in runs above par per 100 balls: {bb['name']} the best at {sg(bb['bat_raa100'], 0)}, "
             f"{wb['name']} the furthest below at {sg(wb['bat_raa100'], 0)}."),
@@ -503,7 +559,10 @@ def thread(b, link):
     from services.ig_x import hand_thread
 
     return hand_thread(texts, copy(b)[1], list(dict.fromkeys([u["name"], g["name"], big["name"], top["name"], bb["name"],
-                                                              wb["name"]] + ([bc[0]] if bc else []))))
+                                                              wb["name"]] + ([bc[0]] if bc else [])
+                                                             # The traded players too, so "Arshdeep Singh" is tagged as
+                                                             # himself, not read as another Singh (PBKS, 10 Nov 2026).
+                                                             + [n for d in (tr or {}).get("deals", []) for n in d["ins"] + d["outs"]])))
 
 
 def trade_tweet(tr):
@@ -525,12 +584,17 @@ def reel_script(b):
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
     say = lambda p: crore(p["price"]).replace("₹", "")  # noqa: E731
-    return {"hook": f"{u['name']} cost {T['short']} {say(u)}. Since the mega auction, he {spoken(u['wpa'])}.",
+    h = big if T.get("hook") == "big" else u
+    lead = (b.get("trade") or {}).get("lead")
+    hook = (f"{lead['out']} {spoken(lead['out_wpa'])} for {T['short']} since the mega auction. {lead['in']}, who replaces him, "
+            f"{spoken(lead['in_wpa'])}." if lead else f"{h['name']} cost {T['short']} {say(h)}. Since the mega auction, he {spoken(h['wpa'])}.")
+    return {"hook": hook,
             "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
                       else "Here's the whole squad, by wins added since 2025.",
                       f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
-                      f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
-                      f"{big['name']}, the big name, {spoken(big['wpa'])}.",
+                      (f"And he cost just {say(g)}." if g is b["top"] else f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}."),
+                      (f"{u['name']}, the big price, {spoken(u['wpa'])}, from a small sample." if h is big
+                       else f"{big['name']}, the big name, {spoken(big['wpa'])}."),
                       (f"Against playoff sides, the biggest gap: {SAY[b['gaps'][0]['key']]}."
                        if b["gaps"] else "Against playoff sides, every role is at their level.")]}
 
@@ -567,7 +631,7 @@ def main() -> int:
     problems, hp = findings(slides, "spotlight"), hook_problem(hook)
     print("lint:", problems or "clean", "| hook:", hp or "ok")
     print(caption)
-    th = thread(b, "hindsightcricket.com")
+    th = thread(b, team_link(b["team"]))
     for t in th:
         print(f"--- tweet {t['n']} ({len(t['text'])})\n{t['text']}")
     tp = thread_problems(th, [b["under"]["name"], b["bargain"]["name"], b["big"]["name"]])
@@ -605,7 +669,8 @@ def main() -> int:
     n = len(slides)
     fact = {"kind": "spotlight", "title": hook, "hook": hook, "subject": b["under"]["name"], "subject_role": "batter",
             "carousel_id": carousel["id"], "slides": n, "render": True, "post_time": "8 pm"}
-    fact["x"] = thread(b, post_link(fact))
+    # The last tweet links to the team's page (it unfurls with the team preview card, api/og.mjs), not the post.
+    fact["x"] = thread(b, team_link(b["team"]))
     fact["youtube"] = youtube_copy(fact, caption, hook)
     ist = timezone(timedelta(hours=5, minutes=30))
     today = date.fromisoformat(args.date) if args.date else datetime.now(ist).date()
