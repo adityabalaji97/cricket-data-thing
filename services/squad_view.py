@@ -26,7 +26,7 @@ TEAMS = {
     "CSK": {"name": "Chennai Super Kings", "short": "Chennai", "tag": "#CSK", "big": "MS Dhoni"},
     "MI": {"name": "Mumbai Indians", "short": "Mumbai", "tag": "#MumbaiIndians", "big": "Rohit Sharma"},
     "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli"},
-    "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Andre Russell"},
+    "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Rinku Singh"},  # Russell retired (Nov 2026)
     # A player just traded in isn't a retention call, so a side's big name is one it already had (Pant, Kuldeep moved).
     "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel",  # captain
            "note": "Delhi say they've made their last trade: Axar Patel and Ashutosh Sharma stay (India Today, 10 Nov)."},
