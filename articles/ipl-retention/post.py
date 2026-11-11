@@ -36,7 +36,8 @@ TEAMS = {
     "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli"},
     "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Andre Russell"},
     # A player just traded in isn't a retention call, so a side's big name is one it already had (Pant, Kuldeep moved).
-    "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel"},  # captain
+    "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel",  # captain
+           "note": "Delhi say they've made their last trade: Axar Patel and Ashutosh Sharma stay (India Today, 10 Nov)."},
     "LSG": {"name": "Lucknow Super Giants", "short": "Lucknow", "tag": "#LSG", "big": "Nicholas Pooran", "hook": "big"},
     "SRH": {"name": "Sunrisers Hyderabad", "short": "Hyderabad", "tag": "#SRH", "big": "Pat Cummins"},
     "RR": {"name": "Rajasthan Royals", "short": "Rajasthan", "tag": "#RR", "big": "Yashasvi Jaiswal"},
@@ -494,7 +495,7 @@ def copy(b):
         return (f"{T['short']} {verb} {' and '.join(d['outs'])} to {TEAMS[d['other']]['short']} for {' and '.join(d['ins'])} "
                 f"({d['source']}{when})")
     news = (["News first: " + "; ".join(deal_text(d) for d in tr["deals"]) + ". In the IPL since 2025: "
-             + "; ".join(tr["lines"]) + "."] if tr else [])
+             + "; ".join(tr["lines"]) + "."] if tr else []) + ([T["note"]] if T.get("note") else [])
     caption = "\n\n".join(news + [
         f"{b['team']} have until 17 November to name who they keep for IPL 2027. Here's the case, player by player, from "
         f"every IPL ball since the 2025 mega auction.",
