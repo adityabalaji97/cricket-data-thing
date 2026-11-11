@@ -18,6 +18,32 @@ const surname = (n) => { const w = n.split(' '); return w.length > 1 && COMMON.h
 const dealLine = (d) => `${d.ins.map(surname).join(', ')} in, ${d.outs.map(surname).join(', ')} out`
   + (/awaiting/.test(d.source || '') ? ' · awaiting BCCI' : '');
 
+const FMT = { average: (v) => v.toFixed(1), strike_rate: (v) => v.toFixed(0), wickets_per_24: (v) => v.toFixed(2), economy: (v) => v.toFixed(2) };
+const UNIT = { average: 'avg', strike_rate: 'SR', wickets_per_24: 'wkts / 4 ov', economy: 'an over' };
+
+/** Who fits a gap: the best players for the role on the template's measure (small samples pulled to the league's),
+ * first those in no 2027 squad (the auction pool), then at other sides. */
+const FitCard = ({ team, fit }) => {
+  const f = FMT[fit.measure];
+  const row = (x) => (
+    <Box key={x.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'baseline', gap: 1, py: 0.5 }}>
+      <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</Box>
+        <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{`${x.balls} balls${x.side ? ` · at ${x.side}` : ''}`}</Box>
+      </Box>
+      <Box sx={{ fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{`${f(x.value)} ${UNIT[fit.measure]}`}</Box>
+    </Box>
+  );
+  if (!fit.free.length && !fit.elsewhere.length) return null;
+  return (
+    <ProfileCard id={`fit-${fit.key}`} title={`Who fits: ${fit.label.toLowerCase()}`} player={team}
+      note={`Theirs ${fit.squad_value != null ? f(fit.squad_value) : '–'} · playoff sides ${f(fit.playoff_level)} · IPL 2024-26`}>
+      {fit.free.length > 0 && <><Eyebrow>Not in a 2027 squad</Eyebrow>{fit.free.map(row)}</>}
+      {fit.elsewhere.length > 0 && <Box sx={{ mt: 1 }}><Eyebrow>At other sides</Eyebrow>{fit.elsewhere.map(row)}</Box>}
+    </ProfileCard>
+  );
+};
+
 const TeamSquad = ({ team }) => {
   const [data, setData] = useState(null);
   useEffect(() => {
@@ -51,6 +77,7 @@ const TeamSquad = ({ team }) => {
           </ProfileCard>
         );
       })}
+      {(data.fits || []).slice(0, 3).map((f) => <FitCard key={f.key} team={team} fit={f} />)}
     </Box>
   );
 };
