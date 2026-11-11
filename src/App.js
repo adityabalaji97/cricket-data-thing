@@ -833,6 +833,9 @@ const AppContent = () => {
             sx={{
               color: 'text.secondary',
               textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: 32,
               '&:hover': {
                 color: 'primary.main',
               },

@@ -99,7 +99,7 @@ const Pills = ({ label, items, value, onChange, light }) => (
       <Box key={key} component="button" role="tab" aria-selected={key === value} onClick={() => onChange(key)}
         sx={{
           all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em',
-          px: 1.5, py: '3px', borderRadius: '999px',
+          px: 1.5, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px',
           bgcolor: key === value ? (light ? colors.textHi : colors.accent) : 'transparent', color: key === value ? colors.bg : colors.textLo,
           '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
         }}>
@@ -153,7 +153,7 @@ export const SummaryRows = ({ rows, label = 'Summary' }) => (
 
 export const Eyebrow = ({ children, right }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-    <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>
+    <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>
       {children}
     </Box>
     {right}
@@ -189,7 +189,7 @@ export const ValueList = ({ rows, label }) => (
 export const PageFooter = ({ queryLink }) => (
   <>
     {queryLink && (
-      <Box component={Link} to={queryLink} sx={{ textAlign: 'center', color: colors.accent, fontSize: 14, textDecoration: 'none', pt: 1, whiteSpace: 'nowrap' }}>
+      <Box component={Link} to={queryLink} sx={{ textAlign: 'center', color: colors.accent, fontSize: 14, textDecoration: 'none', pt: 1, whiteSpace: 'nowrap', minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         Dig deeper in the query builder →
       </Box>
     )}

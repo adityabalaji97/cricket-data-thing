@@ -24,7 +24,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const Eyebrow = ({ children, right }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-    <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>
+    <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>
       {children}
     </Box>
     {right}
@@ -84,7 +84,7 @@ const PhaseCells = ({ block, role, fmt }) => {
     <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))`, gap: 1 }}>
       {cells.map((c) => (
         <Box key={c.n} sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '12px', px: 1.25, py: 1, display: 'flex', flexDirection: 'column' }}>
-          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo }}>{c.n}</Box>
+          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', color: colors.textLo, whiteSpace: 'nowrap' }}>{c.n === 'Middle overs' ? 'Middle' : c.n}</Box>
           <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 20, fontVariantNumeric: 'tabular-nums' }}>{c.v}</Box>
           {c.s.map((line) => (
             <Box key={line} component="span" sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap', lineHeight: 1.35 }}>{line}</Box>
@@ -105,7 +105,7 @@ const StripBlock = ({ role, block, keys, cue }) => {
       {/* Who the player is ranked against on the left, the qualifying floor on the right: one line on a phone. */}
       <Eyebrow right={(
         <Tooltip title="Peers: players who cleared each season's floor (40% of that season's regulars' median balls, at least 120) in two or more seasons" enterTouchDelay={0}>
-          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 9.5, color: colors.textFaint, whiteSpace: 'nowrap' }}>
+          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, color: colors.textFaint, whiteSpace: 'nowrap' }}>
             {(p.floor_label || `${p.min_balls}+ balls`).replace(' balls in ', ' balls · ')}
           </Box>
         </Tooltip>
@@ -190,23 +190,20 @@ const VerdictScreen = ({ player, win, onWindow, onFilters, onSummary }) => {
           <Box key={f} component="button" role="tab" aria-selected={f === fmt} onClick={() => setFmt(f)}
             sx={{
               all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em',
-              px: 1.5, py: '3px', borderRadius: '999px',
+              px: 1.5, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px',
               bgcolor: f === fmt ? colors.accent : 'transparent', color: f === fmt ? colors.bg : colors.textLo,
               '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
             }}>
             {f}
           </Box>
         ))}
-        <Tooltip title="Tests are coming: the data isn't loaded yet" enterTouchDelay={0}>
-          <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: 600, fontSize: 13, px: 1.5, py: '3px', color: colors.textGhost }}>Test</Box>
-        </Tooltip>
       </Box>
       <Box role="tablist" aria-label="Period" sx={{ display: 'inline-flex', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
         {PERIOD_TABS.map(([key, name]) => (
           <Box key={key} component="button" role="tab" aria-selected={key === period} onClick={() => setPeriod(key)}
             sx={{
               all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13, letterSpacing: '0.04em',
-              px: 1.5, py: '3px', borderRadius: '999px',
+              px: 1.5, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px',
               bgcolor: key === period ? colors.textHi : 'transparent', color: key === period ? colors.bg : colors.textLo,
               '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
             }}>
@@ -306,9 +303,9 @@ const VerdictScreen = ({ player, win, onWindow, onFilters, onSummary }) => {
           keys={s.allrounder && i > 0 ? roles[role].peers.metrics.filter((m) => m.key !== 'wpa').map((m) => m.key) : null} />
       ))}
 
-      {/* Every role shown gets its phases: an all-rounder's batting by phase is nowhere else on the page (Livingstone,
-          3 Nov 2026), the role cards carry phases for bowling only. */}
-      {shown.map((role) => (
+      {/* Batting by phase: nowhere else on the page (Livingstone, 3 Nov 2026). Bowling's phases are the role cards' "By
+          phase" (economy, dots and false shots), so they aren't repeated here (Hardik's first screen, 13 Nov audit). */}
+      {shown.filter((role) => role !== 'bowl').map((role) => (
         <Box key={`ph-${role}`} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Eyebrow>{role === 'bowl' ? 'Economy' : 'Strike rate'} by phase</Eyebrow>
           <PhaseCells block={roles[role]} role={role} fmt={fmt} />

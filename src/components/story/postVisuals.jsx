@@ -192,7 +192,7 @@ const ScatterPlus = ({ payload }) => {
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${Y.label} against ${X.label}`} sx={{ width: '100%' }}>
-        <text x={L} y={10} style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{`↑ ${Y.label}${Y.higher_better === false ? ' (lower is better)' : ''}`}</text>
+        <text x={L} y={10} style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{`↑ ${Y.label}${Y.higher_better === false ? ' · lower at the top' : ''}`}</text>
         {subject && payload.box && (
           <rect x={boxX[0]} y={boxY[0]} width={boxX[1] - boxX[0]} height={boxY[1] - boxY[0]} fill={colors.accent} fillOpacity="0.07" />
         )}
@@ -231,7 +231,7 @@ const ScatterPlus = ({ payload }) => {
         <text x={L} y={H - 16} style={{ ...mono, fill: colors.textFaint }}>{fmt(fx ? x1 : x0, X.format)}</text>
         <text x={W - R} y={H - 16} textAnchor="end" style={{ ...mono, fill: colors.textFaint }}>{fmt(fx ? x0 : x1, X.format)}</text>
         <text x={(L + W - R) / 2} y={H - 2} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: colors.textLo }}>
-          {`${X.label}${fx ? ' (lower is better)' : ''} →`}
+          {`${X.label}${fx ? ' · lower to the right' : ''} →`}
         </text>
       </Box>
       {keyed.length > 0 && (
@@ -1560,6 +1560,10 @@ const ZonePair = ({ payload }) => {
   );
 };
 
+// On the site (the team page passes payload.page), text under 11px is lifted to 11: these boards are drawn for
+// 1080px post images, where 9px reads fine, and also shown at phone width on the page (13 Nov 2026 audit).
+const pfs = (payload, n) => (payload && payload.page ? Math.max(11, n) : n);
+
 /**
  * A squad as a board (the IPL retention series): players under their roles, each chip shaded by a value (wins added),
  * from the team's colour at the best to grey at or below zero, the value written on the chip.
@@ -1573,8 +1577,8 @@ const SquadBoard = ({ payload }) => {
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.6, justifyContent: 'center' }}>
       {payload.groups.filter((g) => g.players.length).map((g) => (
-        <Box key={g.label} sx={{ display: 'grid', gridTemplateColumns: '62px minmax(0, 1fr)', columnGap: 0.75, alignItems: 'start' }}>
-          <Typography sx={{ ...mono, fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo, pt: '4px', lineHeight: 1.2 }}>{g.label}</Typography>
+        <Box key={g.label} sx={{ display: 'grid', gridTemplateColumns: payload.page ? '1fr' : '62px minmax(0, 1fr)', columnGap: 0.75, rowGap: payload.page ? 0.4 : 0, alignItems: 'start' }}>
+          <Typography sx={{ ...mono, fontSize: pfs(payload, 9), letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo, pt: '4px', lineHeight: 1.2 }}>{g.label}</Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {g.players.map((p) => {
               const t = shade(p.value);
@@ -1584,7 +1588,7 @@ const SquadBoard = ({ payload }) => {
                   border: `1px solid ${t > 0 ? payload.colour : colors.borderStrong}`,
                   bgcolor: t > 0 ? `${payload.colour}${Math.round(40 + t * 175).toString(16).padStart(2, '0')}` : 'transparent' }}>
                   <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: ink || colors.textHi, whiteSpace: 'nowrap' }}>{p.name}</Typography>
-                  <Typography component="span" sx={{ ...mono, fontSize: 10, color: ink || (p.value > 0 ? colors.textHi : colors.textLo) }}>
+                  <Typography component="span" sx={{ ...mono, fontSize: pfs(payload, 10), color: ink || (p.value > 0 ? colors.textHi : colors.textLo) }}>
                     {p.value == null ? '' : fmt(p.value, payload.format || 'signed2')}
                   </Typography>
                 </Box>
@@ -1651,16 +1655,32 @@ const CaseBoard = ({ payload }) => (
     {payload.cases.map((c) => (
       <Box key={c.name} sx={{ border: `1px solid ${colors.borderStrong}`, borderLeft: `4px solid ${payload.colour}`, borderRadius: '10px', px: 1.25, py: 0.9 }}>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-          <Typography sx={{ ...mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{c.tag}</Typography>
+          <Typography sx={{ ...mono, fontSize: pfs(payload, 10), letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{c.tag}</Typography>
           <Typography sx={{ ...mono, fontSize: 11.5, color: colors.textMed, ml: 'auto' }}>{c.price}</Typography>
         </Box>
         <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2 }}>{c.name}</Typography>
-        <Typography sx={{ fontSize: 12.5, color: colors.textHi, mt: 0.3 }}>
-          <Box component="span" sx={{ color: colors.accent, fontWeight: 700 }}>For </Box>{c.for}
-        </Typography>
-        <Typography sx={{ fontSize: 12.5, color: colors.textHi }}>
-          <Box component="span" sx={{ color: colors.red, fontWeight: 700 }}>Against </Box>{c.against}
-        </Typography>
+        {payload.page ? (
+          // On the page: one fact a line under a label column, not a sentence wrapping at 390px (13 Nov 2026 audit).
+          [['For', c.for, colors.accent], ['Against', c.against, colors.red]].map(([l, text, col]) => (
+            <Box key={l} sx={{ mt: l === 'For' ? 0.5 : 0.35 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: col, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{l}</Typography>
+              <Box>
+                {String(text).replace(' (a small sample)', ', small sample').split('; ').map((t) => (
+                  <Typography key={t} sx={{ fontSize: 12.5, color: colors.textHi, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t}</Typography>
+                ))}
+              </Box>
+            </Box>
+          ))
+        ) : (
+          <>
+            <Typography sx={{ fontSize: 12.5, color: colors.textHi, mt: 0.3 }}>
+              <Box component="span" sx={{ color: colors.accent, fontWeight: 700 }}>For </Box>{c.for}
+            </Typography>
+            <Typography sx={{ fontSize: 12.5, color: colors.textHi }}>
+              <Box component="span" sx={{ color: colors.red, fontWeight: 700 }}>Against </Box>{c.against}
+            </Typography>
+          </>
+        )}
       </Box>
     ))}
   </Box>
@@ -1680,10 +1700,11 @@ const TemplateBoard = ({ payload }) => {
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.55 }}>
       {payload.rows.map((r) => (
         <Box key={r.label}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, lineHeight: 1.15 }}>
+          {/* On the page the value takes its own line: at 11px, label + status + value don't fit 390px (13 Nov 2026 audit). */}
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, lineHeight: 1.15, flexWrap: payload.page ? 'wrap' : 'nowrap' }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.label}</Typography>
-            <Typography sx={{ ...mono, fontSize: 9.5, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.status}</Typography>
-            <Typography sx={{ ...mono, fontSize: 10, color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.value_text}</Typography>
+            <Typography sx={{ ...mono, fontSize: pfs(payload, 9.5), color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: pfs(payload, 10), color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.value_text}</Typography>
           </Box>
           <Box sx={{ position: 'relative', height: 11, mt: '2px' }}>
             <Box sx={{ position: 'absolute', left: 0, right: 0, top: 4.5, height: 2, borderRadius: 1, bgcolor: colors.borderStrong }} />
@@ -1691,10 +1712,10 @@ const TemplateBoard = ({ payload }) => {
             <Box sx={{ position: 'absolute', left: `${Math.max(1.5, Math.min(98.5, r.place))}%`, top: 0.5, width: 10, height: 10, ml: '-5px', borderRadius: '50%',
               bgcolor: statusColour(r.status), border: `1.5px solid ${colors.bg}` }} />
           </Box>
-          {r.holders && <Typography sx={{ fontSize: 10, color: colors.textLo, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.holders}</Typography>}
+          {r.holders && <Typography sx={{ fontSize: pfs(payload, 10), color: colors.textLo, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.holders}</Typography>}
         </Box>
       ))}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', ...mono, fontSize: 9, color: colors.textFaint }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', ...mono, fontSize: pfs(payload, 9), color: colors.textFaint }}>
         <span>{payload.scale_label || 'Place among IPL sides since 2023'}</span><span>│ playoff sides</span>
       </Box>
     </Box>

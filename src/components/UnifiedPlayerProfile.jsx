@@ -68,7 +68,7 @@ const RoleSwitch = ({ order, value, onChange }) => (
     {order.map((r) => (
       <Box key={r} component="button" type="button" role="tab" aria-selected={r === value} onClick={() => onChange(r)}
         sx={{
-          all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 700, fontSize: 14, px: 1.75, py: '4px', borderRadius: '999px',
+          all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 700, fontSize: 14, px: 1.75, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px',
           bgcolor: r === value ? colors.accent : 'transparent', color: r === value ? colors.bg : colors.textMed,
           '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
         }}>
@@ -163,7 +163,7 @@ const UnifiedPlayerProfile = () => {
           <Box sx={{ color: colors.textLo, fontSize: 13.5 }}>The detailed cards couldn't load just now. Try again shortly.</Box>
         )}
 
-        <Box component={Link} to={qb} sx={{ textAlign: 'center', color: colors.accent, fontSize: 14, textDecoration: 'none', pt: 1, whiteSpace: 'nowrap' }}>
+        <Box component={Link} to={qb} sx={{ textAlign: 'center', color: colors.accent, fontSize: 14, textDecoration: 'none', pt: 1, whiteSpace: 'nowrap', minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           Dig deeper in the query builder →
         </Box>
         <Box sx={{ borderTop: `1px solid ${colors.border}`, pt: 1.5, textAlign: 'center', fontSize: 11.5, color: colors.textLo, lineHeight: 1.6 }}>

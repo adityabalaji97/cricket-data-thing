@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../config';
 import { rememberEntity } from '../../utils/recentEntities';
 import { colors, fonts } from '../../theme/hindsightDark';
+import { getTeamAbbr } from '../../utils/teamAbbreviations';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import ProfileFilters from '../playerProfile/cards/ProfileFilters';
 import TeamSquad from './TeamSquad';
@@ -53,7 +54,7 @@ const LastGames = ({ games }) => (
             sx={{ border: `1px solid ${g.result ? tone : colors.borderStrong}`, borderRadius: '8px', textAlign: 'center', py: 0.5, minWidth: 0,
               textDecoration: 'none', color: 'inherit', '&:hover, &:focus-visible': { bgcolor: colors.surface2, outline: 'none' } }}>
             <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 16, color: tone }}>{g.result === 'won' ? 'W' : g.result === 'lost' ? 'L' : '–'}</Box>
-            <Box sx={{ fontFamily: fonts.mono, fontSize: 10, color: colors.textLo, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.opp_short}</Box>
+            <Box sx={{ fontFamily: fonts.mono, fontSize: 11, color: colors.textLo, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.opp_short}</Box>
           </Box>
         );
       })}
@@ -78,11 +79,11 @@ const RatingCard = ({ team, rating }) => {
         {ticks.map((v) => (
           <g key={v}>
             <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={colors.border} />
-            <text x={L - 5} y={sy(v) + 3} textAnchor="end" style={{ fontFamily: fonts.mono, fontSize: 10, fill: colors.textLo }}>{v}</text>
+            <text x={L - 5} y={sy(v) + 3} textAnchor="end" style={{ fontFamily: fonts.mono, fontSize: 11, fill: colors.textLo }}>{v}</text>
           </g>
         ))}
         {years.map(({ y, i }) => (
-          <text key={y} x={sx(i)} y={H - 6} style={{ fontFamily: fonts.mono, fontSize: 10, fill: colors.textLo }}>{y}</text>
+          <text key={y} x={sx(i)} y={H - 6} style={{ fontFamily: fonts.mono, fontSize: 11, fill: colors.textLo }}>{y}</text>
         ))}
         <path d={path} fill="none" stroke={colors.accent} strokeWidth="2" />
         <circle cx={sx(pts.length - 1)} cy={sy(end.elo)} r="4" fill={colors.accent} />
@@ -106,7 +107,7 @@ const PhaseCard = ({ team, phases }) => {
   return (
     <ProfileCard id="phases" title="By phase" player={team}
       note={rows[0]?.measure === 'strike_rate' ? 'Batting: strike rate · bowling: runs an over' : 'Batting: runs v par per 100 balls · bowling: runs an over'}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', fontFamily: fonts.mono, fontSize: 10.5, color: colors.textLo }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', fontFamily: fonts.mono, fontSize: 11, color: colors.textLo }}>
         <span>← worst</span><span>best →</span>
       </Box>
       {rows.map((r) => {
@@ -157,7 +158,7 @@ const OversCard = ({ team, grid }) => {
     <ProfileCard id="bowling-overs" title="Who bowls when" player={team} note="Share of each over's balls · brighter is more">
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Who bowls which over" sx={{ width: '100%', display: 'block' }}>
         {marks.map((o) => (
-          <text key={o} x={L + (o - 0.5) * cw} y={10} textAnchor="middle" style={{ fontFamily: fonts.mono, fontSize: 9.5, fill: colors.textLo }}>{o}</text>
+          <text key={o} x={L + (o - 0.5) * cw} y={10} textAnchor="middle" style={{ fontFamily: fonts.mono, fontSize: 11, fill: colors.textLo }}>{o}</text>
         ))}
         {bowlers.map((b, j) => (
           <g key={b.name}>
@@ -225,7 +226,7 @@ const AgainstCard = ({ team, against }) => {
       {rows.map((r) => (
         <Box key={r.team} sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 96px 40px', columnGap: 1, alignItems: 'center', py: 0.6,
           borderBottom: `1px solid ${colors.border}`, whiteSpace: 'nowrap' }}>
-          <Box sx={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.team}</Box>
+          <Box sx={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.team.length > 22 ? (getTeamAbbr(r.team) || r.team) : r.team}</Box>
           <Box sx={{ display: 'flex', gap: '2px' }}>
             <Box sx={{ height: 10, width: `${(96 * r.won) / most}px`, bgcolor: colors.accent, borderRadius: '3px' }} />
             <Box sx={{ height: 10, width: `${(96 * r.lost) / most}px`, bgcolor: colors.red, borderRadius: '3px' }} />

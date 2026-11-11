@@ -8,7 +8,7 @@ import { colors, fonts } from '../../../theme/hindsightDark';
 
 const Seg = ({ label, options, value, onChange, light }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-    <Box sx={{ fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>{label}</Box>
+    <Box sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>{label}</Box>
     <Box role="radiogroup" aria-label={label} sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
       {options.map(([key, name]) => (
         <Box key={key} component="button" type="button" role="radio" aria-checked={key === value} onClick={() => onChange(key)}
