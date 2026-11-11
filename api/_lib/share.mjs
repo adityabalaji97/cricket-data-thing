@@ -207,9 +207,42 @@ async function teamSummary(team) {
 
 // A built squad (/team-builder?team=&add=&drop=&pin=, XI_BUILDER_PLAN.md X7): scored by the server the way the page
 // scores it, so the preview and the page agree.
+// The XI tab of Fix my team (?tab=xi&xi=&sub=&force=, on top of the squad's add/drop): scored by api/_lib/xiEngine.mjs, a
+// checked copy of the app's scorer, from the same payload the page uses. With no XI in the link: the page's default.
+async function xiTabSummary(params) {
+  const team = params.get('team');
+  const data = await getJSON(`/xi-builder?team=${encodeURIComponent(team)}`, 8000);
+  if (!data || !data.squad) return null;
+  const { scoreXI, defaultXI } = await import('./xiEngine.mjs');
+  const dec = (s) => (s ? s.split('~').map(decodeURIComponent).filter(Boolean) : []);
+  const added = dec(params.get('add')); const dropped = dec(params.get('drop'));
+  const byName = Object.fromEntries([...data.squad, ...(data.pool || [])].map((p) => [p.name, p]));
+  const squad = [...data.squad.filter((p) => !dropped.includes(p.name)), ...added.map((n) => byName[n]).filter(Boolean)];
+  const players = Object.fromEntries(squad.map((p) => [p.name, p]));
+  const fromUrl = dec(params.get('xi')).filter((n) => players[n]);
+  const [forName, bats] = dec(params.get('sub'));
+  const force = Object.fromEntries(dec(params.get('force')).map((x) => x.split(':')).filter(([n]) => players[n]));
+  const xi = fromUrl.length === 12
+    ? { twelve: fromUrl, sub: forName ? { name: fromUrl[11], for: forName, bats: bats === 'bat' } : null, force }
+    : { ...defaultXI(squad, data.roles, data.bench), force };
+  const s = scoreXI(xi, players, data.roles, data.bench);
+  const name = data.team || team;
+  const poss = name.endsWith('s') ? `${name}'` : `${name}'s`;  // Mumbai Indians' XI, CSK's XI
+  const sub = xi.sub ? `Impact sub: ${xi.sub.name} for ${xi.sub.for}` : null;
+  return {
+    kind: 'xi_tab',
+    title: `${poss} XI: ${s.at_level} of ${s.of} roles at playoff level | ${SITE_NAME}`,
+    description: `${poss} XI as a reader picked it: ${s.order.slice(0, 4).join(', ')} and more. ${s.at_level} of ${s.of} roles at IPL playoff sides' level. Pick yours on Hindsight.`,
+    card: { team: name, poss, colour: teamColour(name), at: s.at_level, of: s.of, sub,
+      order: s.order.map((n) => ({ name: n, overseas: !!players[n]?.overseas })),
+      roles: s.roles.map((r) => ({ label: r.label, status: r.status })) },
+  };
+}
+
 async function builderSummary(params) {
   const team = params.get('team');
   if (!team) return null;
+  if (params.get('tab') === 'xi') return xiTabSummary(params);
   const q = new URLSearchParams({ team, add: params.get('add') || '', drop: params.get('drop') || '', pin: params.get('pin') || '' });
   const s = await getJSON(`/xi-builder/score?${q.toString()}`, 8000);
   if (!s) return null;
@@ -226,8 +259,6 @@ async function builderSummary(params) {
   };
 }
 
-// A finished Season Draft (/games/season-draft?d=&p=): the same deal and score as the game (api/_lib/draftEngine.mjs, a
-// checked copy of the app's), from the pinned data the API serves.
 // A locked-in 19-0 draft (/games/19-0?d=&p=&r=1; formerly /games/season-draft): the same deal and score as the game
 // (api/_lib/draftEngine.mjs, a checked copy of the app's), from the pinned data the API serves.
 const DRAFT_NAME = '19-0';  // the game's name, also GAME_NAME in SeasonDraftGame.jsx

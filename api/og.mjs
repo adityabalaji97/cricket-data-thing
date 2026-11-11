@@ -178,6 +178,34 @@ function xiCard(card) {
         h('div', { fontSize: 22, color: C.mid }, r.label)))));
 }
 
+// The XI tab: the team's XI in batting order (and the impact sub), its score, and each role's status in words as well
+// as colour (playoff level / short / gap), with the data credit.
+function xiTabCard(card) {
+  const accent = card.colour || C.lime;
+  const tone = { 'playoff level': C.lime, short: '#f0b429', gap: C.red };
+  const word = { 'playoff level': 'playoff level', short: 'short', gap: 'gap' };
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '36px 56px', fontFamily: 'Barlow', borderTop: `12px solid ${accent}` },
+    top('Fix my team · the XI'),
+    h('div', { marginTop: 16, gap: 36 },
+      h('div', { flexDirection: 'column', width: 470 },
+        h('div', { fontFamily: DISPLAY, fontSize: card.poss.length > 16 ? 44 : 54, fontWeight: 700, lineHeight: 1.05, color: accent }, `${card.poss} XI`),
+        h('div', { alignItems: 'baseline', gap: 12, marginTop: 12 },
+          h('div', { fontFamily: MONO, fontSize: 52, fontWeight: 500 }, `${card.at} of ${card.of}`),
+          h('div', { fontSize: 26, color: C.mid }, 'roles at playoff level')),
+        h('div', { flexDirection: 'column', gap: 8, marginTop: 18 },
+          card.roles.map((r) => h('div', { alignItems: 'center', gap: 10, fontSize: 21 },
+            h('div', { width: 11, height: 11, borderRadius: 6, background: tone[r.status] || C.low }),
+            h('div', { color: C.mid, width: 270 }, r.label),
+            h('div', { color: tone[r.status] || C.low, fontFamily: MONO, fontSize: 17 }, word[r.status] || r.status))))),
+      h('div', { flexDirection: 'column' },
+        card.order.map((p, i) => h('div', { alignItems: 'center', gap: 10, height: 30 },
+          h('div', { width: 28, fontFamily: MONO, fontSize: 17, color: C.low }, String(i + 1)),
+          h('div', { fontSize: 22, color: C.text }, p.name),
+          p.overseas ? PLANE : null)),
+        card.sub ? h('div', { fontSize: 18, color: C.low, marginTop: 6 }, card.sub) : null)),
+    h('div', { marginTop: 'auto', fontSize: 17, color: C.low }, 'hindsightcricket.com · Data: Himanish Ganjoo & TechRadar, Cricsheet'));
+}
+
 // A locked-in Season Draft: the score and the one-line result, the drafted XI (plane: overseas, WK: keeper), and the
 // 19 seasons as a strip (made / topped / missed). With no valid draft in the link: the game's own card.
 // The overseas mark, as in the app (Material's Flight, tilted): drawn, as the card's fonts have no plane.
@@ -258,6 +286,7 @@ export default async function handler(req, res) {
     : summary?.kind === 'player' ? playerCard(card)
     : summary?.kind === 'team' ? teamCard(card)
     : summary?.kind === 'xi' ? xiCard(card)
+    : summary?.kind === 'xi_tab' ? xiTabCard(card)
     : summary?.kind === 'draft' ? draftCard(card)
       : textCard(card);
 

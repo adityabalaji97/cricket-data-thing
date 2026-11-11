@@ -85,6 +85,15 @@ const XIBuilderPage = () => {
   const row = open && now.roles.find((r) => r.key === open);
   const inSquad = new Set(squad.map((p) => p.name));
   const changed = added.length + dropped.length + Object.keys(pins).length > 0;
+  // The XI tab shares the XI (its own card, api/og.mjs xiTabCard): shareable once there's an XI in the link (or the
+  // squad changed), and not with more than four overseas in the twelve.
+  const xiNames = dec(q.get('xi'));
+  const xiOverseas = xiNames.filter((n) => squad.find((p) => p.name === n)?.overseas).length;
+  const share = tab === 'xi'
+    ? { ok: lim?.can_save && xiOverseas <= 4 && (changed || xiNames.length === 12),
+      label: !lim?.can_save ? lim?.problems[0] : xiOverseas > 4 ? 'More than four overseas in the XI' : 'Share this XI',
+      title: `${data?.team}'s XI` }
+    : { ok: lim?.can_save && changed, label: lim?.can_save ? 'Share this squad' : lim?.problems[0], title: `${data?.team}, rebuilt` };
   const fmt = (r, v) => (v == null ? '–' : FMT[r.measure](v));
 
   const addPlayer = (name, instead) => {
@@ -193,16 +202,16 @@ const XIBuilderPage = () => {
             sx={{ all: 'unset', cursor: changed ? 'pointer' : 'default', flex: 1, textAlign: 'center', py: 1.1, borderRadius: '12px', border: `1px solid ${colors.borderStrong}`, color: changed ? colors.textHi : colors.textLo }}>
             Reset
           </Box>
-          <Box component="button" type="button" disabled={!lim.can_save || !changed}
+          <Box component="button" type="button" disabled={!share.ok}
             onClick={() => {
-              // The phone's share sheet where there is one; the link unfurls as this squad's card (api/og.mjs).
+              // The phone's share sheet where there is one; the link unfurls as this squad's or this XI's card (api/og.mjs).
               const url = window.location.href;
-              if (navigator.share) navigator.share({ title: `${data.team}, rebuilt`, url }).catch(() => {});
+              if (navigator.share) navigator.share({ title: share.title, url }).catch(() => {});
               else navigator.clipboard?.writeText(url);
             }}
-            sx={{ all: 'unset', cursor: lim.can_save && changed ? 'pointer' : 'default', flex: 2, textAlign: 'center', py: 1.1, borderRadius: '12px',
-              bgcolor: lim.can_save && changed ? colors.accent : colors.surface2, color: lim.can_save && changed ? colors.bg : colors.textLo, fontWeight: 600 }}>
-            {lim.can_save ? 'Share this squad' : lim.problems[0]}
+            sx={{ all: 'unset', cursor: share.ok ? 'pointer' : 'default', flex: 2, textAlign: 'center', py: 1.1, borderRadius: '12px',
+              bgcolor: share.ok ? colors.accent : colors.surface2, color: share.ok ? colors.bg : colors.textLo, fontWeight: 600 }}>
+            {share.label}
           </Box>
         </Box>
       </Box>
