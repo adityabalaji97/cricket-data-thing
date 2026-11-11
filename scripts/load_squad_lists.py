@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Load the IPL retained and released lists (17 Nov 2026) into squad_moves (migration 040; XI_BUILDER_PLAN.md X8).
+Load the IPL retained and released lists (17 Nov 2026) and the auction's buys (16 Dec 2026) into squad_moves
+(migration 040; XI_BUILDER_PLAN.md X8).
 
     python scripts/load_squad_lists.py lists.csv            # dry run: names matched, counts per team
     python scripts/load_squad_lists.py lists.csv --write    # replace the season's retained/released moves
 
-CSV columns: team (IPL code: CSK, MI, ...), player (as published), status (retained | released), price_crore
-(optional: the retention price), source (optional). Names are matched to ours (services/name_match.py); an unmatched
+CSV columns: team (IPL code: CSK, MI, ...), player (as published), status (retained | released | bought),
+price_crore (the retention price, or the auction price for a buy: required for a buy), source (optional). A file of
+buys replaces the season's buys; a file of retained / released replaces those. Names are matched to ours (services/name_match.py); an unmatched
 name stops a --write, so nobody is silently dropped. After a write the team pages pick it up (team_squad's key
 includes the latest move), and released players join the "who fits" auction pool.
 """
@@ -41,7 +43,8 @@ def main() -> int:
     for r in csv.DictReader(open(args.csv)):
         team, status = r["team"].strip().upper(), r["status"].strip().lower()
         assert team in TEAMS, f"unknown team {team!r}"
-        assert status in ("retained", "released"), f"status must be retained or released: {status!r}"
+        assert status in ("retained", "released", "bought"), f"status must be retained, released or bought: {status!r}"
+        assert status != "bought" or r.get("price_crore"), f"a buy needs its price: {r['player']}"
         name = match_display_name(db, r["player"])
         pid = db.execute(text("SELECT pid FROM player_identity WHERE display_name = :n"), {"n": name}).scalar() if name else None
         if not pid:
@@ -54,18 +57,20 @@ def main() -> int:
     for team in TEAMS:
         kept = sum(1 for x in rows if x["team"] == team and x["kind"] == "retained")
         gone = sum(1 for x in rows if x["team"] == team and x["kind"] == "released")
-        if kept or gone:
-            print(f"{team}: {kept} retained, {gone} released")
+        bought = [x for x in rows if x["team"] == team and x["kind"] == "bought"]
+        if kept or gone or bought:
+            print(f"{team}: {kept} retained, {gone} released, {len(bought)} bought"
+                  + (f" (₹{sum(x['price'] or 0 for x in bought) / 100:.2f} crore)" if bought else ""))
     if missing:
         print("UNMATCHED (fix the spelling or add an alias):", missing)
     if not args.write:
         return 1 if missing else 0
     assert not missing, "unmatched names: not writing"
-    db.execute(text("DELETE FROM squad_moves WHERE league = 'ipl' AND season = :s AND kind IN ('retained', 'released')"),
-               {"s": SEASON})
+    kinds = sorted({x["kind"] for x in rows})
+    db.execute(text("DELETE FROM squad_moves WHERE league = 'ipl' AND season = :s AND kind = ANY(:k)"), {"s": SEASON, "k": kinds})
     db.execute(text("""
         INSERT INTO squad_moves (season, player_name, pid, from_team, to_team, price_lakh, kind, state, source, announced)
-        VALUES (:s, :n, :p, CASE WHEN :kind = 'released' THEN :team END, CASE WHEN :kind = 'retained' THEN :team END,
+        VALUES (:s, :n, :p, CASE WHEN :kind = 'released' THEN :team END, CASE WHEN :kind IN ('retained', 'bought') THEN :team END,
                 :price, :kind, 'confirmed', :src, CAST(:a AS date))"""), [{**x, "s": SEASON} for x in rows])
     db.commit()
     print(f"wrote {len(rows)} moves")
