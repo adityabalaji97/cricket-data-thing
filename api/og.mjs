@@ -161,6 +161,23 @@ function teamCard(card) {
     h('div', { marginTop: 'auto', alignItems: 'flex-end' }, grid, best));
 }
 
+// A built squad as a link preview: the team, roles at playoff level against the real squad's, the seven roles by status.
+function xiCard(card) {
+  const accent = card.colour || C.lime;
+  const tone = { 'playoff level': C.lime, short: '#f0b429', gap: C.red };
+  return h('div', { width: '100%', height: '100%', flexDirection: 'column', background: C.bg, color: C.text, padding: '44px 56px', fontFamily: 'Barlow', borderTop: `12px solid ${accent}` },
+    top('Fix my team · IPL 2027'),
+    h('div', { fontFamily: DISPLAY, fontSize: 60, fontWeight: 700, marginTop: 14, lineHeight: 1.05, color: accent }, `${card.team}, rebuilt`),
+    h('div', { alignItems: 'baseline', gap: 14, marginTop: 10 },
+      h('div', { fontFamily: MONO, fontSize: 44, fontWeight: 500, color: C.text }, `${card.at} of ${card.of}`),
+      h('div', { fontSize: 28, color: C.mid }, `roles at playoff level · the real squad ${card.was}`)),
+    card.moves ? h('div', { fontSize: 24, color: C.low, marginTop: 6 }, card.moves) : null,
+    h('div', { marginTop: 'auto', flexWrap: 'wrap', gap: 10 },
+      card.roles.map((r) => h('div', { alignItems: 'center', gap: 8, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 14px' },
+        h('div', { width: 12, height: 12, borderRadius: 6, background: tone[r.status] || C.low }),
+        h('div', { fontSize: 22, color: C.mid }, r.label)))));
+}
+
 function homeCard(card) {
   const tiles = h('div', { flexWrap: 'wrap', gap: 14, marginTop: 24, width: card.latest ? 620 : 1080 },
     card.features.map(([name, what]) => h('div', { flexDirection: 'column', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 20px', width: card.latest ? 300 : 520 },
@@ -201,6 +218,7 @@ export default async function handler(req, res) {
     : summary?.kind === 'home' ? homeCard(card)
     : summary?.kind === 'player' ? playerCard(card)
     : summary?.kind === 'team' ? teamCard(card)
+    : summary?.kind === 'xi' ? xiCard(card)
       : textCard(card);
 
   const image = new ImageResponse(element, { width: 1200, height: 630, fonts: FONTS });

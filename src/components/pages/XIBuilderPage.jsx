@@ -162,10 +162,15 @@ const XIBuilderPage = () => {
             Reset
           </Box>
           <Box component="button" type="button" disabled={!lim.can_save || !changed}
-            onClick={() => navigator.clipboard?.writeText(window.location.href)}
+            onClick={() => {
+              // The phone's share sheet where there is one; the link unfurls as this squad's card (api/og.mjs).
+              const url = window.location.href;
+              if (navigator.share) navigator.share({ title: `${data.team}, rebuilt`, url }).catch(() => {});
+              else navigator.clipboard?.writeText(url);
+            }}
             sx={{ all: 'unset', cursor: lim.can_save && changed ? 'pointer' : 'default', flex: 2, textAlign: 'center', py: 1.1, borderRadius: '12px',
               bgcolor: lim.can_save && changed ? colors.accent : colors.surface2, color: lim.can_save && changed ? colors.bg : colors.textLo, fontWeight: 600 }}>
-            {lim.can_save ? 'Copy link to this squad' : lim.problems[0]}
+            {lim.can_save ? 'Share this squad' : lim.problems[0]}
           </Box>
         </Box>
       </Box>

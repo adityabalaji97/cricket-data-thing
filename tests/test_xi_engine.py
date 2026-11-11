@@ -28,3 +28,11 @@ def test_over_the_purse_scores_but_cannot_save():
     squad = [{"price": 30.0, "overseas": i < 2} for i in range(5)]
     st = X.limits_state(squad, {**X.LIMITS, "squad_min": 1})
     assert st["spent"] == 150.0 and not st["can_save"] and "over the purse" in st["problems"][0]
+
+
+def test_a_pin_holds_the_role_first():
+    players = [_p("Busy", bowl=[("death|pace", 400, 700, 10)], best=200), _p("Next", bowl=[("death|pace", 300, 420, 12)], best=200),
+               _p("Pinned", bowl=[("death|pace", 90, 120, 4)], best=90)]
+    compact = [{"name": p["name"], "roles": X._roles_of(p), "best_season_balls": p["best_season_balls"]} for p in players]
+    rows = {r["key"]: r for r in X.score(compact, BENCH, {"death_pace": ["Pinned"]})["roles"]}
+    assert rows["death_pace"]["holders"] == ["Pinned", "Busy"]

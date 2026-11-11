@@ -38,9 +38,11 @@ def _roles_of(p: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
     return out
 
 
-def score(players: List[Dict[str, Any]], bench: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def score(players: List[Dict[str, Any]], bench: Dict[str, Dict[str, Any]], pins: Dict[str, List[str]] = None) -> Dict[str, Any]:
     """The template rows for these players, from compact role totals ({name, roles: {key: {balls, runs, wickets, w}},
-    best_season_balls}): the busiest N holders per role pooled; place among IPL sides; status against playoff sides."""
+    best_season_balls}): the busiest N holders per role pooled (pinned players first: a reader's "in for X"); place
+    among IPL sides; status against playoff sides."""
+    pins = pins or {}
     rows = []
     for key, label, side, _slot, measure, n, lower, _f in ROLES:
         b = bench[key]
@@ -49,7 +51,9 @@ def score(players: List[Dict[str, Any]], bench: Dict[str, Dict[str, Any]]) -> Di
             v = float(len(holders))
         else:
             cands = [p for p in players if key in p["roles"] and p["roles"][key]["balls"] >= SQUAD_MIN]
-            held = sorted(cands, key=lambda p: -p["roles"][key]["w"])[:n]
+            pinned = [p for name in pins.get(key, []) for p in cands if p["name"] == name]
+            rest = sorted((p for p in cands if p not in pinned), key=lambda p: -p["roles"][key]["w"])
+            held = (pinned + rest)[:n]
             holders = [p["name"] for p in held]
             tot = {k: sum(p["roles"][key][k] for p in held) for k in KEYS}
             if not held:
@@ -141,3 +145,19 @@ def payload(db, code: str, season: int = 2027) -> Dict[str, Any]:
                 "roles": [{"key": r[0], "label": r[1], "side": r[2], "measure": r[4], "n": r[5], "lower": r[6]}
                           for r in ROLES]}
     return cached_run(db, {"kind": "xi_payload", "v": 1, "code": code, "day": date.today(), "moves": moves}, run)
+
+
+def score_link(db, code: str, add: List[str], drop: List[str], pin: List[str]) -> Dict[str, Any]:
+    """A squad as a builder link describes it (add / drop / pin "role:name", as src/components/pages/XIBuilderPage.jsx
+    writes them), scored: the link-preview card's numbers, and the same as the page shows."""
+    d = payload(db, code)
+    by = {p["name"]: p for p in d["squad"] + d["pool"]}
+    squad = [p for p in d["squad"] if p["name"] not in drop] + [by[n] for n in add if n in by and n not in {p["name"] for p in d["squad"]}]
+    pins: Dict[str, List[str]] = {}
+    for item in pin:
+        k, _, name = item.partition(":")
+        pins.setdefault(k, []).append(name)
+    now, base = score(squad, d["bench"], pins), score(d["squad"], d["bench"])
+    return {"team": d["team"], "code": code, "at_level": now["at_level"], "was": base["at_level"], "of": now["of"],
+            "roles": [{"label": r["label"], "status": r["status"], "holders": r["holders"]} for r in now["roles"]],
+            "added": [n for n in add if n in by], "dropped": [n for n in drop if n in by], "limits": limits_state(squad, d["limits"])}

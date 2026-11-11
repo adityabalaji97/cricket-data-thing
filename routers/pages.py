@@ -99,6 +99,21 @@ def xi_builder_route(response: Response, team: str = Query(..., description="An 
     return payload(db, code)
 
 
+@router.get("/xi-builder/score")
+def xi_builder_score_route(response: Response, team: str = Query(...), add: str = Query(default=""),
+                           drop: str = Query(default=""), pin: str = Query(default=""), db: Session = Depends(get_session)):
+    """A builder link's squad scored (the share card's numbers): add / drop / pin as the page writes them ('~'-separated)."""
+    from services.squad_view import code_for
+    from services.xi_engine import score_link
+
+    code = code_for(team)
+    if not code:
+        raise HTTPException(status_code=404, detail=f"No IPL squad for {team}")
+    split = lambda s: [x for x in s.split("~") if x]  # noqa: E731
+    response.headers["Cache-Control"] = "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
+    return score_link(db, code, split(add), split(drop), split(pin))
+
+
 @router.get("/query-recent")
 def query_recent(response: Response, db: Session = Depends(get_session)):
     """What visitors recently asked the query builder, newest first: the empty screen's "Recently asked"."""
