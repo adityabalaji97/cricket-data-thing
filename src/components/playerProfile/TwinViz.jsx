@@ -46,7 +46,7 @@ export const TwinMap = ({ player, points, highlight = 5 }) => {
       {rings.map((r) => (
         <g key={r}>
           <circle cx={c} cy={c} r={(r / outer) * R} fill="none" stroke={colors.borderStrong} strokeDasharray="3 4" />
-          <text x={c} y={c - (r / outer) * R - 3} textAnchor="middle" fill={colors.textFaint} fontSize="9" fontFamily={fonts.mono}>
+          <text x={c} y={c - (r / outer) * R - 3} textAnchor="middle" fill={colors.textFaint} fontSize="11" fontFamily={fonts.mono}>
             {Math.round(r * 100)} pts
           </text>
         </g>
@@ -103,7 +103,7 @@ export const TwinCompare = ({ player, twin, rows, alwaysOpen = false }) => {
           </Box>
           {groups.map((g) => (
             <Box key={g.group}>
-              <Box sx={{ fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo, mb: 0.25 }}>
+              <Box sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo, mb: 0.25 }}>
                 {groupName(g.group)}
               </Box>
               <svg viewBox={`0 0 ${W} ${g.rows.length * 18}`} width="100%" aria-hidden="true" style={{ display: 'block' }}>
@@ -112,7 +112,7 @@ export const TwinCompare = ({ player, twin, rows, alwaysOpen = false }) => {
                   const text = r.label.replace(/ \((bat|ball)\)$/, '');
                   return (
                     <g key={r.feature}>
-                      <text x="0" y={y + 3.5} fill={colors.textMed} fontSize="10.5" fontFamily={fonts.body}>
+                      <text x="0" y={y + 3.5} fill={colors.textMed} fontSize="11" fontFamily={fonts.body}>
                         {text.length > 24 ? `${text.slice(0, 23)}…` : text}
                       </text>
                       <line x1={track(0)} x2={track(100)} y1={y} y2={y} stroke={colors.surface2} strokeWidth="2" />

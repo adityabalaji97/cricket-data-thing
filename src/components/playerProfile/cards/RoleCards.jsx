@@ -35,7 +35,7 @@ const BarRows = ({ rows, format = (v) => v }) => {
         <Box key={r.label} sx={{ display: 'grid', gridTemplateColumns: '136px 1fr 40px', alignItems: 'center', gap: 1 }}>
           <Box sx={{ minWidth: 0, lineHeight: 1.15 }}>
             <Box sx={{ fontSize: 13.5, whiteSpace: 'nowrap' }}>{r.label}</Box>
-            {r.detail && <Box sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{r.detail}</Box>}
+            {r.detail && <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{r.detail}</Box>}
           </Box>
           <Box sx={{ height: 12, bgcolor: 'rgba(255,255,255,0.04)', borderRadius: '4px', overflow: 'hidden' }}>
             <Box sx={{ height: '100%', width: `${(100 * r.value) / max}%`, bgcolor: r.colour || SLATE, borderRadius: '4px' }} />
@@ -89,7 +89,7 @@ export const StartCard = ({ player, start }) => {
         {[0, 100, 200].map((v) => (
           <g key={v}>
             <line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={colors.border} />
-            <text x={L - 4} y={sy(v) + 3} textAnchor="end" style={{ ...mono, fontSize: 9, fill: colors.textLo }}>{v}</text>
+            <text x={L - 4} y={sy(v) + 3} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{v}</text>
           </g>
         ))}
         <path d={path('sr_ball')} fill="none" stroke={SLATE} strokeWidth="1.5" />
@@ -97,7 +97,7 @@ export const StartCard = ({ player, start }) => {
         <line x1={sx(n)} x2={sx(n)} y1={T} y2={B} stroke={colors.textHi} strokeWidth="1" />
         <circle cx={sx(n)} cy={sy(p.sr_cum)} r="4" fill={LIME} stroke={colors.bg} strokeWidth="1.5" />
         {[1, 10, 20, 30].filter((t) => t <= pts.length).map((t) => (
-          <text key={t} x={sx(t)} y={H - 4} textAnchor="middle" style={{ ...mono, fontSize: 9, fill: colors.textLo }}>{t}</text>
+          <text key={t} x={sx(t)} y={H - 4} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{t}</text>
         ))}
       </Box>
       <Legend items={[['Strike rate so far', LIME], ['On that ball', SLATE]]} />
@@ -144,7 +144,7 @@ export const ScoringWheel = ({ zones, hand, strikeRate, faster = BLUE, slower = 
                 <title>{`${a.label}: ${Math.round(a.share * 100)}% of runs, strike rate ${Math.round(a.sr ?? 0)}`}</title>
               </path>
               <text x={lx} y={ly} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textMed }}>{a.label}</text>
-              <text x={lx} y={ly + 13} textAnchor="middle" style={{ ...mono, fontSize: 10.5, fill: colors.textHi }}>{`${Math.round(a.share * 100)}%`}</text>
+              <text x={lx} y={ly + 13} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: colors.textHi }}>{`${Math.round(a.share * 100)}%`}</text>
             </g>
           );
         })}
@@ -192,7 +192,7 @@ const filterWords = (f) => [f.bowl ? f.bowl.split(':')[1] : null, f.hand ? HAND_
 
 const Pill = ({ on, onClick, children }) => (
   <Box component="button" type="button" onClick={onClick} aria-pressed={on}
-    sx={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, px: 1.1, py: '3px', borderRadius: '999px', whiteSpace: 'nowrap',
+    sx={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, px: 1.1, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px', whiteSpace: 'nowrap',
       border: `1px solid ${on ? colors.accent : colors.borderStrong}`, bgcolor: on ? colors.accent : 'transparent',
       color: on ? colors.bg : colors.textMed, '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
     {children}
@@ -449,7 +449,7 @@ const PaceMapView = ({ player, cells, paceSr, kindWord = 'pace', switcher, actio
                 <title>{`${PACE_LENGTH_NAMES[l]}, ${PACE_LINE_NAMES[j]}: strike rate ${Math.round(cell.strike_rate)} (${cell.balls} balls, ${cell.outs} out)`}</title>
               </rect>
               <text x={x + cw / 2} y={y + ch / 2 + 2} textAnchor="middle" style={{ ...mono, fontSize: 13, fontWeight: 600, fill: ink }}>{Math.round(cell.strike_rate)}</text>
-              <text x={x + cw / 2} y={y + ch / 2 + 14} textAnchor="middle" style={{ ...mono, fontSize: 8.5, fill: ink, opacity: 0.8 }}>{`${cell.balls}b`}</text>
+              <text x={x + cw / 2} y={y + ch / 2 + 14} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: ink, opacity: 0.8 }}>{`${cell.balls}b`}</text>
             </g>
           );
         }))}
@@ -534,7 +534,7 @@ const PitchView = ({ player, cells, economy, action, panel, filtered, noteOverri
                 <title>{`${LENGTH_NAMES[l]}, ${LINE_NAMES[j]}: ${cell.economy} an over (${cell.balls} balls)`}</title>
               </rect>
               <text x={x + cw / 2} y={y + ch / 2 + 2} textAnchor="middle" style={{ ...mono, fontSize: 13, fontWeight: 600, fill: ink }}>{cell.economy.toFixed(1)}</text>
-              <text x={x + cw / 2} y={y + ch / 2 + 14} textAnchor="middle" style={{ ...mono, fontSize: 8.5, fill: ink, opacity: 0.8 }}>{`${cell.balls}b`}</text>
+              <text x={x + cw / 2} y={y + ch / 2 + 14} textAnchor="middle" style={{ ...mono, fontSize: 11, fill: ink, opacity: 0.8 }}>{`${cell.balls}b`}</text>
             </g>
           );
         }))}
@@ -559,7 +559,7 @@ export const PhaseCard = ({ player, phases }) => {
       <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${phases.length}, minmax(0, 1fr))`, gap: 1 }}>
         {phases.map((p) => (
           <Box key={p.phase} sx={{ border: `1px solid ${p === best ? LIME : colors.borderStrong}`, borderRadius: '14px', p: 1.25 }}>
-            <Box sx={{ ...mono, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{PHASE_NAMES[p.phase] || p.phase}</Box>
+            <Box sx={{ ...mono, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{PHASE_NAMES[p.phase] || p.phase}</Box>
             <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26, lineHeight: 1.1 }}>{p.economy.toFixed(1)}</Box>
             <Box sx={{ fontSize: 11.5, color: colors.textLo, lineHeight: 1.35, whiteSpace: 'nowrap' }}>{`${Math.round(p.dot_percentage)}% dots`}</Box>
             {p.false_shots !== null && p.false_shots !== undefined && (
@@ -609,7 +609,7 @@ export const BowlerWheelCard = ({ player, byHand, catchesByHand, query }) => {
           <Box role="tablist" aria-label="Batter's hand" sx={{ display: 'inline-flex', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
             {hands.map((x) => (
               <Box key={x} component="button" type="button" role="tab" aria-selected={x === h} onClick={() => setPick(x)}
-                sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
+                sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px',
                   bgcolor: x === h ? colors.accent : 'transparent', color: x === h ? colors.bg : colors.textMed }}>
                 {x === 'RHB' ? 'Right-handers' : 'Left-handers'}
               </Box>
@@ -644,7 +644,7 @@ const ShotsAgainstView = ({ player, rows, srAgainst, action, panel, filtered, no
           <Box key={r.family} sx={{ display: 'grid', gridTemplateColumns: '136px 1fr 40px', alignItems: 'center', gap: 1 }}>
             <Box sx={{ minWidth: 0, lineHeight: 1.15 }}>
               <Box sx={{ fontSize: 13.5, whiteSpace: 'nowrap' }}>{SHOT_NAMES[r.family] || r.family}</Box>
-              <Box sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>
+              <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>
                 {`SR ${Math.round(r.strike_rate)} · ${r.wickets ? `${Math.round(r.balls / r.wickets)} balls per wicket` : `${r.balls} balls, no wicket`}`}
               </Box>
             </Box>
@@ -679,7 +679,7 @@ const Switch = ({ label, options, value, onChange }) => (
   <Box role="tablist" aria-label={label} sx={{ display: 'inline-flex', alignSelf: 'flex-start', border: `1px solid ${colors.borderStrong}`, borderRadius: '999px', p: '2px' }}>
     {options.map(([v, text]) => (
       <Box key={v} component="button" type="button" role="tab" aria-selected={v === value} onClick={() => onChange(v)}
-        sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, py: '3px', borderRadius: '999px',
+        sx={{ all: 'unset', cursor: 'pointer', fontFamily: fonts.display, fontWeight: 600, fontSize: 13.5, px: 1.5, minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', borderRadius: '999px',
           bgcolor: v === value ? colors.accent : 'transparent', color: v === value ? colors.bg : colors.textMed,
           '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
         {text}

@@ -26,7 +26,7 @@ export const SeasonWinsChart = ({ roles, order }) => {
       {[-dom, 0, dom].map((t) => (
         <g key={t}>
           <line x1={x(t)} x2={x(t)} y1="0" y2={H - 14} stroke={t === 0 ? colors.textGhost : colors.borderStrong} strokeDasharray={t === 0 ? '' : '2 3'} />
-          <text x={x(t)} y={H - 2} textAnchor="middle" fill={colors.textFaint} fontSize="9.5" fontFamily={fonts.mono}>
+          <text x={x(t)} y={H - 2} textAnchor="middle" fill={colors.textFaint} fontSize="11" fontFamily={fonts.mono}>
             {t === 0 ? '0' : signed(t, 1)}
           </text>
         </g>
@@ -49,7 +49,7 @@ export const SeasonWinsChart = ({ roles, order }) => {
                   <g>
                     <rect x={x0} y={y} width={w} height={BAR} rx={Math.min(3, w / 2)} fill={ROLE_COLOURS[s.role]} />
                     <text x={v >= 0 ? x0 + w + 4 : x0 - 4} y={y + BAR - 0.5} textAnchor={v >= 0 ? 'start' : 'end'}
-                      fill={colors.textMed} fontSize="10" fontFamily={fonts.body} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      fill={colors.textMed} fontSize="11" fontFamily={fonts.body} style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {signed(v)}
                     </text>
                     <rect x={LEFT} y={y - 3} width={W - LEFT - RIGHT} height={BAR + 6} fill="transparent" />
@@ -78,7 +78,7 @@ export const SeasonRateChart = ({ rows, metricKey, label, median }) => {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${label} by year`} style={{ display: 'block', overflow: 'visible' }}>
       <line x1={x(median)} x2={x(median)} y1="0" y2={pts.length * rowH} stroke={colors.textLo} strokeDasharray="3 3" />
-      <text x={x(median)} y={pts.length * rowH + 11} textAnchor="middle" fill={colors.textLo} fontSize="9.5" fontFamily={fonts.mono}>
+      <text x={x(median)} y={pts.length * rowH + 11} textAnchor="middle" fill={colors.textLo} fontSize="11" fontFamily={fonts.mono}>
         peer median {median.toFixed(dp)}
       </text>
       {pts.map((r, i) => {
@@ -88,7 +88,7 @@ export const SeasonRateChart = ({ rows, metricKey, label, median }) => {
             <text x="0" y={y + 4} fill={colors.textMed} fontSize="12" fontFamily={fonts.display} fontWeight="600">{r.year}</text>
             <line x1={x(median)} x2={x(r[metricKey])} y1={y} y2={y} stroke={ROLE_COLOURS.bowl} strokeWidth="2" opacity="0.5" />
             <circle cx={x(r[metricKey])} cy={y} r="5" fill={ROLE_COLOURS.bowl} stroke={colors.bg} strokeWidth="2" />
-            <text x={x(r[metricKey]) + 9} y={y + 4} fill={colors.textMed} fontSize="10.5" fontFamily={fonts.body}>
+            <text x={x(r[metricKey]) + 9} y={y + 4} fill={colors.textMed} fontSize="11" fontFamily={fonts.body}>
               {r[metricKey].toFixed(dp)}{r.balls < 120 ? `  (${r.balls} balls)` : ''}
             </text>
           </g>

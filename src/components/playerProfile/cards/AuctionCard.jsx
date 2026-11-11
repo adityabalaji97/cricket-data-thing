@@ -34,7 +34,7 @@ const AuctionCard = ({ player }) => {
           const colour = readableOnDark(getTeamColor(l.team_name) || colors.accent);
           const sold = l.status !== 'unsold' && l.price_lakh != null;
           return (
-            <Box key={l.year} sx={{ display: 'grid', gridTemplateColumns: '40px 1fr 64px', alignItems: 'center', gap: 1 }}>
+            <Box key={l.year} sx={{ display: 'grid', gridTemplateColumns: '40px 1fr auto', alignItems: 'center', gap: 1 }}>
               <Box sx={{ ...mono, fontSize: 13, color: colors.textMed }}>{l.year}</Box>
               <Box sx={{ minWidth: 0, lineHeight: 1.15 }}>
                 <Box sx={{ height: 10, bgcolor: 'rgba(255,255,255,0.04)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -45,7 +45,7 @@ const AuctionCard = ({ player }) => {
                     l.status === 'unsold' && l.base_lakh ? `base ${money(l.base_lakh)}` : null].filter(Boolean).join(' ')}
                 </Box>
               </Box>
-              <Box sx={{ ...mono, fontSize: 13, textAlign: 'right', color: sold ? colors.textHi : colors.textLo }}>
+              <Box sx={{ ...mono, fontSize: 13, textAlign: 'right', whiteSpace: 'nowrap', minWidth: 64, color: sold ? colors.textHi : colors.textLo }}>
                 {sold ? money(l.price_lakh) : '–'}
               </Box>
             </Box>

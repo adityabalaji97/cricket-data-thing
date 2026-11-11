@@ -25,7 +25,7 @@ const UNIT = { average: 'avg', strike_rate: 'SR', wickets_per_24: 'wkts / 4 ov',
 /** Who fits a gap (XI_BUILDER_PLAN.md X4a, X4c): what fits (playoff sides' level and two proven examples, who are
  * examples, not options), then the auction pool: on their IPL record, then on all T20s for those the IPL hasn't seen
  * enough of (not yet adjusted for strength: X4d). */
-const FitCard = ({ team, fit }) => {
+const FitBody = ({ fit }) => {
   const f = FMT[fit.measure];
   const u = UNIT[fit.measure];
   const row = (x, sub) => (
@@ -40,8 +40,7 @@ const FitCard = ({ team, fit }) => {
   const like = (fit.examples || []).map((x) => `${x.name.split(' ').slice(-1)[0]} ${f(x.value)}`).join(', ');
   const empty = !fit.free.length && !(fit.outside || []).length;
   return (
-    <ProfileCard id={`fit-${fit.key}`} title={`Who fits: ${fit.label.toLowerCase()}`} player={team}
-      note={`Theirs ${fit.squad_value != null ? f(fit.squad_value) : '–'} · IPL 2024-26 · all T20s not strength-adjusted`}>
+    <>
       <Box sx={{ fontSize: 13, color: colors.textMed, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', mb: 1 }}>
         {`Playoff sides ${f(fit.playoff_level)} ${u}${like ? ` · like ${like}` : ''}`}
       </Box>
@@ -50,6 +49,33 @@ const FitCard = ({ team, fit }) => {
         <Box sx={{ mt: fit.free.length ? 1 : 0 }}><Eyebrow>In the auction pool · all T20s</Eyebrow>{fit.outside.map((x) => row(x, ' in T20s'))}</Box>
       )}
       {empty && <Box sx={{ fontSize: 13.5, color: colors.textLo, py: 1 }}>Nobody in the auction pool does it yet. The released lists land on 17 Nov.</Box>}
+    </>
+  );
+};
+
+// One "Who fits" card with a switch between the gaps, not a card per gap (four near-identical cards made CSK's page
+// 7.5 phone screens: 13 Nov 2026 audit).
+const FitsCard = ({ team, fits }) => {
+  const [k, setK] = useState(0);
+  const fit = fits[Math.min(k, fits.length - 1)];
+  const f = FMT[fit.measure];
+  return (
+    <ProfileCard id="fits" title="Who fits the gaps" player={team}
+      note={`Theirs ${fit.squad_value != null ? f(fit.squad_value) : '–'} · IPL 2024-26 · all T20s not strength-adjusted`}>
+      {fits.length > 1 && (
+        <Box role="tablist" aria-label="Gap" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.25 }}>
+          {fits.map((x, i) => (
+            <Box key={x.key} component="button" type="button" role="tab" aria-selected={i === k} onClick={() => setK(i)}
+              sx={{ all: 'unset', cursor: 'pointer', minHeight: 32, boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', px: 1.25,
+                borderRadius: '999px', fontSize: 13, border: `1px solid ${i === k ? colors.accent : colors.borderStrong}`,
+                color: i === k ? colors.bg : colors.textMed, bgcolor: i === k ? colors.accent : 'transparent',
+                '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
+              {x.label}
+            </Box>
+          ))}
+        </Box>
+      )}
+      <FitBody fit={fit} />
     </ProfileCard>
   );
 };
@@ -71,8 +97,8 @@ const TeamSquad = ({ team }) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
       <Eyebrow right={<Box component="span" sx={{ fontSize: 11, color: colors.textLo }}>{`as of ${asOf}`}</Box>}>IPL 2027 squad</Eyebrow>
       <Box component={Link} to={`/team-builder?team=${encodeURIComponent(data.code)}`}
-        sx={{ display: 'block', textAlign: 'center', py: 1.1, borderRadius: '12px', bgcolor: colors.accent, color: colors.bg, fontWeight: 600, textDecoration: 'none' }}>
-        Fix my team: swap players, watch the roles move
+        sx={{ display: 'block', textAlign: 'center', py: 1.1, px: 2, borderRadius: '12px', bgcolor: colors.accent, color: colors.bg, fontWeight: 600, textDecoration: 'none' }}>
+        Fix my team: swap players in and out
       </Box>
       {data.cards.map((c) => {
         const Visual = POST_VISUALS[c.visual];
@@ -83,15 +109,15 @@ const TeamSquad = ({ team }) => {
         const quiet = board ? (c.payload.note || '').match(/Barely played since 2025 \(under 10 balls\): (\d+)/) : null;
         const note = board
           ? (data.deals?.length ? data.deals.map(dealLine).join(' · ') : quiet ? `${quiet[1]} have barely played since 2025` : c.sample)
-          : c.sample;
-        const payload = board ? { ...c.payload, note: null } : c.payload;
+          : c.id === 'template' ? 'IPL 2024-26 at any side · v playoff sides 2023-26' : c.sample;
+        const payload = { ...c.payload, ...(board ? { note: null } : {}), page: true };
         return (
           <ProfileCard key={c.id} id={`squad-${c.id}`} title={NAMES[c.id] || c.kicker} player={team} note={note}>
             <Box sx={{ mx: -0.5 }}><Visual payload={payload} /></Box>
           </ProfileCard>
         );
       })}
-      {(data.fits || []).slice(0, 3).map((f) => <FitCard key={f.key} team={team} fit={f} />)}
+      {(data.fits || []).length > 0 && <FitsCard team={team} fits={data.fits.slice(0, 4)} />}
     </Box>
   );
 };

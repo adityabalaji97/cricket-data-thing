@@ -32,7 +32,7 @@ const PeerStrip = ({ metric }) => {
           <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: 600, fontSize: 15, color: colors.textHi, fontVariantNumeric: 'tabular-nums' }}>
             {shown}
           </Box>
-          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 10.5, minWidth: 78, textAlign: 'right', color: top ? colors.accent : colors.textLo, fontVariantNumeric: 'tabular-nums' }}>
+          <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, minWidth: 78, textAlign: 'right', color: top ? colors.accent : colors.textLo, fontVariantNumeric: 'tabular-nums' }}>
             {ordinal(metric.rank)} of {metric.n}
           </Box>
         </Box>
@@ -50,7 +50,7 @@ const PeerStrip = ({ metric }) => {
 };
 
 export const StripAxisCue = () => (
-  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontFamily: fonts.mono, fontSize: 9.5, color: colors.textFaint, letterSpacing: '0.06em' }}>
+  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontFamily: fonts.mono, fontSize: 11, color: colors.textFaint, letterSpacing: '0.06em' }}>
     <span>← worse</span><span>│ median</span><span>better →</span>
   </Box>
 );

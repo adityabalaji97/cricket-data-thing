@@ -52,7 +52,7 @@ const FormChips = ({ games }) => {
                 color: colors.textHi, textDecoration: 'none',
                 '&:hover, &:focus-visible': { borderColor: colors.accent, outline: 'none' },
               }}>
-              <Box component="span" sx={{ fontSize: 8, lineHeight: 1, height: 9, color: st.glyphColour }}>{st.glyph}</Box>
+              <Box component="span" sx={{ fontSize: 11, lineHeight: 1, height: 11, color: st.glyphColour }}>{st.glyph}</Box>
               {g.bowl && (
                 <Box component="span" sx={{ fontFamily: fonts.display, fontWeight: 600, fontSize: 12.5, lineHeight: 1.15, whiteSpace: 'nowrap' }}>
                   {g.bowl.wickets}/{g.bowl.runs}
@@ -64,7 +64,7 @@ const FormChips = ({ games }) => {
                   <Box component="span" sx={{ color: colors.textLo, fontWeight: 500 }}> ({g.bat.balls})</Box>
                 </Box>
               )}
-              <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 8.5, color: colors.textLo, mt: '1px' }}>{short(g.opponent)}</Box>
+              <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11, color: colors.textLo, mt: '1px' }}>{short(g.opponent)}</Box>
             </Box>
           </Tooltip>
         );

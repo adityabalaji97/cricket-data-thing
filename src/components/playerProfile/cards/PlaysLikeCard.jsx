@@ -57,19 +57,19 @@ const PlaysLikeCard = ({ player, unit }) => {
     <ProfileCard id="plays-like" title={d.unique ? 'No close twin' : 'Plays like'} player={player}
       note={`How he plays, as percentiles among ${KIND[d.role] || 'players'}`}>
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
-        {d.twins.slice(0, 4).map((t, i) => {
+        {d.twins.slice(0, 4).map((t) => {
           const expanded = open === t.player;
           return (
             <Box component="li" key={t.player} sx={{ borderBottom: `1px solid ${colors.border}`, py: 1 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto 28px', alignItems: 'center', columnGap: 1 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto 32px', alignItems: 'center', columnGap: 1 }}>
                 <Box component={Link} to={`/player?name=${encodeURIComponent(t.player)}`}
-                  sx={{ fontWeight: 600, fontSize: 15, color: i < 2 && !d.unique ? colors.accent : colors.textHi, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  sx={{ fontWeight: 600, fontSize: 15, color: colors.textHi, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minHeight: 32, display: 'flex', alignItems: 'center' }}>
                   {t.player}
                 </Box>
                 <Box component="span" sx={{ fontFamily: fonts.mono, fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{`${t.gap_points} pts apart`}</Box>
                 <Box component="button" type="button" aria-expanded={expanded} aria-label={`Compare with ${t.player}`}
                   onClick={() => setOpen(expanded ? null : t.player)}
-                  sx={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', color: colors.accent, borderRadius: '50%', justifySelf: 'end',
+                  sx={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, color: colors.accent, borderRadius: '50%', justifySelf: 'end',
                     transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s',
                     '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 } }}>
                   <ExpandMoreRoundedIcon fontSize="small" />
