@@ -177,6 +177,11 @@ jobs:
         continue-on-error: true
         run: python scripts/warm_verdict.py --hours 36
 
+      # The IPL squad on each team page (XI_BUILDER_PLAN.md X3): ~40 s a side cold. Never blocks the rest of the run.
+      - name: Warm IPL squads
+        continue-on-error: true
+        run: python scripts/warm_team_squads.py
+
       # The venue and team pages (TEAM_VENUE_PLAN.md) are 15-30 s cold: build the likeliest ones (fixtures in the next
       # 48 hours, the IPL, then every ground and side with a T20 in the last month), capped at 40 minutes.
       - name: Warm venue and team pages

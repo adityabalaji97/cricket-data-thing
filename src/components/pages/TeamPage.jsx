@@ -6,6 +6,7 @@ import { rememberEntity } from '../../utils/recentEntities';
 import { colors, fonts } from '../../theme/hindsightDark';
 import ProfileCard from '../playerProfile/cards/ProfileCard';
 import ProfileFilters from '../playerProfile/cards/ProfileFilters';
+import TeamSquad from './TeamSquad';
 import {
   Eyebrow, PageFooter, PageHeader, PageSkeleton, SummaryRows, ValueList, ordinal, readWindow, signed, usePageData, windowChip,
   windowQuery, writeSearch,
@@ -314,6 +315,7 @@ const TeamPage = () => {
             <TopCard team={team} top={data.top} />
             {data.results && <WhereCard team={team} res={data.results} />}
             <AgainstCard team={team} against={data.results?.against} />
+            <TeamSquad team={data.team || team} />
           </>
         )}
         <PageFooter queryLink={qb} />

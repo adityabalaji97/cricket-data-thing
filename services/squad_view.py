@@ -375,3 +375,39 @@ def gap_text(r):
             "regular_bowlers": "regular bowlers"}[r["measure"]]
     v = "nobody in the role" if r["value"] is None else (f.format(r["value"]) + (f" {unit}" if unit == "an over" else f" {unit}"))
     return f"{SAY[r['key']]} ({v}; playoff sides {f.format(r['playoff_level'])})"
+
+
+# ---- the team page (XI_BUILDER_PLAN.md X3) -------------------------------------------------------------------------
+
+def code_for(team: str):
+    """The IPL code for a team's full name (or its code), or None for a side without an IPL squad."""
+    t = (team or "").strip()
+    if t.upper() in TEAMS:
+        return t.upper()
+    return next((c for c, v in TEAMS.items() if v["name"].lower() == t.lower()), None)
+
+
+def team_squad(db, team: str):
+    """The team page's Squad group: the squad board, against the winners' template, price v wins added and the three
+    calls, as the retention post draws them; with the trades and how sure each is. Cached per team and day, and again
+    whenever a squad move is added (its id and time are in the key). None for a side without an IPL squad."""
+    from sqlalchemy import text
+
+    from services.query_cache import cached_run
+
+    code = code_for(team)
+    if not code:
+        return None
+    moves = db.execute(text("SELECT COALESCE(MAX(id), 0), MAX(created_at) FROM squad_moves WHERE league = 'ipl'")).fetchone()
+    key = {"kind": "team_squad", "v": 1, "code": code, "day": date.today(), "moves": [moves[0], str(moves[1])]}
+
+    def run():
+        b = build(db, code)
+        by_id = {c["id"]: c for c in b["cards"]}
+        cards = [b["lead"]] + [by_id[k] for k in ("template", "value", "cases") if k in by_id]
+        tr = b.get("trade") or {}
+        return {"team": b["team"], "code": code, "colour": b["colour"], "as_of": date.today().isoformat(),
+                "window": "IPL 2025-26 at any side (the template: 2024-26)", "cards": cards,
+                "deals": tr.get("deals") or [], "gaps": [{"key": g["key"], "label": g["label"], "status": g["status"]}
+                                                       for g in b.get("gaps") or []]}
+    return cached_run(db, key, run)
