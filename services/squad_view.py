@@ -399,7 +399,7 @@ def team_squad(db, team: str):
     if not code:
         return None
     moves = db.execute(text("SELECT COALESCE(MAX(id), 0), MAX(created_at) FROM squad_moves WHERE league = 'ipl'")).fetchone()
-    key = {"kind": "team_squad", "v": 2, "code": code, "day": date.today(), "moves": [moves[0], str(moves[1])]}
+    key = {"kind": "team_squad", "v": 3, "code": code, "day": date.today(), "moves": [moves[0], str(moves[1])]}
 
     def run():
         b = build(db, code)

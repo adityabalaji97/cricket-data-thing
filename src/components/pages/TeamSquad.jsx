@@ -21,25 +21,34 @@ const dealLine = (d) => `${d.ins.map(surname).join(', ')} in, ${d.outs.map(surna
 const FMT = { average: (v) => v.toFixed(1), strike_rate: (v) => v.toFixed(0), wickets_per_24: (v) => v.toFixed(2), economy: (v) => v.toFixed(2) };
 const UNIT = { average: 'avg', strike_rate: 'SR', wickets_per_24: 'wkts / 4 ov', economy: 'an over' };
 
-/** Who fits a gap: the best players for the role on the template's measure (small samples pulled to the league's),
- * first those in no 2027 squad (the auction pool), then at other sides. */
+/** Who fits a gap (XI_BUILDER_PLAN.md X4a, X4c): what fits (playoff sides' level and two proven examples, who are
+ * examples, not options), then the auction pool: on their IPL record, then on all T20s for those the IPL hasn't seen
+ * enough of (not yet adjusted for strength: X4d). */
 const FitCard = ({ team, fit }) => {
   const f = FMT[fit.measure];
-  const row = (x) => (
+  const u = UNIT[fit.measure];
+  const row = (x, sub) => (
     <Box key={x.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'baseline', gap: 1, py: 0.5 }}>
       <Box sx={{ minWidth: 0 }}>
         <Box sx={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</Box>
-        <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{`${x.balls} balls${x.side ? ` · at ${x.side}` : ''}`}</Box>
+        <Box sx={{ fontSize: 11, color: colors.textLo, whiteSpace: 'nowrap' }}>{`${x.balls} balls${sub}`}</Box>
       </Box>
-      <Box sx={{ fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{`${f(x.value)} ${UNIT[fit.measure]}`}</Box>
+      <Box sx={{ fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{`${f(x.value)} ${u}`}</Box>
     </Box>
   );
-  if (!fit.free.length && !fit.elsewhere.length) return null;
+  const like = (fit.examples || []).map((x) => `${x.name.split(' ').slice(-1)[0]} ${f(x.value)}`).join(', ');
+  const empty = !fit.free.length && !(fit.outside || []).length;
   return (
     <ProfileCard id={`fit-${fit.key}`} title={`Who fits: ${fit.label.toLowerCase()}`} player={team}
-      note={`Theirs ${fit.squad_value != null ? f(fit.squad_value) : '–'} · playoff sides ${f(fit.playoff_level)} · IPL 2024-26`}>
-      {fit.free.length > 0 && <><Eyebrow>Not in a 2027 squad</Eyebrow>{fit.free.map(row)}</>}
-      {fit.elsewhere.length > 0 && <Box sx={{ mt: 1 }}><Eyebrow>At other sides</Eyebrow>{fit.elsewhere.map(row)}</Box>}
+      note={`Theirs ${fit.squad_value != null ? f(fit.squad_value) : '–'} · IPL 2024-26 · all T20s not strength-adjusted`}>
+      <Box sx={{ fontSize: 13, color: colors.textMed, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', mb: 1 }}>
+        {`Playoff sides ${f(fit.playoff_level)} ${u}${like ? ` · like ${like}` : ''}`}
+      </Box>
+      {fit.free.length > 0 && <><Eyebrow>In the auction pool · IPL</Eyebrow>{fit.free.map((x) => row(x, ' in the IPL'))}</>}
+      {(fit.outside || []).length > 0 && (
+        <Box sx={{ mt: fit.free.length ? 1 : 0 }}><Eyebrow>In the auction pool · all T20s</Eyebrow>{fit.outside.map((x) => row(x, ' in T20s'))}</Box>
+      )}
+      {empty && <Box sx={{ fontSize: 13.5, color: colors.textLo, py: 1 }}>Nobody in the auction pool does it yet. The released lists land on 17 Nov.</Box>}
     </ProfileCard>
   );
 };

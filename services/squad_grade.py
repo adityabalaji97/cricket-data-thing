@@ -119,7 +119,9 @@ def squad_players(db, league: str, names: List[str], start: date, end: date) -> 
     from services.query_builder_v2 import run_deliveries_query
     from services.team_roles import KINDS
 
-    base = dict(fmt="T20", include_international=False, leagues=[league], start_date=start, end_date=end, limit=10000)
+    # league None: every men's T20 (leagues=[] with include_international off is all of them, internationals included).
+    base = dict(fmt="T20", include_international=False, leagues=[league] if league else [], start_date=start, end_date=end,
+                limit=10000)
     players: Dict[str, Dict[str, Any]] = {}
     keys = ("balls", "runs", "wickets", "dots", "boundaries")
 
