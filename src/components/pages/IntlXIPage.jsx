@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, Drawer } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { PageFooter, PageSkeleton, usePageData } from '../pageKit/pageKit';
@@ -103,6 +103,12 @@ const Slot = ({ data, slot }) => {
   );
 };
 
+// Short role labels for the XI list (a 390px row: role, name, his number).
+const SHORT = { openers: 'Opener', top: 'No. 3-4', middle: 'No. 5-7', 'powerplay|pace': 'PP pace', 'middle|spin': 'Spin', 'death|pace': 'Death' };
+const KEY = { bat: ['sr', 'SR', (v) => v.toFixed(0)], bowl: ['econ', 'Econ', (v) => v.toFixed(2)] };
+
+// The XI first, as eleven rows (role, player, his number in the role, what he did last match); tap a row for its sheet:
+// who else fits and the case, as picking a slot in 19-0 (user, 13 Nov 2026). ?slot=N opens that sheet (a shareable link).
 const IntlXIPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -111,31 +117,67 @@ const IntlXIPage = () => {
   const { status, data } = usePageData('/intl-xi', `team=${encodeURIComponent(team)}`);
   useEffect(() => { document.title = `${team} XI · Hindsight`; }, [team]);
   const slots = data?.slots || [];
-  const n = Number(q.get('slot')) || 2;
-  const slot = slots.find((s) => s.n === n) || slots[0];
-  const pick = (k) => { const p = new URLSearchParams(location.search); p.set('slot', String(k)); navigate({ search: `?${p.toString()}` }, { replace: true }); };
+  const n = Number(q.get('slot')) || null;
+  const open = slots.find((s) => s.n === n) || null;
+  const setSlot = (k) => {
+    const p = new URLSearchParams(location.search);
+    if (k) p.set('slot', String(k)); else p.delete('slot');
+    navigate({ search: `?${p.toString()}` }, { replace: true });
+  };
+  const when = data?.as_of ? new Date(data.as_of).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
 
   return (
     <Box sx={{ maxWidth: 560, mx: 'auto', px: 2, pt: 1.5, pb: 4, color: colors.textHi, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Box>
         <Box component={Link} to={`/team?team=${encodeURIComponent(team)}`} sx={{ color: colors.textLo, fontSize: 13, textDecoration: 'none' }}>← {team}</Box>
         <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 26, mt: 0.5 }}>{`Pick ${team}'s XI`}</Box>
-        <Box sx={{ color: colors.textMed, fontSize: 13.5, ...oneLine }}>The last T20I XI, slot by slot: who else fits, and the case.</Box>
+        <Box sx={{ color: colors.textMed, fontSize: 13.5, ...oneLine }}>Tap a player to see who else fits, and the case.</Box>
       </Box>
       {(status === 'loading' || status === 'building') && <PageSkeleton note={status === 'building' ? 'Building this XI. It takes under a minute the first time.' : null} />}
       {status === 'empty' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>Pick your XI covers the top 10 T20I sides.</Box>}
       {status === 'error' && <Box sx={{ color: colors.textLo, fontSize: 14 }}>This XI couldn't load just now. Try again shortly.</Box>}
-      {status === 'ready' && slot && (
+      {status === 'ready' && slots.length > 0 && (
         <>
-          <Box role="tablist" aria-label="Slots" sx={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: '3px' }}>
-            {slots.map((s) => (
-              <Box key={s.n} component="button" type="button" role="tab" aria-selected={s.n === slot.n} aria-label={`Slot ${s.n}: ${s.holder}`} onClick={() => pick(s.n)}
-                sx={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', height: 32, borderRadius: '6px', ...mono, fontSize: 11.5, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', bgcolor: s.n === slot.n ? colors.accent : colors.surface2,
-                  color: s.n === slot.n ? colors.bg : colors.textLo, '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>{s.n}</Box>
-            ))}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <Box sx={{ ...mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo }}>The last XI</Box>
+            <Box sx={{ fontSize: 11.5, color: colors.textLo }}>{`${when} v ${data.last_opponent || ''}`}</Box>
           </Box>
-          <Slot data={data} slot={slot} />
+          <Box sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`, borderRadius: '14px', px: 1.25, py: 0.5 }}>
+            {slots.map((s, i) => {
+              const key = KEY[s.kind];
+              const me = (s.contenders || []).find((c) => c.holder);
+              const better = key && me ? (s.contenders || []).filter((c) => !c.holder && (s.kind === 'bat' ? c.m[key[0]] > me.m[key[0]] : c.m[key[0]] < me.m[key[0]])).length : 0;
+              return (
+                <Box key={s.n} component="button" type="button" onClick={() => setSlot(s.n)} disabled={s.kind === 'lower'}
+                  sx={{ all: 'unset', boxSizing: 'border-box', cursor: s.kind === 'lower' ? 'default' : 'pointer', width: '100%', display: 'grid',
+                    gridTemplateColumns: '58px minmax(0, 1fr) auto', alignItems: 'center', columnGap: 1, py: 0.8, minHeight: 48,
+                    borderTop: i ? `1px solid ${colors.border}` : 'none', '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
+                  <Box sx={{ fontSize: 11.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{SHORT[s.role] || s.label}</Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Box sx={{ fontSize: 14.5, fontWeight: 500, ...oneLine }}>{s.holder}</Box>
+                    <Box sx={{ fontSize: 11.5, color: colors.textLo, ...oneLine }}>{s.moved}</Box>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    {key && me && me.m[key[0]] != null && <Box sx={{ ...mono, fontSize: 13.5 }}>{`${key[2](me.m[key[0]])}`}<Box component="span" sx={{ fontSize: 11, color: colors.textLo }}>{` ${key[1]}`}</Box></Box>}
+                    {key && s.contenders?.length > 0 && (
+                      <Box sx={{ fontSize: 11, color: better ? colors.textMed : colors.accent, whiteSpace: 'nowrap' }}>{better ? `${better} ahead ›` : 'best of these ›'}</Box>
+                    )}
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+          <Box sx={{ fontSize: 11.5, color: colors.textLo }}>
+            In the role, all T20s since Jan 2025. "Ahead": contenders with a better strike rate (batting) or economy (bowling).
+          </Box>
+          <Drawer anchor="bottom" open={!!open} onClose={() => setSlot(null)}
+            PaperProps={{ sx: { bgcolor: colors.bg, color: colors.textHi, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '88vh' } }}>
+            {open && (
+              <Box sx={{ maxWidth: 560, mx: 'auto', width: '100%', boxSizing: 'border-box', p: 2, pb: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}>
+                <Slot data={data} slot={open} />
+              </Box>
+            )}
+          </Drawer>
         </>
       )}
       <PageFooter />

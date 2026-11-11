@@ -314,21 +314,18 @@ const TeamPage = () => {
             {data.rating && <RatingCard team={team} rating={data.rating} />}
             {data.phases && <PhaseCard team={team} phases={data.phases} />}
             <OrderCard team={team} order={data.batting_order} win={win} />
+            {/* After who bats where, as the IPL sides' "Fix my team": the same full-width button (13 Nov 2026). */}
+            {PICK_XI.includes(data.team || team) && (
+              <Box component={Link} to={`/pick-xi?team=${encodeURIComponent(data.team || team)}`}
+                sx={{ display: 'block', textAlign: 'center', py: 1.1, px: 2, borderRadius: '12px', bgcolor: colors.accent, color: colors.bg,
+                  fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                {`Pick ${data.team || team}'s XI: who else fits each slot`}
+              </Box>
+            )}
             <OversCard team={team} grid={data.bowling_overs} />
             <TopCard team={team} top={data.top} win={win} />
             {data.results && <WhereCard team={team} res={data.results} />}
             <AgainstCard team={team} against={data.results?.against} />
-            {PICK_XI.includes(data.team || team) && (
-              <Box component={Link} to={`/pick-xi?team=${encodeURIComponent(data.team || team)}`}
-                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: colors.surface1, border: `1px solid ${colors.border}`,
-                  borderRadius: '14px', px: 2, py: 1.5, textDecoration: 'none', color: colors.textHi, '&:hover': { borderColor: colors.accent } }}>
-                <Box>
-                  <Box sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 18 }}>{`Pick ${data.team || team}'s XI`}</Box>
-                  <Box sx={{ fontSize: 13, color: colors.textMed }}>Slot by slot: who else fits, and the case for each.</Box>
-                </Box>
-                <Box sx={{ color: colors.accent, fontFamily: fonts.mono, fontSize: 13 }}>Open →</Box>
-              </Box>
-            )}
             <TeamSquad team={data.team || team} />
           </>
         )}
