@@ -45,7 +45,7 @@ import { getPreviewStartDate, TODAY } from './utils/dateDefaults';
 import { getPageTitleForPath } from './navItems';
 import ExploreMenu, { ExploreButton } from './components/nav/ExploreMenu';
 import { MensT20Scope, useFormat } from './context/FormatContext';
-import { trackPageView } from './utils/analytics';
+import { pageViewKey, trackPageView } from './utils/analytics';
 import { apiErrorText } from './utils/apiError';
 
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
@@ -153,9 +153,11 @@ const AppContent = () => {
 
   // One page_view per route change (query-string changes on the same page count too: a
   // new player or scorecard is a new view).
+  // (pageViewKey: on 19-0 the query changes with every pick, which isn't a new view.)
+  const pageKey = pageViewKey(location);
   useEffect(() => {
     trackPageView();
-  }, [location.pathname, location.search]);
+  }, [pageKey]);
 
   // In-app links carry ?fmt= so the destination opens in the right format (a Home fixture card
   // opens an ODI preview in ODI; a preview's Explore link opens the query builder in the same

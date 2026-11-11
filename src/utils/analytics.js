@@ -85,19 +85,28 @@ const flush = () => {
   if (queue.length) flush();
 };
 
-/** Record an event: snake_case name, optional small props object. */
-export const track = (event, props) => {
+/** Record an event: snake_case name, optional small props object, optional path (default: the page's, with its query). */
+export const track = (event, props, path) => {
   if (disabled()) return;
   queue.push({
     event,
     // 1000, not 200: a query builder run's link carries its whole question, and a cut one can't be replayed.
-    path: `${window.location.pathname}${window.location.search}`.slice(0, 1000),
+    path: (path || `${window.location.pathname}${window.location.search}`).slice(0, 1000),
     props: props || undefined,
   });
   if (!timer) timer = setTimeout(flush, FLUSH_MS);
 };
 
-export const trackPageView = () => track('page_view');
+// Pages whose query changes as you use them (19-0: every pick rewrites ?p=): one page view per visit, logged without the
+// query. What happened there is its own event (19-0's game_start / game_result). 13 Nov 2026.
+export const QUIET_QUERY_PATHS = ['/games/19-0'];
+const quiet = (pathname) => QUIET_QUERY_PATHS.some((p) => pathname.startsWith(p));
+export const pageViewKey = (location) => (quiet(location.pathname) ? location.pathname : `${location.pathname}${location.search}`);
+
+export const trackPageView = () => {
+  const { pathname } = window.location;
+  track('page_view', undefined, quiet(pathname) ? pathname : undefined);
+};
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
