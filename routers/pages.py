@@ -114,6 +114,19 @@ def xi_builder_score_route(response: Response, team: str = Query(...), add: str 
     return score_link(db, code, split(add), split(drop), split(pin))
 
 
+@router.get("/games/season-draft/data")
+def season_draft_data(response: Response):
+    """The Season Draft's cards and seasons (services/pinned/season_draft_IPL.json, scripts/build_season_draft.py)."""
+    import json
+    from pathlib import Path as P
+
+    path = P(__file__).resolve().parents[1] / "services/pinned/season_draft_IPL.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Season Draft data not built")
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+    return json.loads(path.read_text())
+
+
 @router.get("/query-recent")
 def query_recent(response: Response, db: Session = Depends(get_session)):
     """What visitors recently asked the query builder, newest first: the empty screen's "Recently asked"."""
