@@ -26,10 +26,12 @@ test('the deal is the same for the same day, three cards a slot, no player twice
 test('a stronger XI makes the playoffs in more seasons', () => {
   const seasons = [1, 2, 3].map((n) => ({ season: `${n}`, playoff: ['a', 'b', 'c', 'd'], teams: Object.fromEntries(
     'abcdefgh'.split('').map((t, i) => [t, { openers: 1 + (4 - i) * 0.03, top: 1, finishers: 1, pp_pace: 1, mid_spin: 1, death_pace: 1 }])) }));
-  const weak = seasonResults({ openers: 0.8, top: 0.9, finishers: 0.9, pp_pace: 0.9, mid_spin: 0.9, death_pace: 1.1 }, seasons, roles);
-  const strong = seasonResults({ openers: 1.3, top: 1.2, finishers: 1.2, pp_pace: 1.2, mid_spin: 1.2, death_pace: 0.85 }, seasons, roles);
+  const many = Array.from({ length: 12 }, (_, i) => ({ ...seasons[0], season: `${i}` }));
+  const weak = seasonResults({ openers: 0.8, top: 0.9, finishers: 0.9, pp_pace: 0.9, mid_spin: 0.9, death_pace: 1.1 }, many, roles, 'w');
+  const strong = seasonResults({ openers: 1.3, top: 1.2, finishers: 1.2, pp_pace: 1.2, mid_spin: 1.2, death_pace: 0.85 }, many, roles, 's');
   expect(strong.filter((r) => r.made).length).toBeGreaterThan(weak.filter((r) => r.made).length);
-  expect(strong.every((r) => r.topped)).toBe(true);
+  expect(seasonResults({ openers: 1, top: 1, finishers: 1, pp_pace: 1, mid_spin: 1, death_pace: 1 }, many, roles, 'x'))
+    .toEqual(seasonResults({ openers: 1, top: 1, finishers: 1, pp_pace: 1, mid_spin: 1, death_pace: 1 }, many, roles, 'x'));
 });
 
 test('the best XI from a deal keeps to four overseas', () => {

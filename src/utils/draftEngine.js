@@ -2,8 +2,12 @@
 // same deal for everyone each day), scored against all 19 IPL seasons. Every number is era-adjusted: a ratio to that
 // season's league rate for the role (scripts/build_season_draft.py), so seasons compare.
 //
-// Scoring is a game rule, not a prediction (XI_SCORE_CHECK.md): in each season, the XI's role profile is ranked among
-// that season's real sides (the mean of its percentile on each role); top four "made the playoffs", top "topped it".
+// Scoring is a game rule, not a prediction (XI_SCORE_CHECK.md): each season is simulated. The XI joins that season's
+// real sides; every side's strength is its role profile against the season's (mean z-score over the roles, economy the
+// other way round, a missing role -1.5); each pair plays twice, a win drawn with probability 1/(1+e^(-K·gap)); top
+// four on wins "made the playoffs", top "topped it". Seeded by the deal and the picks, so a draft always scores the
+// same. K was tuned (12 Nov 2026) so a random draft makes ~10 of 19 (4-15), the best a deal allows ~16 (13-18), the
+// worst ~2: ranking alone was all-or-nothing (a standout XI topped every season).
 
 export const SLOTS = [
   { key: 'openers', label: 'Opener', roles: ['openers'] }, { key: 'openers', label: 'Opener', roles: ['openers'] },
@@ -30,15 +34,16 @@ export const rng = (seed) => {
 
 const eligible = (card, slot) => slot.roles.some((r) => card.roles[r]);
 
-/** Three cards per slot, no player twice in a deal. Weighted toward recognisable seasons: how much he played and how
- * far above his season he was (squared), so standout seasons come up often and an ordinary one now and then. */
+/** Three cards per slot, no player twice in a deal. Weighted toward recognisable seasons: how much he played, and
+ * (gently: square root) how far above his season he was, so standout seasons come up often but not every card. */
 const LOWER = { death_pace: true };
 const quality = (c, slot) => Math.max(...slot.roles.map((r) => {
   const x = c.roles[r];
   if (!x) return 0;
   const good = LOWER[r] ? 1 / x.r : x.r;
-  return Math.sqrt(x.balls) * Math.max(0.35, good) ** 3;
+  return Math.sqrt(x.balls) * Math.sqrt(Math.max(0.35, good));
 }));
+
 export const deal = (cards, seed) => {
   const rand = rng(seed);
   const used = new Set();
@@ -71,24 +76,46 @@ export const profile = (picks) => {
   return Object.fromEntries(Object.entries(acc).map(([r, a]) => [r, a.s / a.w]));
 };
 
-/** In each season: where the XI's profile ranks among that season's sides. */
-export const seasonResults = (prof, seasons, roles) => seasons.map((s) => {
-  const entries = [...Object.entries(s.teams).map(([team, p]) => ({ team, p })), { team: 'XI', p: prof }];
-  const score = Object.fromEntries(entries.map((e) => [e.team, 0]));
+export const K = 0.4;
+
+/** Every side's strength in a season: the mean over roles of its z-score among the season's sides (and the XI). */
+const strengths = (season, prof, roles) => {
+  const ents = [...Object.entries(season.teams), ['XI', prof]];
+  const s = Object.fromEntries(ents.map(([t]) => [t, 0]));
   roles.forEach((r) => {
-    const vals = entries.map((e) => e.p[r.key]).filter((v) => v != null);
-    entries.forEach((e) => {
-      const v = e.p[r.key];
-      if (v == null) return;  // nobody in the role: no credit
-      const beaten = vals.filter((x) => (r.lower ? x > v : x < v)).length + 0.5 * (vals.filter((x) => x === v).length - 1);
-      score[e.team] += beaten / Math.max(1, vals.length - 1);
+    const vals = ents.map(([, p]) => p[r.key]).filter((v) => v != null);
+    const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length) || 1;
+    ents.forEach(([t, p]) => {
+      const v = p[r.key];
+      s[t] += v == null ? -1.5 : Math.max(-3, Math.min(3, (r.lower ? m - v : v - m) / sd));
     });
   });
-  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]).map(([t]) => t);
-  const rank = ranked.indexOf('XI') + 1;
-  const cut = Math.max(4, Math.min(4, (s.playoff || []).length || 4));
-  return { season: s.season, rank, of: entries.length, made: rank <= cut, topped: rank === 1, champion: s.champion };
-});
+  Object.keys(s).forEach((t) => { s[t] /= roles.length; });
+  return s;
+};
+
+/** Each season simulated with the XI in it (see the note at the top): rank, wins, made the playoffs, topped it. */
+export const seasonResults = (prof, seasons, roles, seed = 'draft') => {
+  const rand = rng(`${seed}|sim`);
+  return seasons.map((season) => {
+    const s = strengths(season, prof, roles);
+    const teams = Object.keys(s);
+    const wins = Object.fromEntries(teams.map((t) => [t, 0]));
+    for (let i = 0; i < teams.length; i += 1) {
+      for (let j = i + 1; j < teams.length; j += 1) {
+        for (let g = 0; g < 2; g += 1) {
+          const p = 1 / (1 + Math.exp(-K * (s[teams[i]] - s[teams[j]])));
+          if (rand() < p) wins[teams[i]] += 1; else wins[teams[j]] += 1;
+        }
+      }
+    }
+    const ranked = teams.slice().sort((a, b) => wins[b] - wins[a] || s[b] - s[a]);
+    const rank = ranked.indexOf('XI') + 1;
+    return { season: season.season, rank, of: teams.length, wins: wins.XI, games: 2 * (teams.length - 1),
+      made: rank <= 4, topped: rank === 1, champion: season.champion };
+  });
+};
 
 /** The best XI the deal allowed: the best card per slot on its role (ratio; economy the other way), overseas-capped. */
 export const bestFromDeal = (dealt, roles) => {

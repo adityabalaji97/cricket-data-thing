@@ -39,7 +39,7 @@ const Card = ({ card, slot, onPick, disabled }) => (
 const Strip = ({ results }) => (
   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 0.75 }}>
     {results.map((r) => (
-      <Box key={r.season} title={`${r.season}: ${r.rank} of ${r.of}`}
+      <Box key={r.season} title={`${r.season}: ${r.rank} of ${r.of}, won ${r.wins} of ${r.games}`}
         sx={{ textAlign: 'center', borderRadius: '8px', py: 0.6, ...mono, fontSize: 12.5,
           bgcolor: r.topped ? '#c9a227' : r.made ? colors.accent : colors.surface2, color: r.made ? colors.bg : colors.textLo }}>
         {r.season.slice(-2)}
@@ -73,8 +73,8 @@ const SeasonDraftGame = () => {
   };
   const restart = () => navigate({ search: `?d=${day}` }, { replace: true });
   const done = dealt && chosen.length === SLOTS.length;
-  const results = useMemo(() => (done ? seasonResults(profile(chosen), data.seasons, data.roles) : null), [done, chosen, data]);
-  const best = useMemo(() => (done ? seasonResults(profile(bestFromDeal(dealt, data.roles)), data.seasons, data.roles) : null), [done, dealt, data]);
+  const results = useMemo(() => (done ? seasonResults(profile(chosen), data.seasons, data.roles, `${day}|${pStr}`) : null), [done, chosen, data, day, pStr]);
+  const best = useMemo(() => (done ? seasonResults(profile(bestFromDeal(dealt, data.roles)), data.seasons, data.roles, `${day}|best`) : null), [done, dealt, data, day]);
 
   if (error) return <Box sx={{ p: 2, color: colors.textLo }}>The draft couldn't load just now. Try again shortly.</Box>;
   if (!dealt) return <Box sx={{ p: 2, color: colors.textLo }}>Dealing…</Box>;
@@ -123,9 +123,9 @@ const SeasonDraftGame = () => {
             {`The best XI today's deal allowed: ${best.filter((r) => r.made).length}/${best.length}.`}
           </Box>
           <Box sx={{ fontSize: 11.5, color: colors.textLo }}>
-            How scoring works: each pick's numbers against his season's league average for the role; in each season your
-            XI is ranked among that season's real sides on those roles, and top four counts as making the playoffs. A game
-            rule, not a prediction.
+            How scoring works: each pick's numbers against his season's league average for the role. Your XI then plays
+            each of the 19 seasons against that season's real sides, the stronger side more likely to win each game; top
+            four on wins makes the playoffs. A game, not a prediction.
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Box component="button" type="button" onClick={restart}
