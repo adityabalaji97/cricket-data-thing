@@ -32,6 +32,7 @@ import GuessInningsGame from './components/games/GuessInningsGame';
 import PlayerJourneysGame from './components/games/PlayerJourneysGame';
 import CallItGame from './components/games/CallItGame';
 import HigherLowerGame from './components/games/HigherLowerGame';
+import SeasonDraftGame from './components/games/SeasonDraftGame';
 import CreditsPage from './components/CreditsPage';
 import FantasyPlanner from './components/FantasyPlanner';
 import MatchScorecardPage from './components/scorecard/MatchScorecardPage';
@@ -733,6 +734,7 @@ const AppContent = () => {
         <Route path="/games/player-journeys" element={<MensT20Scope><PlayerJourneysGame /></MensT20Scope>} />
         <Route path="/games/call-it" element={<MensT20Scope><CallItGame /></MensT20Scope>} />
         <Route path="/games/higher-lower" element={<MensT20Scope><HigherLowerGame /></MensT20Scope>} />
+        <Route path="/games/season-draft" element={<SeasonDraftGame />} />
         <Route path="/wrapped/2025" element={<WrappedPage />} />
         <Route path="/search" element={<GoogleSearchLanding />} />
         <Route path="/credits" element={<CreditsPage />} />
