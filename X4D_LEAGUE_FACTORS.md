@@ -23,9 +23,9 @@ Fitted to 2024 and tested on 2025–26 the samples are 4–18 and the picture is
 his record elsewhere, raw or adjusted; batting strike rate is the one place the raw record helps. No "expected IPL"
 numbers on the cards. The auction pool's records elsewhere stay as evidence, labelled, not as a forecast.
 
-**Data issue found:** the Syed Mushtaq Ali Trophy is stored under four competition names in delivery_details ("SMAT",
-"SMA TROPHY", "SMA TROPHY FINAL", "Syed Mushtaq Ali Trophy"), which split its pairs below the 15 a factor needs.
-Worth canonicalising for the query builder and the profiles regardless.
+**SMAT names:** it's stored under four competition names, but the site already maps them to one
+(services/competition_aliases.py); the script now does too. Re-run: no change. SMAT's ball-by-ball data starts in 2019,
+so there are too few SMAT-to-IPL moves in the fitting window for a factor either way.
 
 **For X4e (style twins as potential):** given that a player's own record elsewhere doesn't beat the IPL average, a
 style match is unlikely to; the test is still the right gate if we want "plays like" on the cards.
