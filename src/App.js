@@ -19,6 +19,7 @@ import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
 import UnifiedPlayerProfile from './components/UnifiedPlayerProfile';
 import TeamPage from './components/pages/TeamPage';
+import XIBuilderPage from './components/pages/XIBuilderPage';
 import VenuePage from './components/pages/VenuePage';
 import QueryPage from './components/query2/QueryPage';
 import ComparePage from './components/pages/ComparePage';
@@ -723,6 +724,7 @@ const AppContent = () => {
         <Route path="/venues" element={<VenuesPage />} />
         <Route path="/query" element={<QueryPage isMobile={isMobile} />} />
         <Route path="/team" element={<TeamPage />} />
+        <Route path="/team-builder" element={<XIBuilderPage />} />
         <Route path="/team-comparison" element={<Navigate to="/team" replace />} />
         <Route path="/doppelgangers" element={<Navigate to="/player" replace />} />
         <Route path="/ipl-predictions" element={<MensT20Scope><IPLPredictions /></MensT20Scope>} />
