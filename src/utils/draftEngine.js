@@ -68,7 +68,19 @@ const priceValue = (c, slot) => {
 
 export const PER_SLOT = 5;
 
+/** Keepers a deal must hold across the batting slots, so an XI with a wicketkeeper (the rule to lock in) is always
+ * possible: a deal short of them is redealt from the next seed (`seed#1`, `seed#2`, ...), deterministically. */
+export const DEAL_KEEPERS = 2;
+
 export const deal = (cards, seed, perSlot = PER_SLOT) => {
+  for (let k = 0; k < 50; k += 1) {
+    const d = dealOnce(cards, k ? `${seed}#${k}` : seed, perSlot);
+    if (d.slice(0, 7).flat().filter((c) => c.wk).length >= DEAL_KEEPERS) return d;
+  }
+  return dealOnce(cards, seed, perSlot);
+};
+
+const dealOnce = (cards, seed, perSlot) => {
   const rand = rng(seed);
   const used = new Set();
   return SLOTS.map((slot) => {
@@ -112,7 +124,7 @@ export const profile = (picks) => {
   }));
 };
 
-export const K = 1.0;
+export const K = 1.5;
 
 /** Every side's strength in a season: the mean over roles of its z-score among the season's sides (and the XI). */
 const strengths = (season, prof, roles) => {
@@ -155,7 +167,7 @@ export const seasonResults = (prof, seasons, roles, seed = 'draft') => {
 
 // ---- the budget (12 Nov 2026: tight; a card's cost from the data, one scale for all 19 seasons) -------------------
 
-export const BUDGET = 110;           // credits for eleven (costs 4-12). Tuned 12 Nov 2026 with K: the best a deal allows ~13 of 19 (11-17), a random legal XI ~6 (2-10)
+export const BUDGET = 100;           // credits for eleven (costs 4-12). Tuned 13 Nov 2026 with K and the keeper rule: the best a deal allows ~13 of 19 (10-15), a random legal XI ~5 (2-10)
 export const COST_MIN = 4;
 export const COST_MAX = 12;
 
@@ -180,38 +192,39 @@ export const costOf = (card, slotIndex, table) => {
   return Math.round(2 * (COST_MIN + (COST_MAX - COST_MIN) * Math.min(1, pct))) / 2;
 };
 
-/** A set of picks (a card or null per slot) against the rules: the budget, the overseas cap, no player twice. */
+/** A set of picks (a card or null per slot) against the rules: the budget, the overseas cap, no player twice; and
+ * whether it can be locked in (eleven picks, one of them a wicketkeeper). */
 export const checkPicks = (picks, table) => {
   const chosen = picks.map((c, i) => (c ? { c, i } : null)).filter(Boolean);
   const spent = chosen.reduce((a, { c, i }) => a + costOf(c, i, table), 0);
   const overseas = chosen.filter(({ c }) => c.overseas).length;
   const names = chosen.map(({ c }) => c.name);
-  return { spent, left: BUDGET - spent, overseas, ok: spent <= BUDGET && overseas <= OVERSEAS_MAX && new Set(names).size === names.length };
+  const keeper = chosen.some(({ c }) => c.wk);
+  const ok = spent <= BUDGET && overseas <= OVERSEAS_MAX && new Set(names).size === names.length;
+  return { spent, left: BUDGET - spent, overseas, keeper, ok, complete: ok && keeper && chosen.length === SLOTS.length };
 };
 
-/** The best XI the deal allowed under the budget and the overseas cap: the most total value (what prices are
- * based on), by dynamic programming
- * over (slot, credits spent, overseas used). */
+/** The best XI the deal allowed under the rules (budget, overseas cap, a wicketkeeper): the most total value (what
+ * prices are based on), by dynamic programming over (slot, credits spent, overseas used, keeper yet). */
 export const bestFromDeal = (dealt, roles, table) => {
   const half = (x) => Math.round(x * 2);
   const B = half(BUDGET);
-  // state key: `${spent},${overseas}` -> {score, picks}
-  let states = new Map([['0,0', { score: 0, picks: [] }]]);
+  let states = new Map([['0,0,0', { score: 0, picks: [] }]]);
   dealt.forEach((cards, i) => {
     const next = new Map();
     states.forEach((st, key) => {
-      const [sp, ov] = key.split(',').map(Number);
+      const [sp, ov, wk] = key.split(',').map(Number);
       cards.forEach((c) => {
         if (st.picks.some((p) => p.name === c.name)) return;
         const cost = half(costOf(c, i, table)); const o = ov + (c.overseas ? 1 : 0);
         if (sp + cost > B || o > OVERSEAS_MAX) return;
-        const k = `${sp + cost},${o}`; const sc = st.score + priceValue(c, SLOTS[i]);
+        const k = `${sp + cost},${o},${wk || (c.wk ? 1 : 0)}`; const sc = st.score + priceValue(c, SLOTS[i]);
         if (!next.has(k) || next.get(k).score < sc) next.set(k, { score: sc, picks: [...st.picks, c] });
       });
     });
     states = next;
   });
   let best = null;
-  states.forEach((st) => { if (!best || st.score > best.score) best = st; });
+  states.forEach((st, key) => { if (key.endsWith(',1') && (!best || st.score > best.score)) best = st; });
   return best ? best.picks : [];
 };

@@ -7,7 +7,7 @@ const card = (name, rolesR, overseas = false) => ({ name, season: '2020', overse
 const cards = [];
 for (let i = 0; i < 20; i += 1) {
   cards.push(card(`O${i}`, { openers: 0.8 + i * 0.03 }, i % 3 === 0));
-  cards.push(card(`T${i}`, { top: 0.8 + i * 0.03 }));
+  cards.push(Object.assign(card(`T${i}`, { top: 0.8 + i * 0.03 }), { wk: i % 4 === 0 }));
   cards.push(card(`F${i}`, { finishers: 0.8 + i * 0.03 }, i % 2 === 0));
   cards.push(card(`P${i}`, { pp_pace: 0.8 + i * 0.03, death_pace: 1.2 - i * 0.02 }, i % 2 === 1));
   cards.push(card(`S${i}`, { mid_spin: 0.8 + i * 0.03 }));
@@ -60,4 +60,15 @@ test("a batter's bowling counts when he's among the busiest bowlers; a bowler's 
   expect(rolesFilled(bowler, 7)).toEqual(['pp_pace']);
   const picks = Array(11).fill(null); picks[4] = ar; picks[7] = card('P', { death_pace: 1.2 }); picks[8] = card('Q', { death_pace: 1.2 });
   expect(profile(picks).death_pace).toBeLessThan(1.2);   // AR bowled most at the death: he's a holder
+});
+
+test('every deal holds two keepers in the batting slots, and an XI needs one to lock in', () => {
+  ['a', 'b', 'c', 'd'].forEach((seed) => {
+    expect(deal(cards, seed).slice(0, 7).flat().filter((c) => c.wk).length).toBeGreaterThanOrEqual(2);
+  });
+  const table = costTable(cards);
+  const best = bestFromDeal(deal(cards, 'x'), roles, table);
+  expect(best.some((c) => c.wk)).toBe(true);
+  expect(checkPicks(best, table).complete).toBe(true);
+  expect(checkPicks(best.map((c) => ({ ...c, wk: false })), table).complete).toBe(false);
 });

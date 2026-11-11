@@ -74,12 +74,45 @@ def overseas_years(db):
         UNION SELECT d.bowler, EXTRACT(YEAR FROM m.date)::int FROM deliveries d JOIN matches m ON m.id = d.match_id
             WHERE m.match_type = 'league' AND m.date < '2019-01-01' AND NOT (m.competition = ANY(:ind))"""),
         {"full": list(FULL_MEMBERS), "ind": list(INDIAN_COMPS)}).fetchall()
+    alias = aliases(db)
     for name, y in rows:
         years[name].add(int(y))
+        if name in alias:  # the scorecards' short names ("ST Jayasuriya") under the cards' names too
+            years[alias[name]].add(int(y))
     return years
 
 
-CARD_WINDOW = (10, 3)  # evidence from 10 years before a season to 3 after makes that season's card overseas
+def aliases(db):
+    """{scorecard name: our display name} (player_aliases: "RV Uthappa" -> "Robin Uthappa")."""
+    from sqlalchemy import text
+
+    return dict(db.execute(text("SELECT player_name, alias_name FROM player_aliases WHERE alias_name IS NOT NULL")).fetchall())
+
+
+def keeper_years(db):
+    """({name: [stumping years, one entry per stumping]}, {name: auction WK-Batter years}) (13 Nov 2026). Only the keeper
+    stumps, so stumpings in any men's match on the scorecards (under scorecard and display names) find keepers,
+    part-time ones included. One stumping can be a stand-in (David Miller, Gurkeerat Singh) and the auction's label
+    alone can be wrong (Shahbaz Ahmed, 2020), so is_keeper wants two stumpings, or the label and one."""
+    from collections import defaultdict
+
+    from sqlalchemy import text
+
+    stumps, label = defaultdict(list), defaultdict(set)
+    alias = aliases(db)
+    for name, y, n in db.execute(text("""
+        SELECT d.fielder, EXTRACT(YEAR FROM m.date)::int, COUNT(*) FROM deliveries d JOIN matches m ON m.id = d.match_id
+        WHERE d.wicket_type = 'stumped' AND d.fielder IS NOT NULL GROUP BY 1, 2""")).fetchall():
+        for nm in {name, alias.get(name)} - {None}:
+            stumps[nm] += [int(y)] * int(n)
+    for name, y in db.execute(text("""
+        SELECT p.display_name, a.year FROM auction_lots a JOIN player_identity p ON p.pid = a.pid WHERE a.role = 'WK-Batter'
+        UNION SELECT player_name, year FROM auction_lots WHERE role = 'WK-Batter'""")).fetchall():
+        label[name].add(int(y))
+    return stumps, label
+
+
+CARD_WINDOW = (10, 3)  # overseas evidence from 10 years before a season to 3 after makes that season's card overseas
 
 
 def is_overseas(years, name, season):
@@ -87,18 +120,49 @@ def is_overseas(years, name, season):
     return any(s - CARD_WINDOW[0] <= y <= s + CARD_WINDOW[1] for y in years.get(name, ()))
 
 
+KEEPER_WINDOW = 2
+
+
+def is_keeper(keepers, name, season):
+    """Two stumpings within KEEPER_WINDOW years; or the auction's WK-Batter label and one stumping; or the label in two
+    auctions (young keepers with few stumpings: Porel, Rawat); or, for a newcomer, the label in the latest auction for
+    that same season (Kartik Sharma 2026). Not the label once on its own (Shahbaz Ahmed, 2020)."""
+    stumps, label = keepers
+    s = int(season)
+    near = sum(1 for y in stumps.get(name, ()) if abs(s - y) <= KEEPER_WINDOW)
+    labels = {y for y in label.get(name, ()) if abs(s - y) <= KEEPER_WINDOW + 1}
+    latest = max((y for ys in label.values() for y in ys), default=None)
+    return bool(near >= 2 or (near >= 1 and labels) or len(labels) >= 2
+            or (labels == {s} and s == latest and len(label.get(name, ())) == 1))
+
+
+def write_version(path):
+    """src/utils/draftDataVersion.js: a hash of the pinned data. The app and the link previews put it in the data URL,
+    so a rebuild reaches phones at once (the response is cached for up to a week). 13 Nov 2026."""
+    import hashlib
+
+    v = hashlib.sha1(path.read_bytes()).hexdigest()[:10]
+    (ROOT / "src/utils/draftDataVersion.js").write_text(
+        f"// Written by scripts/build_season_draft.py: the pinned Season Draft data's version (a hash). Don't edit.\nexport default '{v}';\n")
+    print(f"data version {v}")
+
+
 def main() -> int:
-    if "--refresh-overseas" in sys.argv:  # just the overseas flags on the pinned file
+    if "--refresh-overseas" in sys.argv:  # just the overseas and keeper flags on the pinned file
         from database import get_session
 
         path = ROOT / "services/pinned/season_draft_IPL.json"
         data = json.loads(path.read_text())
-        ov = overseas_years(next(get_session()))
+        db = next(get_session())
+        ov, wk = overseas_years(db), keeper_years(db)
         before = sum(c["overseas"] for c in data["cards"])
         for c in data["cards"]:
             c["overseas"] = is_overseas(ov, c["name"], c["season"])
+            c["wk"] = is_keeper(wk, c["name"], c["season"])
+        print(f"keepers: {sum(c['wk'] for c in data['cards'])} cards")
         path.write_text(json.dumps(data, separators=(",", ":")))
         print(f"overseas cards {before} -> {sum(c['overseas'] for c in data['cards'])}")
+        write_version(path)
         return 0
 
     from sqlalchemy import text
@@ -110,6 +174,7 @@ def main() -> int:
     db = next(get_session())
     data = league_roles(db, "IPL")
     overseas = overseas_years(db)
+    keepers = keeper_years(db)
     roles = [r for r in ROLES if r[2] != "depth"]
     seasons, cards = [], []
     for s in data["seasons"]:
@@ -165,7 +230,7 @@ def main() -> int:
                 if bowled >= 24:
                     bowl = {"runs": int(sum(t["runs"] for t in m["bowl"].values())), "balls": int(bowled),
                             "wkts": int(sum(t["wickets"] for t in m["bowl"].values()))}
-                cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]),
+                cards.append({"name": name, "season": str(s["season"]), "team": m["teams"][0], "overseas": is_overseas(overseas, name, s["season"]), "wk": is_keeper(keepers, name, s["season"]),
                               "roles": ratios, "regular": bowled >= 120, "bat": bat, "bowl": bowl})
         print(s["season"], len(teams), "teams,", sum(1 for c in cards if c["season"] == str(s["season"])), "cards")
     out = {"league": "IPL", "roles": [{"key": r[0], "label": r[1], "measure": r[4], "lower": r[6]} for r in roles],
@@ -173,6 +238,7 @@ def main() -> int:
     path = ROOT / "services/pinned/season_draft_IPL.json"
     path.write_text(json.dumps(out, separators=(",", ":")))
     print(f"{len(cards)} cards, {len(seasons)} seasons -> {path} ({path.stat().st_size // 1024} KB)")
+    write_version(path)
     return 0
 
 
