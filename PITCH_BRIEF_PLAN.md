@@ -68,8 +68,8 @@ published post was hand-built.
 | P1 | Switch off the automatic trend, preview, on-this-day, debate and play-along posts (flags, default off); expire what's queued | [ ] |
 | P2 | `post_pitches` table (day, rank, player, kind, angle, number, claim, why_now, source_url, visual, hook, status, picked_at) and a "Today's pitches" section at the top of the admin page with a Pick button | [ ] |
 | P3a | **Who and why.** Headlines → players named (existing matcher) → spike score against a stored 14-day mention history (`player_mentions` by day) → one model call per top player: what is being said (kind + claim), from headlines only | [ ] |
-| P3b | **The answer.** Per kind, a tester returns a verdict and one number: form (last 10 v his usual), matchup, selection (his slot's case from INDIA_XI_PLAN.md I2), milestone (services/record_radar.py); else the most surprising stable number from his profile cards, related to the claim | [ ] |
-| P3c | **Last night.** For India matches (IPL in season): the standout scanner's top angle and the India XI's "what moved" as candidate pitches | [ ] |
+| P3b | **The answer.** Per kind, a tester returns a verdict and one number: form (last 10 v his usual), matchup, selection (his slot's case from XI_BUILDER_PLAN.md X9), milestone (services/record_radar.py); else the most surprising stable number from his profile cards, related to the claim | [ ] |
+| P3c | **Last night.** For India matches (IPL in season): the standout scanner's top angle and the India XI's "what moved" (XI_BUILDER_PLAN.md X9) as candidate pitches | [ ] |
 | P3d | **Held ideas.** The backlog table in SOCIAL_CALENDAR.md and dated events as a third source when the news is quiet | [ ] |
 | P4 | Ranking and checks: India-first, the 14-day player + angle rule, the surprise bar, hook rules (`social_rules.hook_problem`), numbers re-run on the morning shown | [ ] |
 | P5 | Nightly run after the feed refresh; the picked pitch shows on the admin page for the build session | [ ] |
