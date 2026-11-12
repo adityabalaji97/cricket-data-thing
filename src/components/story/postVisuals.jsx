@@ -1723,7 +1723,70 @@ const TemplateBoard = ({ payload }) => {
   );
 };
 
+/**
+ * When each player is in the game, over by over (the team page's The XI card, for a post): one row per player, the 20
+ * overs, blue where he's at the crease (his share of the over's balls faced), lime where he bowls (his share of the
+ * over's balls bowled); an all-rounder gets both, batting on top. Gaps after the powerplay and the middle overs.
+ * payload: {rows:[{name, sub?, bat?:[20], bowl?:[20], highlight?}]}
+ */
+const STRIP_BAT = '91,155,240';
+const STRIP_BOWL = '182,242,74';
+const STRIP_COLS = 'repeat(6, 1fr) 4px repeat(9, 1fr) 4px repeat(5, 1fr)';
+const stripSum = (a) => (a || []).reduce((x, y) => x + y, 0);
+const StripCells = ({ shares, rgb, k, h }) => (
+  <Box sx={{ display: 'grid', gridTemplateColumns: STRIP_COLS, gap: '2px', height: h }}>
+    {Array.from({ length: 20 }, (_, i) => {
+      const v = shares ? shares[i] || 0 : 0;
+      return (
+        <React.Fragment key={i}>
+          {(i === 6 || i === 15) && <span />}
+          <Box sx={{ borderRadius: '2px', bgcolor: v > 0.004 ? `rgba(${rgb},${Math.min(1, 0.08 + v * k).toFixed(2)})` : 'rgba(255,255,255,.05)' }} />
+        </React.Fragment>
+      );
+    })}
+  </Box>
+);
+const OverStrips = ({ payload }) => {
+  const anyBat = payload.rows.some((r) => stripSum(r.bat) > 0.2);
+  return (
+  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+    <Box sx={{ display: 'flex', gap: 2, fontSize: 12, color: colors.textLo }}>
+      {anyBat && <span><Box component="i" sx={{ display: 'inline-block', width: 11, height: 11, borderRadius: '2px', bgcolor: `rgb(${STRIP_BAT})`, mr: 0.6, verticalAlign: '-1px' }} />at the crease</span>}
+      <span><Box component="i" sx={{ display: 'inline-block', width: 11, height: 11, borderRadius: '2px', bgcolor: `rgb(${STRIP_BOWL})`, mr: 0.6, verticalAlign: '-1px' }} />bowling</span>
+    </Box>
+    <Box sx={{ display: 'grid', gridTemplateColumns: '104px 1fr', columnGap: 1.25, ...mono, fontSize: 11, color: colors.textLo }}>
+      <span>Over</span>
+      <Box sx={{ display: 'grid', gridTemplateColumns: STRIP_COLS, gap: '2px' }}>
+        {Array.from({ length: 20 }, (_, i) => (
+          <React.Fragment key={i}>
+            {(i === 6 || i === 15) && <span />}
+            <Box component="span" sx={{ textAlign: 'center' }}>{[1, 6, 7, 15, 16, 20].includes(i + 1) ? i + 1 : ''}</Box>
+          </React.Fragment>
+        ))}
+      </Box>
+    </Box>
+    {payload.rows.map((r) => {
+      const b = stripSum(r.bat) > 0.2; const w = stripSum(r.bowl) > 0.2;
+      return (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '104px 1fr', columnGap: 1.25, alignItems: 'center' }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: 14, fontWeight: 600, color: r.highlight ? colors.accent : colors.textHi }}>{r.name}</Typography>
+            {r.sub && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.sub}</Typography>}
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {b && <StripCells shares={r.bat} rgb={STRIP_BAT} k={3.2} h={b && w ? 15 : 26} />}
+            {w && <StripCells shares={r.bowl} rgb={STRIP_BOWL} k={1.2} h={b && w ? 15 : 26} />}
+          </Box>
+        </Box>
+      );
+    })}
+    <Box sx={{ ...mono, fontSize: 11, color: colors.textLo }}>Brighter: more of that over’s balls</Box>
+  </Box>
+  );
+};
+
 export const POST_VISUALS = {
+  over_strips: OverStrips,
   recap_text: RecapText,
   score_race: ScoreRace,
   deep_compare: DeepCompare,

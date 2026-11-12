@@ -130,6 +130,20 @@ home-league locals.
 | I2 | The screen: XI strip, slot sheet as on the mockup, on the team page for the ten sides | `IntlXIPage.jsx`, link from `/team` |
 | I3 | Nightly warm after the feed, and the share card per slot | warm step, `api/og.mjs` |
 
+### Backlog: does SMAT predict the IPL? (added 12 Nov 2026)
+
+Can a player's Syed Mushtaq Ali Trophy numbers tell us how he'll do in the IPL, and by how much? SMAT 2016-24 is now
+in delivery_details (PRs #320-321), with Impact, RAA and WPA from the nightly job.
+
+- **Sample:** players with a SMAT season (240+ balls faced or 120+ bowled) and an IPL season the following year.
+- **Measures:** RAA and Impact per 100 balls, bat and ball, plus SR, economy, dot %. WPA reported, not leaned on: it
+  barely repeats even IPL to IPL.
+- **Baselines to beat:** the IPL average (X4d found league factors didn't beat it) and the player's previous IPL
+  season where he has one. Correlation and prediction error with intervals, by role.
+- **Output:** a short note; if it holds, a "what SMAT says" line on auction cards. If it doesn't beat the average,
+  that's the post.
+- **Gap:** SMAT 2024-25 and 2025-26 group stages aren't in Cricsheet; ask the feed provider.
+
 ## Risks
 
 - **The score fails X2.** Then the builder shows template rows only, with no headline number, until a better score
