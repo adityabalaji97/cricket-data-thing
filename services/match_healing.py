@@ -211,6 +211,9 @@ def add(session, match, name_of: Callable, pid_of: Callable, competition: str) -
             "season": str(season) if season else None, "daynight": None, "trophy_name": (info.get("event") or {}).get("name"),
             "format": "T20", "gender": "male", "date": None}
     rows = dd_rows(match, name_of, pid_of, meta, _hands(session, match, name_of))
+    # The loader's own stats rows are still pending in this session: flush them first, or the DELETE misses them and the
+    # rebuild doubles every batter and bowler (12 Nov 2026, the first SMAT match).
+    session.flush()
     for table, col in (("batting_stats", "match_id"), ("bowling_stats", "match_id"), ("deliveries", "match_id")):
         session.execute(text(f"DELETE FROM {table} WHERE {col}::text = :m"), {"m": mid})
     _insert(session, rows)
