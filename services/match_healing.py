@@ -149,17 +149,8 @@ META = ("match_date", "year", "ground", "country", "competition", "toss", "tourn
         "trophy_name", "format", "gender", "date")
 
 
-def heal(session, match, name_of: Callable, pid_of: Callable) -> Dict:
-    """Replace a stuck feed match's rows with Cricsheet's: its delivery_details rows, stats, Primer metrics and
-    partnership stands go (the nightly steps rebuild the last three; the stats are rebuilt here), the matches row
-    takes Cricsheet's result and data_source 'cricsheet_dd'. One transaction."""
-    from sync_stats_from_dd import StatsFromDeliveryDetails
-
-    mid = match.match_id
-    first = session.execute(text(f"SELECT {', '.join(META)} FROM delivery_details WHERE p_match = :m LIMIT 1"),
-                            {"m": mid}).mappings().first() or {}
-    meta = {k: first.get(k) for k in META}
-    # Batting hand and bowling style: as the feed had them for these players (in this match, else their latest).
+def _hands(session, match, name_of: Callable) -> Dict[str, Dict]:
+    """Batting hand and bowling style for the match's players, as the feed has them (their latest)."""
     names = {name_of(n) for n in match.player_ids()}
     hands: Dict[str, Dict] = {}
     for r in session.execute(text("""
@@ -170,14 +161,31 @@ def heal(session, match, name_of: Callable, pid_of: Callable) -> Dict:
             SELECT DISTINCT ON (bowl) bowl, bowl_style, bowl_kind FROM delivery_details
             WHERE bowl = ANY(:n) AND bowl_style IS NOT NULL ORDER BY bowl, match_date DESC"""), {"n": list(names)}):
         hands.setdefault(r[0], {}).update(bowl_style=r[1], bowl_kind=r[2])
-    rows = dd_rows(match, name_of, pid_of, meta, hands)
+    return hands
+
+
+def _insert(session, rows: List[Dict]) -> None:
+    cols = sorted({k for r in rows for k in r})
+    session.execute(text(f"INSERT INTO delivery_details ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"),
+                    [{c: r.get(c) for c in cols} for r in rows])
+
+
+def heal(session, match, name_of: Callable, pid_of: Callable) -> Dict:
+    """Replace a stuck feed match's rows with Cricsheet's: its delivery_details rows, stats, Primer metrics and
+    partnership stands go (the nightly steps rebuild the last three; the stats are rebuilt here), the matches row
+    takes Cricsheet's result and data_source 'cricsheet_dd'. One transaction."""
+    from sync_stats_from_dd import StatsFromDeliveryDetails
+
+    mid = match.match_id
+    first = session.execute(text(f"SELECT {', '.join(META)} FROM delivery_details WHERE p_match = :m LIMIT 1"),
+                            {"m": mid}).mappings().first() or {}
+    meta = {k: first.get(k) for k in META}
+    rows = dd_rows(match, name_of, pid_of, meta, _hands(session, match, name_of))
     before = ours_legal(session, mid)
     for table, col in (("ball_metrics", "p_match"), ("partnership_stands", "p_match"), ("batting_stats", "match_id"),
                        ("bowling_stats", "match_id"), ("delivery_details", "p_match")):
         session.execute(text(f"DELETE FROM {table} WHERE {col}::text = :m"), {"m": mid})
-    cols = sorted({k for r in rows for k in r})
-    session.execute(text(f"INSERT INTO delivery_details ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"),
-                    [{c: r.get(c) for c in cols} for r in rows])
+    _insert(session, rows)
     winner = _result(match)
     outcome = match.info.get("outcome") or {}
     session.execute(text("""UPDATE matches SET data_source = :src, winner = COALESCE(:w, winner),
@@ -185,3 +193,27 @@ def heal(session, match, name_of: Callable, pid_of: Callable) -> Dict:
                     {"src": HEALED, "w": winner, "o": __import__("json").dumps(outcome) if outcome else None, "m": mid})
     stats = StatsFromDeliveryDetails().process_match_stats(session, mid)
     return {"match": mid, "legal_before": before, "legal_after": legal_balls(match), "rows": len(rows), **stats}
+
+
+def add(session, match, name_of: Callable, pid_of: Callable, competition: str) -> Dict:
+    """A match the feed never delivered, loaded from Cricsheet just now (matches row, `deliveries`, stats): its balls
+    into delivery_details too, so the query builder, the Primer metrics (next nightly step) and the profile see it, as a
+    healed match (12 Nov 2026: SMAT 2024-26, which the feed mostly missed). The scorecard-only `deliveries` copy goes and
+    the stats are rebuilt from the new rows; data_source 'cricsheet_dd'. Cricsheet has no line, length or shot tags."""
+    from sync_stats_from_dd import StatsFromDeliveryDetails
+
+    mid = match.match_id
+    info = match.info
+    toss = info.get("toss") or {}
+    season = info.get("season")
+    meta = {"match_date": match.date.isoformat(), "year": match.date.year, "ground": info.get("venue"), "country": None,
+            "competition": competition, "toss": toss.get("winner"), "tournament": (info.get("event") or {}).get("name"),
+            "season": str(season) if season else None, "daynight": None, "trophy_name": (info.get("event") or {}).get("name"),
+            "format": "T20", "gender": "male", "date": None}
+    rows = dd_rows(match, name_of, pid_of, meta, _hands(session, match, name_of))
+    for table, col in (("batting_stats", "match_id"), ("bowling_stats", "match_id"), ("deliveries", "match_id")):
+        session.execute(text(f"DELETE FROM {table} WHERE {col}::text = :m"), {"m": mid})
+    _insert(session, rows)
+    session.execute(text("UPDATE matches SET data_source = :src WHERE id = :m"), {"src": HEALED, "m": mid})
+    stats = StatsFromDeliveryDetails().process_match_stats(session, mid)
+    return {"match": mid, "rows": len(rows), **stats}

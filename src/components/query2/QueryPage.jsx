@@ -90,6 +90,9 @@ const QueryPage = ({ isMobile }) => {
   const [follow, setFollow] = useState('');
   const [parsing, setParsing] = useState(null);   // 'ask' | 'follow'
   const [parseError, setParseError] = useState(null);
+  // What the question asked that the query couldn't apply ("Couldn't apply: on Indian pitches"), shown above the answer
+  // until the next question (12 Nov 2026: these were returned by the parser and never shown).
+  const [notes, setNotes] = useState([]);
   const [run, setRun] = useState({ status: 'idle', data: null, qs: '' });
   const [options, setOptions] = useState(null);
   const [sheet, setSheet] = useState({ open: false, focus: null });
@@ -173,6 +176,7 @@ const QueryPage = ({ isMobile }) => {
     if (!t || parsing) return;
     setParsing(mode);
     setParseError(null);
+    setNotes([]);
     track('nl_search', { follow_up: mode === 'follow' });
     try {
       const body = { query: t, format: fmtOverride || fmt };
@@ -181,6 +185,7 @@ const QueryPage = ({ isMobile }) => {
       if (!data.success) { setParseError(data.error || "That question didn't parse. Try rephrasing it."); return; }
       if (data.format === 'ODI' || data.format === 'T20') setFmt(data.format);
       nlRef.current = data.log_ref || null;
+      setNotes(Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : []);
       const merged = { ...parseUrlParams(''), ...data.filters };
       const label = mode === 'follow' ? `${question || queryInWords(filters, groupBy)} … ${t}` : t;
       setFollow('');
@@ -296,6 +301,12 @@ const QueryPage = ({ isMobile }) => {
         </Box>
       )}
       {live && run.status === 'error' && <Box sx={{ color: colors.red, fontSize: 14 }}>{run.error}</Box>}
+      {live && answer && notes.length > 0 && (
+        <Box role="note" sx={{ border: '1px solid rgba(240,180,41,0.45)', bgcolor: 'rgba(240,180,41,0.08)', borderRadius: '12px', px: 1.5, py: 1, fontSize: 13.5, color: colors.textHi }}>
+          {notes.map((n) => <Box key={n}>{n}</Box>)}
+          <Box sx={{ fontSize: 12, color: colors.textLo, mt: 0.25 }}>The answer below leaves these out.</Box>
+        </Box>
+      )}
       {live && answer && (
         <AnswerCard answer={answer} results={run.data} filters={filters} groupBy={groupBy} isMobile={isMobile}
           apiQueryString={run.qs} autoGraphic={params.get('graphic') === '1'} />
