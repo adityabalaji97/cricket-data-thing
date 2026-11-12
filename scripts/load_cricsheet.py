@@ -468,12 +468,15 @@ def same_fixture_ids(session, match: CricsheetMatch) -> List[str]:
     return sorted({r[0] for r in rows if {team_key(r[1]), team_key(r[2])} == teams})
 
 
-def write_match(session, stats_writer, match: CricsheetMatch, name_of) -> Dict:
-    """One match in one transaction: matches row, deliveries, stats."""
+def write_match(session, stats_writer, match: CricsheetMatch, name_of, matches_row_only: bool = False) -> Dict:
+    """One match in one transaction: matches row, deliveries, stats. matches_row_only: --into-dd writes the balls into
+    delivery_details and rebuilds the stats from them, so the `deliveries` copy and its stats would only be deleted."""
     from models import Delivery, Match
 
     session.add(Match(**match_row(match, name_of)))
     session.flush()
+    if matches_row_only:
+        return {'batting': 0, 'bowling': 0}
     session.bulk_insert_mappings(Delivery, legacy_deliveries(match, name_of))
     return stats_writer.write_stats_for_deliveries(session, match.match_id, stat_deliveries(match, name_of))
 
@@ -527,7 +530,7 @@ def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False
                 summary['would_load'] += 1
                 continue
             try:
-                result = write_match(session, stats_writer, m, name_of)
+                result = write_match(session, stats_writer, m, name_of, matches_row_only=into_dd and m.fmt == 'T20')
                 if into_dd and m.fmt == 'T20':
                     # Into delivery_details as well, so the query builder sees it (services/match_healing.add).
                     from services import match_healing
