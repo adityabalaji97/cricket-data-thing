@@ -93,6 +93,7 @@ Return a JSON object with these fields:
   "query_mode": "delivery",
   "group_by": [...],
   "confidence": "high" | "medium" | "low",
+  "not_applied": ["conditions in the question that no filter above can express, in the user's words (e.g. \"who haven't played the IPL in 2026\", \"on Indian pitches\"). Never list ranking or sorting words (best, top, lowest), metrics, or anything a filter, date or group_by above already covers. Usually empty."],
   "suggestions": ["0-3 short query refinements, as phrases or prompts"],
   "recommended_columns": ["4-6 metric columns to prioritize in results display"],
   "recommended_chart": {
@@ -118,7 +119,7 @@ Return only these fields: the system writes the explanation and lists what was m
 - "venue": a single venue/ground string (e.g. "Eden Gardens")
 
 ### League/competition filters
-- "leagues": list of league abbreviations. Valid values: "IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20 Blast", "T20I"
+- "leagues": list of league abbreviations. Valid values: "IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20 Blast", "T20I", "SMAT", "Super Smash", "MLC", "Men's Hundred", "CSA Pro20 Cup", "CSA T20 Challenge", "National T20 Cup", "Shpageeza CL", "National Cricket League T20", "ZIM T20", "INTER-PRO T20", "SLC T20 League"
 - "include_international": true/false (for international T20I matches)
 
 ### Batting hand filter
@@ -224,6 +225,11 @@ format, venue, country, match_id, competition, year, batting_team, bowling_team,
 - BBL → Big Bash League
 - PSL → Pakistan Super League
 - CPL → Caribbean Premier League
+- SMAT → Syed Mushtaq Ali Trophy (India's domestic T20; "Mushtaq Ali", "SMA Trophy")
+- Super Smash → New Zealand's domestic T20
+- MLC → Major League Cricket (USA)
+- Men's Hundred → The Hundred (men's)
+- National T20 Cup → Pakistan's domestic T20; CSA Pro20 Cup / CSA T20 Challenge → South Africa's
 - T20I → International Twenty20
 
 ## Rules
@@ -596,7 +602,11 @@ def call_openai(
 VALID_BAT_HAND = {"RHB", "LHB"}
 VALID_BOWL_STYLE = {"RF", "RFM", "RM", "LF", "LFM", "LM", "RO", "RL", "LO", "LC"}
 VALID_BOWL_KIND = {"pace bowler", "spin bowler", "mixture/unknown"}
-VALID_LEAGUES = {"IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20 Blast", "T20I"}
+# Every men's T20 competition the data holds (12 Nov 2026: SMAT questions were losing their filter here, as the list stopped
+# at ten, so "Best SMAT death bowlers" came back with every league). Names as the query builder takes them.
+VALID_LEAGUES = {"IPL", "BBL", "PSL", "CPL", "SA20", "ILT20", "BPL", "LPL", "T20 Blast", "T20I", "SMAT", "Super Smash", "MLC",
+                 "Men's Hundred", "CSA Pro20 Cup", "CSA T20 Challenge", "National T20 Cup", "Shpageeza CL",
+                 "National Cricket League T20", "ZIM T20", "INTER-PRO T20", "SLC T20 League"}
 VALID_QUERY_MODE = {"delivery", "batting_stats", "bowling_stats"}
 VALID_MATCH_OUTCOME = {"win", "loss", "tie", "no_result"}
 VALID_TOSS_DECISION = {"bat", "field"}
@@ -688,6 +698,34 @@ _PHASE_PATTERNS = {
     "death": re.compile(r"\bdeath\b|\bslog\s+overs\b|\bfinal\s+(?:4|5|four|five|10|ten)\s+overs\b"),
 }
 _EXPLICIT_OVERS = re.compile(r"\bovers?\s+\d|\b\d+\s*(?:-|to)\s*\d+\s+overs?\b|\b\d+(?:st|nd|rd|th)\s+over\b")
+
+
+_VENUE_STOP = {"stadium", "ground", "cricket", "international", "oval", "park", "the", "club", "association", "sports", "complex"}
+
+
+# Franchise names that contain a city or ground word ("Mumbai Indians", "Sydney Sixers"): taken out of a question before
+# looking for a venue, so a side isn't read as "at its home ground" (12 Nov 2026: "Mumbai Indians in 2026" got the Wankhede).
+_TEAM_NAMES_WITH_PLACES = re.compile(
+    r"\b(?:mumbai indians|chennai super kings|royal challengers (?:bangalore|bengaluru)|kolkata knight riders|delhi capitals"
+    r"|delhi daredevils|punjab kings|kings xi punjab|rajasthan royals|sunrisers hyderabad|lucknow super giants|gujarat titans"
+    r"|perth scorchers|sydney (?:sixers|thunder)|melbourne (?:stars|renegades)|brisbane heat|adelaide strikers|hobart hurricanes"
+    r"|lahore qalandars|karachi kings|islamabad united|peshawar zalmi|quetta gladiators|multan sultans"
+    r"|durban's super giants|joburg super kings|pretoria capitals|paarl royals)\b")
+
+
+def _strip_team_names(text: str, teams: Optional[List[str]] = None) -> str:
+    q = (text or "").lower()
+    for t in teams or []:
+        q = q.replace(str(t).lower(), " ")
+    return _TEAM_NAMES_WITH_PLACES.sub(" ", q)
+
+
+def _question_names_venue(query: str, raw: str, canonical: str, teams: Optional[List[str]] = None) -> bool:
+    """Whether the question names the ground (or its city): any distinctive word of the venue the model returned, once
+    team names are taken out ("Mumbai Indians" names a side, not the Wankhede)."""
+    q = _strip_team_names(query, teams)
+    words = {w for name in (raw, canonical) for w in re.findall(r"[a-z]{4,}", (name or "").lower()) if w not in _VENUE_STOP}
+    return any(w in q for w in words)
 
 
 def _question_format(q_lower: str, filters: Dict[str, Any]) -> Optional[str]:
@@ -1204,7 +1242,9 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
             canonical = VENUE_STANDARDIZATION.get(raw_venue, raw_venue)
             if canonical == raw_venue:
                 canonical = CITY_TO_VENUE.get(raw_venue, CITY_TO_VENUE.get(raw_venue.title(), raw_venue))
-            validated["venue"] = canonical
+            # Only a ground the question names: "Mumbai Indians in 2026" isn't "at the Wankhede" (12 Nov 2026).
+            if _question_names_venue(query, raw_venue, canonical, (filters.get("batting_teams") or []) + (filters.get("bowling_teams") or []) + (filters.get("teams") or [])):
+                validated["venue"] = canonical
 
     # Validated enum filters
     # Track if bat_hand should become a group_by (when LLM returns a list like ["RHB", "LHB"])
@@ -1360,6 +1400,11 @@ def validate_filters(parsed: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     suggestions = interpretation.get("suggestions", suggestions)
 
     threshold_notes = validated.pop("_threshold_notes", [])
+    # What the question asked that no filter can express: shown to the reader ("Couldn't apply: ..."), never dropped silently.
+    not_applied = parsed.get("not_applied") or []
+    if isinstance(not_applied, str):
+        not_applied = [not_applied]
+    threshold_notes = threshold_notes + [f"Couldn't apply: {str(x).strip()}" for x in not_applied if str(x).strip()][:3]
     return {
         "filters": validated,
         "group_by": group_by,
@@ -1400,7 +1445,7 @@ def _post_process_result(query: str, result: Dict[str, Any], page_format: Option
             group_by = _append_group_by(group_by, col)
 
     # Venue inference and canonicalization.
-    inferred_venue = _infer_venue_from_query(query)
+    inferred_venue = _infer_venue_from_query(_strip_team_names(query))
     if inferred_venue:
         filters["venue"] = VENUE_STANDARDIZATION.get(inferred_venue, inferred_venue)
         explicit_venue_grouping = bool(
