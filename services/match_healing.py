@@ -165,9 +165,16 @@ def _hands(session, match, name_of: Callable) -> Dict[str, Dict]:
 
 
 def _insert(session, rows: List[Dict]) -> None:
+    """One multi-row INSERT (psycopg2 execute_values), not a round trip per ball: row by row, a match's ~240 balls took
+    90 s against the production database (12 Nov 2026, the SMAT backfill)."""
+    from psycopg2.extras import execute_values
+
+    if not rows:
+        return
     cols = sorted({k for r in rows for k in r})
-    session.execute(text(f"INSERT INTO delivery_details ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})"),
-                    [{c: r.get(c) for c in cols} for r in rows])
+    cur = session.connection().connection.cursor()
+    execute_values(cur, f"INSERT INTO delivery_details ({', '.join(cols)}) VALUES %s",
+                   [tuple(r.get(c) for c in cols) for r in rows], page_size=1000)
 
 
 def heal(session, match, name_of: Callable, pid_of: Callable) -> Dict:
