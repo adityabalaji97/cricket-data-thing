@@ -37,6 +37,7 @@ Usage:
     python scripts/load_cricsheet.py                      # recently added, last 7 days
     python scripts/load_cricsheet.py --days 30 --dry-run  # what would load, no writes
     python scripts/load_cricsheet.py --zip path/or/url.zip --ids 1549969
+    python scripts/load_cricsheet.py --zip https://cricsheet.org/downloads/sma_json.zip --into-dd   # SMAT backfill
 """
 
 from __future__ import annotations
@@ -83,6 +84,7 @@ LEAGUE_BUCKETS = {
     'bangladesh premier league': 'BPL',
     'lanka premier league': 'LPL',
     'super smash': 'Super Smash',
+    'syed mushtaq ali trophy': 'SMAT',  # 12 Nov 2026: the feed missed most of SMAT 2024-26
 }
 
 # Cricsheet wicket kinds -> the delivery_details spelling, which the stats writer expects.
@@ -477,7 +479,7 @@ def write_match(session, stats_writer, match: CricsheetMatch, name_of) -> Dict:
 
 
 def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False,
-        people_source: str = PEOPLE_URL, post_steps: bool = True) -> Dict:
+        people_source: str = PEOPLE_URL, post_steps: bool = True, into_dd: bool = False) -> Dict:
     from database import get_database_connection
     from sync_stats_from_dd import StatsFromDeliveryDetails
 
@@ -526,6 +528,16 @@ def run(source: str, only_ids: Optional[List[str]] = None, dry_run: bool = False
                 continue
             try:
                 result = write_match(session, stats_writer, m, name_of)
+                if into_dd and m.fmt == 'T20':
+                    # Into delivery_details as well, so the query builder sees it (services/match_healing.add).
+                    from services import match_healing
+
+                    people = m.player_ids()
+                    pid_of = lambda n, people=people: next(iter(register.get(people.get(n), [])), None)  # noqa: E731
+                    competition = competition_for(m, [canonical_team(t) for t in m.info['teams']])[0]
+                    added = match_healing.add(session, m, name_of, pid_of, competition)
+                    summary['into_dd'] += 1
+                    result = {**result, **{k: added[k] for k in ('batting', 'bowling') if k in added}}
                 session.commit()
                 summary['loaded'] += 1
                 logger.info(f"Loaded {label}: {result['batting']} batting, {result['bowling']} bowling rows")
@@ -613,11 +625,14 @@ def main() -> int:
     parser.add_argument('--ids', nargs='*', help='Only these match ids')
     parser.add_argument('--dry-run', action='store_true', help='Report what would load; write nothing')
     parser.add_argument('--skip-post', action='store_true', help='Skip venue/team/league standardizing and ELO')
+    parser.add_argument('--into-dd', action='store_true',
+                        help='Also write new T20 matches into delivery_details, so the query builder sees them (a backfill '
+                             'of a competition the feed missed: --zip https://cricsheet.org/downloads/sma_json.zip)')
     args = parser.parse_args()
 
     source = args.zip or f"{CRICSHEET}/downloads/recently_added_{args.days}_male_json.zip"
     summary = run(source, only_ids=args.ids, dry_run=args.dry_run,
-                  people_source=args.people, post_steps=not args.skip_post)
+                  people_source=args.people, post_steps=not args.skip_post, into_dd=args.into_dd)
     print("Cricsheet fallback:", ", ".join(f"{k} {v}" for k, v in summary.items()))
     return 1 if summary.get('errors') else 0
 
