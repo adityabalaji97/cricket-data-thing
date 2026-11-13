@@ -27,6 +27,69 @@ from services.squad_view import (  # noqa: E402  the squad's numbers and cards, 
 
 
 
+# From CSK (13 Nov 2026) the value slide makes way for "who fills the gaps" (the team page's fits card, services/fit.py):
+# what fits each gap, and who is actually available today. Teams posted before then kept the value slide.
+FITS_FROM = {"CSK", "RCB", "KKR", "MI"}
+UNIT = {"strike_rate": ("{:.0f}", "SR"), "wickets_per_24": ("{:.2f}", "wkts/4 ov"), "economy": ("{:.2f}", "an over"),
+        "average": ("{:.1f}", "avg")}
+SHORT_LABEL = {"finishers": "5-7 finishers", "pp_pace": "Powerplay pace", "death_pace": "Death pace", "openers": "Openers",
+               "top": "No. 3-4", "mid_spin": "Middle-overs spin"}
+
+
+def fits_card(db, b):
+    """Each template gap (depth aside, three at most): the squad's number against playoff sides', two proven holders
+    elsewhere as the profile ("like ..."), and who is available today: unsold at the last auction (released players
+    join on 17 Nov) on IPL numbers where they have enough, else on every T20 we hold, unadjusted and labelled so."""
+    from services import xi_engine as x
+    from services.fit import fits
+
+    gaps = [g for g in b["gaps"] if g["key"] != "depth"][:3]
+    if not gaps:
+        return None, []
+    found = fits(db, b["code"], gaps)
+    overseas = {p["name"]: p["overseas"] for p in x.payload(db, b["code"])["pool"]}
+    status = {g["key"]: g["status"] for g in gaps}
+    rows = []
+    for f in found:
+        fmt, unit = UNIT[f["measure"]]
+        v = lambda n: fmt.format(n)  # noqa: E731
+        opts = ([{"name": o["name"], "value": f"{v(o['value'])}", "overseas": overseas.get(o["name"], False), "source": "IPL"}
+                 for o in f["free"][:2]]
+                + [{"name": o["name"], "value": f"{v(o['value'])}", "overseas": overseas.get(o["name"], False),
+                    "source": "all T20s"} for o in f["outside"]
+                   # only those who'd lift the squad's number (Bracewell's 144 matched CSK's 144: 13 Nov 2026)
+                   if (float(v(o["value"])) < float(v(f["squad_value"])) if f["lower_is_better"]
+                       else float(v(o["value"])) > float(v(f["squad_value"])))])[:2]
+        rows.append({"key": f["key"], "label": SHORT_LABEL.get(f["key"], f["label"]), "status": status[f["key"]],
+                     "now": f"{v(f['squad_value'])} {unit}", "playoff": v(f["playoff_level"]),
+                     "like": [{"name": called(e["name"]), "value": v(e["value"])} for e in f["examples"]], "options": opts})
+    T = TEAMS[b["code"]]
+    n_os = sum(1 for r in rows for o in r["options"] if o["overseas"])
+    n_opt = sum(len(r["options"]) for r in rows)
+    title = (f"Who fills {T['short']}'s gaps? All {n_opt} available today are overseas" if n_os == n_opt else
+             f"Who fills {T['short']}'s gaps? {n_os} of the {n_opt} available today are overseas" if n_os else f"Who fills {T['short']}'s gaps? The best available today")
+    c = card("fits", "gap_fits", title,
+             {"rows": rows, "note": "Available: unsold in 2026 · released players join 17 Nov"},
+             "Fits: IPL 2024-26 at any side · all T20s: unadjusted, since 2024", kicker="Who fills the gaps")
+    return c, rows
+
+
+def bowling_hook(b):
+    """The only bowler above par, as a sentence (TEAMS "hook": "bowling"); None unless the bowling slide says so."""
+    if TEAMS[b["code"]].get("hook") != "bowling":
+        return None
+    c4 = next(c for c in b["cards"] if c["id"] == "bowling")
+    if "is the only one of" not in c4["title"]:
+        return None
+    # Checked on every bowler, not just the slide's six (CSK: R Ghosh is +3 from 3 overs), so the claim carries a floor.
+    bowled = [x for x in b["players"] if x.get("bowl_raa") is not None and (x["bowl_balls"] or 0) >= 60]
+    p = max(bowled, key=lambda x: x["bowl_raa"])
+    if p["bowl_raa"] <= 0 or any(x["bowl_raa"] > 0 for x in bowled if x is not p):
+        return None
+    return (f"{p['name']} saved {p['bowl_raa']:.0f} runs against par since the mega auction. Every other "
+            f"{TEAMS[b['code']]['short']} bowler with 10+ overs is below it.")
+
+
 def copy(b):
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
@@ -40,6 +103,7 @@ def copy(b):
         did = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
         hook = (f"{lead['out']} {did} wins for {T['short']} since the mega auction. "
                 f"{lead['in']}, coming in: {sg(lead['in_wpa'])}.")
+    hook = bowling_hook(b) or hook
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
     tr = b.get("trade")
     def deal_text(d):
@@ -60,12 +124,26 @@ def copy(b):
         f"2024-26 at any side): {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
         + (f" Short of playoff level, biggest first: " + "; ".join(gap_text(r) for r in b["gaps"][:3]) + "." if b["gaps"] else "")
         + f" Squad cost: ₹{b['bill']:.1f} crore.",
+        *([fits_text(b)] if b.get("fits") else []),
         "Wins added, runs above par and Impact: T20 Primer method. IPL 2025-26, counting each player's record at any side. "
         "Prices: 2026 squad (Cricbuzz). Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
         "Who would you keep?",
         f"Free ball-by-ball cricket stats: link in bio.\n.\n#IPL2027 #IPLRetention {T['tag']} #IPL",
     ])
     return hook, caption
+
+
+def fits_text(b):
+    """The fits slide in words, for the caption."""
+    parts = []
+    for r in b["fits"]:
+        like = " and ".join(e["name"] for e in r["like"])
+        opts = ", ".join(f"{o['name']} ({o['value']}{', ' + o['source'] if o['source'] != 'IPL' else ''})" for o in r["options"])
+        parts.append(f"{r['label']} ({r['now']}; playoff sides {r['playoff']}): think {like}. Available today: {opts or 'nobody yet'}")
+    os_ = sum(1 for p in b["players"] if p.get("overseas"))
+    return ("Who fills the gaps? " + ". ".join(parts) + ". \"All T20s\" numbers come from outside the IPL and aren't "
+            "adjusted for the standard of the league. Released players join the pool on 17 November."
+            + (f" {TEAMS[b['code']]['short']} also have {os_} overseas players for 8 spots." if os_ > 8 else ""))
 
 
 def team_link(team):
@@ -90,6 +168,9 @@ def thread(b, link):
     lead = (tr or {}).get("lead")
     opener = (f"{T['short']} have until 17 November to name who they keep for IPL 2027. {h['name']} cost {crore(h['price'])} "
               f"and added {sg(h['wpa'])} wins since the mega auction. The case, player by player 🧵")
+    if bowling_hook(b):
+        opener = (f"{T['short']} have until 17 November to name who they keep for IPL 2027. {bowling_hook(b)} "
+                  "The case, player by player 🧵")
     if lead:
         did = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
         opener = (f"{T['short']} have agreed to trade {lead['out']} for {lead['in']} (awaiting BCCI ratification). Since the mega auction, {called(lead['out'])} {did} "
@@ -101,12 +182,13 @@ def thread(b, link):
             f"{wb['name']} the furthest below at {sg(wb['bat_raa100'], 0)}."),
         (4, (f"Bowling by phase: {bc[0]} saves {bc[2]:.1f} runs every four overs {'at the death' if bc[1] == 'death' else 'in the ' + PH[bc[1]]}, "
              f"the most by anyone in any phase." if bc else "Bowling by phase: runs saved against par, every four overs.")),
-        (5, f"Price against wins added. The bargain: {g['name']}, {sg(g['wpa'])} for {crore(g['price'])}. "
-            f"The big price: {u['name']}, {sg(u['wpa'])} for {crore(u['price'])}."),
-        (6, f"Three calls: {big['name']} ({crore(big['price'])}, {sg(big['wpa'])} wins), {u['name']} ({crore(u['price'])}, "
+        *([] if b.get("fits") else [(5, f"Price against wins added. The bargain: {g['name']}, {sg(g['wpa'])} for {crore(g['price'])}. "
+            f"The big price: {u['name']}, {sg(u['wpa'])} for {crore(u['price'])}.")]),
+        (6 - bool(b.get("fits")), f"Three calls: {big['name']} ({crore(big['price'])}, {sg(big['wpa'])} wins), {u['name']} ({crore(u['price'])}, "
             f"{sg(u['wpa'])}) and {g['name']} ({crore(g['price'])}, {sg(g['wpa'])}). The case for and against each."),
-        (7, f"Against what playoff sides have had since 2023: {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
+        (7 - bool(b.get("fits")), f"Against what playoff sides have had since 2023: {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
             + (f" Furthest short: {gap_text(b['gaps'][0])}." if b["gaps"] else "")),
+        *([(7, fits_tweet(b))] if b.get("fits") else []),
         (8, f"Who would you keep?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9"),
     ]
     from services.ig_x import hand_thread
@@ -116,6 +198,16 @@ def thread(b, link):
                                                              # The traded players too, so "Arshdeep Singh" is tagged as
                                                              # himself, not read as another Singh (PBKS, 10 Nov 2026).
                                                              + [n for d in (tr or {}).get("deals", []) for n in d["ins"] + d["outs"]])))
+
+
+def fits_tweet(b):
+    r = b["fits"][0]
+    opts = ", ".join(f"{o['name']} {o['value']}" for o in r["options"][:3])
+    n_os = sum(1 for x in b["fits"] for o in x["options"] if o["overseas"])
+    n = sum(len(x["options"]) for x in b["fits"])
+    t = (f"Who fills the gaps? {r['label']}: think {' and '.join(e['name'] for e in r['like'])}. Available today: {opts}."
+         + (f" All {n} names across the gaps are overseas." if n_os == n else f" {n_os} of the {n} names across the gaps are overseas." if n_os else ""))
+    return t if len(t) <= 250 else t.split(" Available today")[0] + f". Available today: {opts}."
 
 
 def trade_tweet(tr):
@@ -141,6 +233,19 @@ def reel_script(b):
     lead = (b.get("trade") or {}).get("lead")
     hook = (f"{lead['out']} {spoken(lead['out_wpa'])} for {T['short']} since the mega auction. {lead['in']}, who replaces him, "
             f"{spoken(lead['in_wpa'])}." if lead else f"{h['name']} cost {T['short']} {say(h)}. Since the mega auction, he {spoken(h['wpa'])}.")
+    hook = bowling_hook(b) or hook
+    if b.get("fits"):
+        r = b["fits"][0]
+        o = r["options"][0] if r["options"] else None
+        return {"hook": hook,
+                "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
+                          else "Here's the whole squad, by wins added since 2025.",
+                          f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
+                          f"{big['name']}, the big name, {spoken(big['wpa'])}. {g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
+                          (f"Against playoff sides, the biggest gap: {SAY[b['gaps'][0]['key']]}." if b["gaps"]
+                           else "Against playoff sides, every role is at their level."),
+                          (f"Who's available? {o['name']}, among others{', on numbers from outside the IPL' if o['source'] != 'IPL' else ''}."
+                           if o else "And nobody's available to fill it yet.")]}
     return {"hook": hook,
             "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
                       else "Here's the whole squad, by wins added since 2025.",
@@ -175,6 +280,11 @@ def main() -> int:
 
     db = next(get_session())
     b = build(db, args.team)
+    if args.team in FITS_FROM:
+        fc, rows = fits_card(db, b)
+        if fc:
+            b["fits"] = rows
+            b["cards"] = [c for c in b["cards"] if c["id"] != "value"] + [fc]
     hook, caption = copy(b)
     slides = slides_of(b, hook)
     print("HOOK:", hook, f"({len(hook)})")
