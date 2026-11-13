@@ -5,6 +5,7 @@ import { colors, fonts } from '../../theme/hindsightDark';
 import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 import { InningsClue } from '../games/GuessInningsGame';
 import PlayerLink from '../common/PlayerLink';
+import OverseasMark from '../common/OverseasMark';
 
 /**
  * Visuals for Instagram post cards (services/ig_posts): one question answered from several angles. Same contract as
@@ -1785,7 +1786,49 @@ const OverStrips = ({ payload }) => {
   );
 };
 
+/**
+ * Who'd fill a side's template gaps (services/fit.py fits, the team page's fits card, for a post): one block per gap,
+ * the side's number against playoff sides', the profile that fits ("like" two proven holders elsewhere, their numbers),
+ * and who is actually available now, each with his number, a plane if overseas, and where the number comes from.
+ * payload: {rows:[{label, status, now, playoff, like:[{name, value}], options:[{name, value, overseas?, source?}],
+ *           none?}], note?}
+ */
+const GapFits = ({ payload }) => {
+  const statusColour = (s) => (s === 'playoff level' ? colors.accent : s === 'short' ? STATUS_COLOUR.short : colors.red);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.6 }}>
+      {payload.rows.map((r) => (
+        <Box key={r.label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.45 }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.label}</Typography>
+            <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: 11, color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap' }}>now {r.now} · playoff {r.playoff}</Typography>
+          </Box>
+          <Typography noWrap sx={{ fontSize: 11.5, color: colors.textLo }}>
+            Like {r.like.map((x) => `${x.name} (${x.value})`).join(', ')}
+          </Typography>
+          {r.options.length ? r.options.map((o) => (
+            <Box key={o.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto 92px', gap: 1, alignItems: 'baseline', pl: 1.25,
+              borderLeft: `2px solid ${colors.borderStrong}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                <Typography noWrap sx={{ fontSize: 13, color: colors.textHi }}>{o.name}</Typography>
+                {o.overseas && <OverseasMark size={13} />}
+              </Box>
+              <Typography sx={{ ...mono, fontSize: 13, color: colors.textHi, textAlign: 'right' }}>{o.value}</Typography>
+              <Typography noWrap sx={{ ...mono, fontSize: 10, color: colors.textLo, textAlign: 'right' }}>{o.source || 'IPL'}</Typography>
+            </Box>
+          )) : (
+            <Typography sx={{ fontSize: 12, color: colors.textLo, pl: 1.25 }}>{r.none || 'Nobody available yet'}</Typography>
+          )}
+        </Box>
+      ))}
+      {payload.note && <Typography sx={{ ...mono, fontSize: 10.5, color: colors.textLo }}>{payload.note}</Typography>}
+    </Box>
+  );
+};
+
 export const POST_VISUALS = {
+  gap_fits: GapFits,
   over_strips: OverStrips,
   recap_text: RecapText,
   score_race: ScoreRace,

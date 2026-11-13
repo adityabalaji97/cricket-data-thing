@@ -23,7 +23,8 @@ PALETTE = json.loads((ROOT / "src/utils/teamPalette.json").read_text())["teams"]
 MIN_BAT, MIN_BOWL, MIN_CELL = 60, 60, 18
 
 TEAMS = {
-    "CSK": {"name": "Chennai Super Kings", "short": "Chennai", "tag": "#CSK", "big": "MS Dhoni"},
+    # "hook": "bowling": lead with the only bowler above par (the user's choice for CSK, 13 Nov 2026).
+    "CSK": {"name": "Chennai Super Kings", "short": "Chennai", "tag": "#CSK", "big": "MS Dhoni", "hook": "bowling"},
     "MI": {"name": "Mumbai Indians", "short": "Mumbai", "tag": "#MumbaiIndians", "big": "Rohit Sharma"},
     "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli"},
     "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Rinku Singh"},  # Russell retired (Nov 2026)
@@ -266,8 +267,17 @@ def build(db, code, reported=True):
         rows4.append({"name": short(p["name"]), "sub": f"{sg(p['bowl_raa'] or 0, 0)} runs saved", "cells": cells})
     best_c = max((c for c in cells_all if c[3] >= 48), key=lambda c: c[2], default=None)
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
-    c4 = card("bowling", "grid_heat",
-              f"Bowling: {short(best_c[0])} saves {best_c[2]:.1f} runs every four overs in the {PH[best_c[1]]}" if best_c else "Bowling by phase",
+    # One bowler above par and the rest below (CSK, 13 Nov 2026: Noor +41, five others under) is the sturdier line: a
+    # whole-window total, not one phase's rate. Otherwise the best phase rate, as before.
+    above = [r for r in rows4 if not r["sub"].startswith("−") and not r["sub"].startswith("-") and not r["sub"].startswith("+0 ")]
+    if len(above) == 1 and len(rows4) >= 4:
+        t4 = f"Bowling: {above[0]['name']} is the only one of {len(rows4)} above par, {above[0]['sub']}"
+    elif best_c:
+        t4 = (f"Bowling: {short(best_c[0])} saves {best_c[2]:.1f} runs every four overs "
+              + ("at the death" if best_c[1] == "death" else f"in the {PH[best_c[1]]}"))
+    else:
+        t4 = "Bowling by phase"
+    c4 = card("bowling", "grid_heat", t4,
               {"cols": ["Powerplay", "Middle", "Death"], "rows": rows4, "format": "signed1", "higher_better": True, "mid": 0,
                "legend": ["Saves runs against par", "Costs runs"]},
               f"Runs saved against par per 24 balls (T20 Primer) · IPL 2025-26 · {MIN_CELL}+ balls a cell", kicker="Bowling by phase")
