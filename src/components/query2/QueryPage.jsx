@@ -12,7 +12,7 @@ import { track } from '../../utils/analytics';
 import { PageFooter } from '../pageKit/pageKit';
 import AnswerCard from './AnswerCard';
 import FilterSheet from './FilterSheet';
-import { ASKABLE, shapeAnswer } from './answerShape';
+import { ASKABLE, measureAsked, shapeAnswer } from './answerShape';
 import { GROUP_CHIPS, followLabel, queryChips, queryInWords, questionAfterEdit, removeChip } from './qbWords';
 
 // The query builder, rebuilt for the phone (QUERY_BUILDER_PLAN.md, signed off 5 Nov 2026). The question is the way in:
@@ -148,6 +148,9 @@ const QueryPage = ({ isMobile }) => {
       if (Array.isArray(v)) v.forEach((x) => p.append(k, x)); else p.append(k, v);
     });
     groupBy.forEach((g) => p.append('group_by', g));
+    // No grouping returns raw balls, which the answer can't read ("Nothing matched" for /query?batters=Sanju+Samson,
+    // where site search lands; 14 Nov 2026): one group by format is the totals row. The URL stays ungrouped.
+    if (!groupBy.length) p.append('group_by', 'format');
     if (nlRef.current) p.set('nl_ref', nlRef.current);
     const qs = p.toString();
     setRun({ status: 'loading', data: null, qs });
@@ -190,7 +193,8 @@ const QueryPage = ({ isMobile }) => {
       const label = mode === 'follow' ? followLabel(question, queryInWords(filters, groupBy), t) : t;
       setFollow('');
       // The measure the question asks about, when it names one ("most wickets"); otherwise the page's default.
-      const yAxis = data.recommended_chart?.y_axis;
+      // Words the parser has no column for ("average score") pick the measure first; a follow-up keeps the one in use.
+      const yAxis = measureAsked(t) || data.recommended_chart?.y_axis || (mode === 'follow' ? measure : null);
       const runFmt = data.format === 'ODI' || data.format === 'T20' ? data.format : (fmtOverride || fmt);
       go(merged, data.group_by || [], label, ASKABLE.includes(yAxis) ? yAxis : null, runFmt);
     } catch (e) {

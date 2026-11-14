@@ -85,7 +85,7 @@ Status: **built** (5 Nov 2026, mockups signed off).
 | Q6 | Cleanup and check | [x] 5 Nov 2026: QueryBuilder, QueryFilters, NLQueryInput and FormatSwitcher removed; checked at 390px (empty, by year, ranking, pitch map, filter sheet, plain English) |
 | Q7 | Dates on phones | [x] 14 Nov 2026: presets (Any time, This year, Since 2025/2024/2023, Pick dates) in FilterSheet.jsx; cleanDates drops a range starting today or later and turns a backwards one round; empty answer with dates shows "Try any time"; a one-day range reads "9 Nov 2026". Tests in __tests__/qbFixes.test.js; checked at 390px |
 | Q8 | The title follows the query | [x] 14 Nov 2026: qbWords.questionAfterEdit drops `q` when a chip removal or the sheet changes the filters (a new grouping keeps it); followLabel keeps the first question and the latest follow-up only. Checked at 390px: Samson + "Since 2024" from the sheet clears the bar |
-| Q9 | "Average score" questions | [ ] |
+| Q9 | "Average score" questions | [x] 14 Nov 2026: no parser or API change. Delivery rows already carry innings_count (GT IPL 2026 powerplay: 984 runs, 17 innings in both modes), so answerShape has a runs_per_innings measure ("Runs an innings", runs incl. extras / innings; lower is better from the bowling side), measureAsked() picks it from the words ("average score/total", "runs per innings"), and a follow-up keeps the measure in use. Also fixed: a query with no grouping (/query?batters=Sanju+Samson, where site search lands) showed "Nothing matched" because the API returns raw balls; the page now asks for group_by=format, one totals row, keeping the URL ungrouped. Checked at 390px |
 | Q10 | Hamilton's old names | [ ] |
 | Q11 | Bot questions out of the counts | [ ] |
 
