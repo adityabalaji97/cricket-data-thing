@@ -6,7 +6,7 @@ import { POST_VISUALS } from '../story/postVisuals';
 import GraphicMaker from '../GraphicMaker';
 import QueryResults from '../QueryResults';
 import { ScoringWheel } from '../playerProfile/cards/RoleCards';
-import { fmtValue, MEASURES } from './answerShape';
+import { fmtValue, MEASURES, metricOf } from './answerShape';
 
 // The answer (QUERY_BUILDER_PLAN.md Q2): one sentence that reads the result, the picture that fits its shape, then
 // the rows. "All columns" opens the full table; the share button copies the link or makes a graphic (the old Make a
@@ -62,7 +62,7 @@ const Ranked = ({ rows, lowerBetter }) => {
 const Tiles = ({ r, measure }) => {
   const cells = [
     ['Runs (balls)', `${r.runs} (${r.balls})`], [measure === 'economy' ? 'Wickets' : 'Outs', r.wickets],
-    [MEASURES[measure].label, fmtValue(measure === 'economy' ? (6 * r.runs) / r.balls : r[measure], MEASURES[measure].format)],
+    [MEASURES[measure].label, fmtValue(metricOf(r, measure), MEASURES[measure].format)],
     ['Dots', r.dot_percentage != null ? `${Math.round(r.dot_percentage)}%` : '–'],
     ['Boundaries', r.boundary_percentage != null ? `${Math.round(r.boundary_percentage)}%` : '–'],
     ['False shots', r.control_percentage != null ? `${Math.round(100 - r.control_percentage)}%` : '–'],

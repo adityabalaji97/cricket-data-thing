@@ -15,7 +15,15 @@ export const MEASURES = {
   dot_percentage: { label: 'Dot %', short: 'dots', format: 'pct0', better: 'lower' },
   boundary_percentage: { label: 'Boundary %', short: 'boundaries', format: 'pct0', better: 'higher' },
   wickets: { label: 'Wickets', short: 'wkts', format: 'int', better: 'higher' },
+  // A team's score: runs (extras included) over innings. The query builder's rows carry innings_count (Q9).
+  runs_per_innings: { label: 'Runs an innings', short: 'an innings', format: 'dec1', better: 'higher' },
 };
+
+/** The measure a question's words name when the parser can't: "average score", "runs per innings" (13 Nov 2026:
+ * "Average scores in powerplay of all teams in IPL 2026" was asked three ways and answered with strike rate). */
+export const measureAsked = (text) => (
+  /\b(average|avg|mean)\s+(\w+\s+)?(score|total)s?\b|\b(score|total|runs)s?\s+(per|an?|each)\s+innings\b/i.test(text || '')
+    ? 'runs_per_innings' : null);
 
 export const fmtValue = (v, format) => {
   if (v == null || Number.isNaN(Number(v))) return '–';
@@ -27,7 +35,9 @@ export const fmtValue = (v, format) => {
 };
 
 const economy = (r) => (r.economy != null ? Number(r.economy) : r.balls ? (6 * r.runs) / r.balls : null);
-const metricOf = (r, key) => (key === 'economy' ? economy(r) : r[key] != null ? Number(r[key]) : null);
+const perInnings = (r) => (r.innings_count ? Number(r.runs || 0) / Number(r.innings_count) : null);
+export const metricOf = (r, key) => (key === 'economy' ? economy(r) : key === 'runs_per_innings' ? perInnings(r)
+  : r[key] != null ? Number(r[key]) : null);
 
 /** Batting or bowling: who the question is about. */
 export const perspectiveOf = (filters, groupBy) => {
@@ -58,8 +68,9 @@ export const rowLabel = (row, groupBy) => (groupBy || [])
   })
   .join(' · ');
 
-const detailOf = (r, perspective) => {
+const detailOf = (r, perspective, mKey = null) => {
   const parts = [`${Number(r.balls || 0).toLocaleString('en-US')} balls`];
+  if (mKey === 'runs_per_innings' && r.innings_count) parts.unshift(`${r.innings_count} innings`);
   if (perspective === 'bowl') { if (r.wickets != null) parts.push(`${r.wickets} wkts`); } else if (r.wickets != null) parts.push(`${r.wickets} out`);
   if (r.dot_percentage != null) parts.push(`${Math.round(r.dot_percentage)}% dots`);
   return parts.join(' · ');
@@ -81,7 +92,7 @@ const subjectOf = (filters) => {
  * The answer for a result: {type, measure, sentence:[[text, strong?]...], chart:{visual, payload}|null, rows, note}.
  * type: 'single' | 'time' | 'pitch' | 'ranked' | 'bars' | 'table'.
  */
-export const ASKABLE = ['wickets', 'economy', 'strike_rate', 'average', 'dot_percentage', 'boundary_percentage'];
+export const ASKABLE = ['wickets', 'economy', 'strike_rate', 'average', 'dot_percentage', 'boundary_percentage', 'runs_per_innings'];
 
 export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null) => {
   // A group with one value across every row (by batter when the question names one batter) says nothing: drop it.
@@ -93,7 +104,8 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
   const asked = ASKABLE.includes(measure) && (measure !== 'wickets' || rankedShape) ? measure : null;
   const mKey = asked || measureFor(persp, g);
   const M = MEASURES[mKey];
-  const lowerBetter = M.better === 'lower';
+  // Runs an innings from the bowling side are runs conceded: lower is better.
+  const lowerBetter = M.better === 'lower' || (mKey === 'runs_per_innings' && persp === 'bowl');
   const all = (data || []).filter((r) => r && (r.balls || 0) > 0);
   const subject = subjectOf(filters);
   const S = (t, b = false) => [t, b];
@@ -131,7 +143,7 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
           series: [{ name: subject || M.label, points: rows.map((r) => ({ x: Number(r[g[0]]), y: Number(metricOf(r, mKey).toFixed(2)) })), highlight: true }],
         },
       } : null,
-      rows: rows.map((r) => ({ label: String(r[g[0]]), detail: detailOf(r, persp), value: val(r), row: r })),
+      rows: rows.map((r) => ({ label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), row: r })),
     };
   }
 
@@ -160,7 +172,7 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
           cells: cells.map((r) => ({ line: r.line, length: r.length, value: Number(metricOf(r, mKey).toFixed(2)), balls: r.balls, outs: r.wickets })),
         },
       },
-      rows: big.slice(0, 5).map((r) => ({ label: name(r), detail: detailOf(r, persp), value: val(r), row: r })),
+      rows: big.slice(0, 5).map((r) => ({ label: name(r), detail: detailOf(r, persp, mKey), value: val(r), row: r })),
       note: `${floor}+ balls a cell`,
     };
   }
@@ -173,12 +185,13 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
     const top = rows[0]; const second = rows[1];
     const what = GROUP_WORDS[g[0]] || g[0];
     const how = mKey === 'economy' ? ['is the cheapest', `${val(top)} an over`] : mKey === 'wickets' ? ['has the most wickets', val(top)]
+      : mKey === 'runs_per_innings' ? [lowerBetter ? 'concedes fewest' : 'scores most', `${val(top)} an innings`]
       : [lowerBetter ? 'is lowest' : 'leads', `${M.label.toLowerCase()} ${val(top)}`];
     const sentence = [S(String(top[g[0]]), true), S(` ${how[0]}: ${how[1]}`),
       S(second ? `, then ${String(second[g[0]]).split(' ').slice(-1)[0]} (${val(second)}).` : '.')];
     return {
       type: 'ranked', measure: mKey, sentence,
-      rows: rows.slice(0, 10).map((r, i) => ({ rank: i + 1, label: String(r[g[0]]), detail: detailOf(r, persp), value: val(r), num: metricOf(r, mKey), row: r })),
+      rows: rows.slice(0, 10).map((r, i) => ({ rank: i + 1, label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), num: metricOf(r, mKey), row: r })),
       note: `${rows.length} ${what}s${floor ? `, ${floor}+ balls` : ''} · ${lowerBetter ? 'lower is better' : 'higher is better'}`,
     };
   }
@@ -224,7 +237,7 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
         visual: 'metric_bars',
         payload: {
           metric: { label: M.label, format: M.format === 'dec2' ? 'dec2' : 'int' }, label_width: 130,
-          rows: rows.map((r) => ({ name: rowLabel(r, g), value: Number(metricOf(r, mKey).toFixed(2)), detail: detailOf(r, persp), highlight: r === best })),
+          rows: rows.map((r) => ({ name: rowLabel(r, g), value: Number(metricOf(r, mKey).toFixed(2)), detail: detailOf(r, persp, mKey), highlight: r === best })),
         },
       },
       rows: [],
@@ -237,6 +250,6 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
     type: 'table', measure: mKey,
     sentence: [S(`${rows.length} rows by ${g.map((x) => GROUP_WORDS[x] || x).join(' and ')}. The biggest: `), S(rowLabel(rows[0], g), true),
       S(`, ${val(rows[0])} ${M.short === 'SR' ? 'SR' : M.short} from ${rows[0].balls} balls.`)],
-    rows: rows.slice(0, 12).map((r) => ({ label: rowLabel(r, g), detail: detailOf(r, persp), value: val(r), row: r })),
+    rows: rows.slice(0, 12).map((r) => ({ label: rowLabel(r, g), detail: detailOf(r, persp, mKey), value: val(r), row: r })),
   };
 };
