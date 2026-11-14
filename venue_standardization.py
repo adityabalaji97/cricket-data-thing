@@ -158,6 +158,9 @@ NEW_VENUES = {
     'Sabina Park, Kingston': 'Sabina Park, Kingston, Jamaica',
     'Saurashtra Cricket Association Stadium': 'Saurashtra Cricket Association Stadium, Rajkot',
     'Seddon Park': 'Seddon Park, Hamilton',
+    # Seddon Park under its sponsors' names (one ODI each, 2001 and 2003). National Stadium, Hamilton is in Bermuda.
+    'Westpac Park, Hamilton': 'Seddon Park, Hamilton',
+    'WestpacTrust Park, Hamilton': 'Seddon Park, Hamilton',
     'Shaheed Veer Narayan Singh International Stadium': 'Shaheed Veer Narayan Singh International Stadium, Raipur',
     'Shere Bangla National Stadium': 'Shere Bangla National Stadium, Mirpur',
     'Sir Vivian Richards Stadium, North Sound': 'Sir Vivian Richards Stadium, North Sound, Antigua',
