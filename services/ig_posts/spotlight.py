@@ -94,6 +94,19 @@ SPECS: Dict[str, Dict[str, Any]] = {
         "prompt": "Does he open in Christchurch?",
         "key": "spotlight-sooryavanshi-nz-2026-10",
     },
+    "kohli-warner-ipl": {
+        "type": "player_compare", "scope": "IPL",
+        "players": [{"name": "Virat Kohli", "label": "Kohli", "start": date(2023, 1, 1), "end": date(2026, 12, 31),
+                     "leagues": ["IPL"]},
+                    {"name": "David Warner", "label": "Warner", "start": date(2015, 1, 1), "end": date(2019, 12, 31),
+                     "leagues": ["IPL"]}],
+        "kicker": "Kohli 2023-26 or Warner 2015-19?", "sub": "Same numbers, different eras",
+        "tags": ["#IPL", "#ViratKohli", "#DavidWarner", "#RCB", "#SRH"],
+        "method": ("every IPL ball for each in his window; Impact (runs added to the team's projected total) and WPA "
+                   "(win probability added) are judged against the conditions of the day."),
+        "prompt": "Who would you pick?",
+        "key": "spotlight-kohli-warner-ipl-2026-10",
+    },
     "india-openers-nz": {
         "type": "openers_case", "side": "India", "side_word": "India's", "side_poss": "India's", "since": date(2025, 1, 1),
         "candidates": ["Abhishek Sharma", "Vaibhav Sooryavanshi", "Sanju Samson", "Ishan Kishan"],
@@ -443,6 +456,10 @@ def build(db, spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         from services.ig_posts import series_preview
 
         return series_preview.build(db, spec)
+    if spec.get("type") == "player_compare":  # two batters, each in his own window (services/ig_posts/player_compare.py)
+        from services.ig_posts import player_compare
+
+        return player_compare.build(db, spec)
     if spec.get("type") == "openers_case":  # who opens: boom, bust and the possible top threes (openers_case.py)
         from services.ig_posts import openers_case
 
