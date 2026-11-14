@@ -241,7 +241,10 @@ def reel_script(b):
                 "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
                           else "Here's the whole squad, by wins added since 2025.",
                           f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
-                          f"{big['name']}, the big name, {spoken(big['wpa'])}. {g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
+                          # The big name already opened the Reel when he's the hook (RCB, 14 Nov 2026): say the big price.
+                          (f"{u['name']}, the big price, {spoken(u['wpa'])}, from a small sample. " if h is big
+                           else f"{big['name']}, the big name, {spoken(big['wpa'])}. ")
+                          + f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}.",
                           (f"Against playoff sides, the biggest gap: {SAY[b['gaps'][0]['key']]}." if b["gaps"]
                            else "Against playoff sides, every role is at their level."),
                           (f"Who's available? {o['name']}, among others{', on numbers from outside the IPL' if o['source'] != 'IPL' else ''}."

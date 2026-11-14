@@ -26,7 +26,7 @@ TEAMS = {
     # "hook": "bowling": lead with the only bowler above par (the user's choice for CSK, 13 Nov 2026).
     "CSK": {"name": "Chennai Super Kings", "short": "Chennai", "tag": "#CSK", "big": "MS Dhoni", "hook": "bowling"},
     "MI": {"name": "Mumbai Indians", "short": "Mumbai", "tag": "#MumbaiIndians", "big": "Rohit Sharma"},
-    "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli"},
+    "RCB": {"name": "Royal Challengers Bengaluru", "short": "Bengaluru", "tag": "#RCB", "big": "Virat Kohli", "hook": "big"},
     "KKR": {"name": "Kolkata Knight Riders", "short": "Kolkata", "tag": "#KKR", "big": "Rinku Singh"},  # Russell retired (Nov 2026)
     # A player just traded in isn't a retention call, so a side's big name is one it already had (Pant, Kuldeep moved).
     "DC": {"name": "Delhi Capitals", "short": "Delhi", "tag": "#DelhiCapitals", "big": "Axar Patel",  # captain
@@ -294,8 +294,11 @@ def build(db, code, reported=True):
     # Digvesh Rathi's +0.02 from 546): 300+ balls and +0.10 wins, else the ₹4 crore fallback.
     rest = [p for p in pool if p is not under]
     real = [p for p in rest if (p["bat_balls"] or 0) + (p["bowl_balls"] or 0) >= 300] or rest
-    bargain = max([p for p in real if p["price"] <= 1.0] or real, key=lambda p: p["wpa"])
-    if bargain["wpa"] < 0.1:
+    # No ₹1 crore player with a real sample goes to the ₹4 crore step, not the whole squad (RCB, 14 Nov 2026: the
+    # whole-squad fallback made Bhuvneshwar at ₹10.75 crore "the bargain" over Padikkal at ₹2 crore).
+    cheap = [p for p in real if p["price"] <= 1.0]
+    bargain = max(cheap, key=lambda p: p["wpa"]) if cheap else None
+    if bargain is None or bargain["wpa"] < 0.1:
         bargain = max([p for p in real if p["price"] <= 4.0] or real, key=lambda p: p["wpa"])
     trio = [big, under, bargain]
     c5 = card("value", "scatter_plus",

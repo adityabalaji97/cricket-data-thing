@@ -1,18 +1,16 @@
 # cricket-data-thing (Hindsight)
 
 Cricket stats app: FastAPI + Postgres (Heroku) backend, React/MUI frontend on Vercel
-(hindsight2020.vercel.app). Hero features are the **query builder**, **match preview** and
+(hindsightcricket.com). Hero features are the **query builder**, **match preview** and
 **scorecard**.
 
-## Active project: multi-format expansion
+## Plans
 
-The app is being extended from men's-T20-only to ODIs, women's T20s and Tests.
-
-* **Plan and chunk briefs:** [MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md)
-* **Dev log / handoff state:** [MULTI_FORMAT_DEV_LOG.md](MULTI_FORMAT_DEV_LOG.md)
-
-**Read the dev log's CURRENT STATE block before starting work, and update it before you finish.**
-Sessions alternate between Claude Code and Codex, so an undescribed change is a lost change.
+Feature plans live as `*_PLAN.md` files in the repo root (multi-format expansion:
+[MULTI_FORMAT_PLAN.md](MULTI_FORMAT_PLAN.md), with its log in
+[MULTI_FORMAT_DEV_LOG.md](MULTI_FORMAT_DEV_LOG.md)). When working on a plan's chunk, read its
+plan first and record what you changed there: Claude Code and Codex both work in this repo,
+so an unrecorded change is a lost change.
 
 ## Local development
 
@@ -25,16 +23,17 @@ npm start                            # frontend on :3000
 python scripts/regression_snapshot.py check   # diff hero endpoints against frozen goldens
 ```
 
-Run the golden `check` after every backend change: the point of the current phase is that men's T20
-behaviour stays bit-identical while new formats are added.
+Run the golden `check` after every backend change: men's T20 output must stay bit-identical as
+other formats are added.
 
 ## Landmines
 
 * **Never run `cleanup_non_t20.py`.** It deletes any match with more than 260 deliveries — that is
   every ODI and every Test.
 * **`.env` holds the production database URL.** Never repoint it at localhost. Local runs export
-  `DATABASE_URL` instead, which wins because `database.py` calls `load_dotenv(override=False)`.
-* **`models.py:308-396` (`DeliveryDetails`) is stale** and does not match the live table.
+  `DATABASE_URL` instead, which wins because `load_dotenv()` in `database.py` never overrides an
+  exported variable.
+* **The `DeliveryDetails` model in `models.py` is stale** and does not match the live table.
   `scripts/recreate_delivery_details.sql` is authoritative.
 * **`delivery_details.date` is entirely NULL.** The populated column is `match_date`
   (varchar, ISO `YYYY-MM-DD`).
