@@ -37,6 +37,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const dateWords = (s, e) => {
   const d = (x) => { const t = new Date(`${x}T00:00:00`); return `${MONTHS[t.getMonth()]} ${t.getFullYear()}`; };
   if (s && e) {
+    if (s === e) { const t = new Date(`${s}T00:00:00`); return `${t.getDate()} ${MONTHS[t.getMonth()]} ${t.getFullYear()}`; }
     if (s.slice(5) === '01-01' && e.slice(5) === '12-31' && s.slice(0, 4) === e.slice(0, 4)) return s.slice(0, 4);
     return `${d(s)} to ${d(e)}`;
   }
@@ -104,3 +105,45 @@ export const removeChip = (filters, groupBy, chip) => {
   else f[chip.key] = Array.isArray(filters[chip.key]) ? [] : null;
   return { filters: f, groupBy: g };
 };
+
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** The date presets in the filter sheet, newest first: [label, start_date]. Any time has no start. */
+export const datePresets = (today = new Date()) => {
+  const y = today.getFullYear();
+  return [['Any time', null], ['This year', `${y}-01-01`], [`Since ${y - 1}`, `${y - 1}-01-01`],
+    [`Since ${y - 2}`, `${y - 2}-01-01`], [`Since ${y - 3}`, `${y - 3}-01-01`]];
+};
+
+/** Which preset the dates are, or 'custom' when they're picked by hand. */
+export const datePresetOf = (f, today = new Date()) => {
+  if (!f.start_date && !f.end_date) return 'Any time';
+  if (f.end_date) return 'custom';
+  const hit = datePresets(today).find(([, s]) => s === f.start_date);
+  return hit ? hit[0] : 'custom';
+};
+
+/** Dates as the query should get them. A phone's date picker fills in today when it's opened and closed, which made
+ * "today to today" ranges with no matches (14 Nov 2026: Gurjapneet Singh, Rovman Powell), so a range that starts today
+ * or later goes; a range picked backwards is turned round. */
+export const cleanDates = (f, today = new Date()) => {
+  const t = isoDay(today);
+  let { start_date: s, end_date: e } = f;
+  // A start of today or later holds nothing yet; its end goes with it. An end in the future ("IPL 2026" ends 31 Dec) stays.
+  if (s && s >= t) { s = null; if (e && e >= t) e = null; }
+  if (s && e && s > e) [s, e] = [e, s];
+  return { ...f, start_date: s || null, end_date: e || null };
+};
+
+/** The filters with empty values left out, keys in order: two equal strings are the same filters. */
+const filterKey = (f) => JSON.stringify(Object.keys(f || {}).sort()
+  .filter((k) => { const v = f[k]; return v != null && v !== '' && !(Array.isArray(v) && !v.length); })
+  .map((k) => [k, Array.isArray(f[k]) ? [...f[k]].map(String).sort() : String(f[k])]));
+
+/** Filters changed by hand no longer match the question that made them (14 Nov 2026: a card titled "Sanju Samson …
+ * pace heavy sides" went on to show Axar Patel and Dewald Brevis), so the question goes and the chips say what's asked.
+ * A new grouping keeps it: "Kohli v spin since 2023" is still the question when it's split by phase. */
+export const questionAfterEdit = (question, before, after) => (filterKey(before) === filterKey(after) ? question : null);
+
+/** A follow-up's label is the first question and the latest follow-up, not every step ("A … B … C … D"). */
+export const followLabel = (question, inWords, t) => `${(question || '').split(' … ')[0] || inWords} … ${t}`;
