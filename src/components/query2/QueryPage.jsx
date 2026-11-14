@@ -13,7 +13,7 @@ import { PageFooter } from '../pageKit/pageKit';
 import AnswerCard from './AnswerCard';
 import FilterSheet from './FilterSheet';
 import { ASKABLE, shapeAnswer } from './answerShape';
-import { GROUP_CHIPS, queryChips, queryInWords, removeChip } from './qbWords';
+import { GROUP_CHIPS, followLabel, queryChips, queryInWords, questionAfterEdit, removeChip } from './qbWords';
 
 // The query builder, rebuilt for the phone (QUERY_BUILDER_PLAN.md, signed off 5 Nov 2026). The question is the way in:
 // a plain-English bar, then the answer (a sentence, the chart that fits, the rows), the query as editable chips,
@@ -187,7 +187,7 @@ const QueryPage = ({ isMobile }) => {
       nlRef.current = data.log_ref || null;
       setNotes(Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : []);
       const merged = { ...parseUrlParams(''), ...data.filters };
-      const label = mode === 'follow' ? `${question || queryInWords(filters, groupBy)} … ${t}` : t;
+      const label = mode === 'follow' ? followLabel(question, queryInWords(filters, groupBy), t) : t;
       setFollow('');
       // The measure the question asks about, when it names one ("most wickets"); otherwise the page's default.
       const yAxis = data.recommended_chart?.y_axis;
@@ -256,7 +256,7 @@ const QueryPage = ({ isMobile }) => {
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
           {chips.map((c) => (
             <Chip key={`${c.key}-${c.value ?? ''}`} onClick={() => setSheet({ open: true, focus: c.key === 'dates' ? 'dates' : c.key })}
-              onRemove={() => { const n = removeChip(filters, groupBy, c); go(n.filters, n.groupBy, question, measure); }}>
+              onRemove={() => { const n = removeChip(filters, groupBy, c); go(n.filters, n.groupBy, questionAfterEdit(question, filters, n.filters), measure); }}>
               {c.label}
             </Chip>
           ))}
@@ -311,6 +311,13 @@ const QueryPage = ({ isMobile }) => {
         <AnswerCard answer={answer} results={run.data} filters={filters} groupBy={groupBy} isMobile={isMobile}
           apiQueryString={run.qs} autoGraphic={params.get('graphic') === '1'} />
       )}
+      {live && answer?.type === 'empty' && (filters.start_date || filters.end_date) && (
+        <Box sx={{ display: 'flex' }}>
+          <Chip tone="add" onClick={() => go({ ...filters, start_date: null, end_date: null }, groupBy, question, measure)}>
+            Try any time
+          </Chip>
+        </Box>
+      )}
 
       {live && run.status === 'ready' && (
         <>
@@ -339,7 +346,7 @@ const QueryPage = ({ isMobile }) => {
 
       <PageFooter />
       <FilterSheet open={sheet.open} focus={sheet.focus} onClose={() => setSheet({ open: false, focus: null })}
-        filters={filters} groupBy={groupBy} options={options} onApply={(f, g) => go(f, g, question, measure)} />
+        filters={filters} groupBy={groupBy} options={options} onApply={(f, g) => go(f, g, questionAfterEdit(question, filters, f), measure)} />
     </Box>
   );
 };

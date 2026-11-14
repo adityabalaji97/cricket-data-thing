@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Autocomplete, Box, Drawer, TextField } from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import { colors, fonts } from '../../theme/hindsightDark';
-import { GROUP_WORDS, KIND_WORDS, LENGTH_WORDS, LINE_WORDS, ZONE_WORDS } from './qbWords';
+import { GROUP_WORDS, KIND_WORDS, LENGTH_WORDS, LINE_WORDS, ZONE_WORDS, cleanDates, datePresetOf, datePresets } from './qbWords';
 
 // "Add filter" (QUERY_BUILDER_PLAN.md Q3): every filter the query builder has, in five plain groups, with a search
 // box. Tapping a filter opens its control in place; "Show results" applies them all and runs the query.
@@ -41,6 +41,31 @@ const Choice = ({ choices, value, onChange }) => (
   </Box>
 );
 
+// Presets first, and the date fields only under "Pick dates": tapping a phone's date field sets today (Q7).
+const Dates = ({ draft, set }) => {
+  const preset = datePresetOf(draft);
+  const [picking, setPicking] = useState(preset === 'custom');
+  const choices = [...datePresets().map(([l]) => [l, l]), ['custom', 'Pick dates']];
+  const pick = (v) => {
+    if (v === 'custom') { setPicking(true); return; }
+    setPicking(false);
+    set({ start_date: datePresets().find(([l]) => l === v)[1], end_date: null });
+  };
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Choice choices={choices} value={picking ? 'custom' : preset} onChange={pick} />
+      {picking && (
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {[['start_date', 'From'], ['end_date', 'To']].map(([k, l]) => (
+            <TextField key={k} type="date" size="small" label={l} InputLabelProps={{ shrink: true }} value={draft[k] || ''}
+              onChange={(e) => set({ [k]: e.target.value || null })} sx={{ flex: 1 }} />
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 const Control = ({ item, draft, set, options, groupBy, setGroupBy }) => {
   const opts = item.optionsKey === 'wagon_zone_all' ? [1, 2, 3, 4, 5, 6, 7, 8] : (options?.[item.optionsKey] || []).filter((v) => v !== '-' && v !== '');
   const words = item.words || ((v) => (item.key === 'shot_family' ? options?.shot_family_definitions?.[v]?.label || v : String(v)));
@@ -56,16 +81,7 @@ const Control = ({ item, draft, set, options, groupBy, setGroupBy }) => {
         renderInput={(p) => <TextField {...p} placeholder={`Any ${item.label.toLowerCase()}`} />} />
     );
   }
-  if (item.type === 'dates') {
-    return (
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        {[['start_date', 'From'], ['end_date', 'To']].map(([k, l]) => (
-          <TextField key={k} type="date" size="small" label={l} InputLabelProps={{ shrink: true }} value={draft[k] || ''}
-            onChange={(e) => set({ [k]: e.target.value || null })} sx={{ flex: 1 }} />
-        ))}
-      </Box>
-    );
-  }
+  if (item.type === 'dates') return <Dates draft={draft} set={set} />;
   if (item.type === 'toggle') {
     return <Choice choices={[['false', 'Leagues only'], ['true', 'Include internationals']]} value={String(Boolean(draft.include_international))}
       onChange={(v) => set({ include_international: v === 'true' })} />;
@@ -137,7 +153,7 @@ const FilterSheet = ({ open, onClose, filters, groupBy, options, focus, onApply 
           </Box>
         ))}
       </Box>
-      <Box component="button" type="button" onClick={() => { onApply(draft, gb); onClose(); }}
+      <Box component="button" type="button" onClick={() => { onApply(cleanDates(draft), gb); onClose(); }}
         sx={{ all: 'unset', cursor: 'pointer', textAlign: 'center', bgcolor: colors.accent, color: colors.bg, borderRadius: '999px', py: 1, fontWeight: 700,
           fontSize: 15, mt: 1, '&:focus-visible': { outline: `2px solid ${colors.textHi}`, outlineOffset: 2 } }}>
         Show results

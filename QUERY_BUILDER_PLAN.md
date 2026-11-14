@@ -83,6 +83,52 @@ Status: **built** (5 Nov 2026, mockups signed off).
 | Q4 | Group-by chips and follow-up | [x] 5 Nov 2026: /nl2query/parse takes `context` (the query in words) and reads it with the follow-up as one question |
 | Q5 | Share | [x] 5 Nov 2026: share menu (copy link, make a graphic with the old maker); /query?graphic=1 still opens it |
 | Q6 | Cleanup and check | [x] 5 Nov 2026: QueryBuilder, QueryFilters, NLQueryInput and FormatSwitcher removed; checked at 390px (empty, by year, ranking, pitch map, filter sheet, plain English) |
+| Q7 | Dates on phones | [x] 14 Nov 2026: presets (Any time, This year, Since 2025/2024/2023, Pick dates) in FilterSheet.jsx; cleanDates drops a range starting today or later and turns a backwards one round; empty answer with dates shows "Try any time"; a one-day range reads "9 Nov 2026". Tests in __tests__/qbFixes.test.js; checked at 390px |
+| Q8 | The title follows the query | [x] 14 Nov 2026: qbWords.questionAfterEdit drops `q` when a chip removal or the sheet changes the filters (a new grouping keeps it); followLabel keeps the first question and the latest follow-up only. Checked at 390px: Samson + "Since 2024" from the sheet clears the bar |
+| Q9 | "Average score" questions | [ ] |
+| Q10 | Hamilton's old names | [ ] |
+| Q11 | Bot questions out of the counts | [ ] |
+
+## Fixes from the first week of use (14 Nov 2026)
+
+Read from `app_events` (event `query_run`), `nl_query_log` and `mcp_call_log`, 2–14 Nov. Already fixed before
+this review, so not chunks here: SMAT and the other leagues dropped by the parser, invented home grounds, conditions
+it couldn't apply shown as "Couldn't apply: …" (#319, live 12 Nov). The Wellington names work: "Hnry Stadium" since
+2023 returns pace 1,385 balls and spin 380 today.
+
+**Q7: dates on phones.** On 9 and 11 Nov two sessions ended up with `start_date` = `end_date` = that day
+(Gurjapneet Singh, Rovman Powell), so the answer covered one day and was empty. The cause is most likely the phone's
+date picker: the From/To fields in `FilterSheet.jsx` are `type="date"`, and iOS fills in today when the picker is
+opened and closed. Fix: presets first (Any time, This season, Since 2025, Since 2024, Since 2023, Pick dates), with the
+two date fields only under "Pick dates"; and a range that ends today and starts today, or holds no matches, is shown
+as "No matches between these dates" with a one-tap "Any time" instead of an empty card.
+Check: at 390px, open and close each date field and confirm no filter is set.
+
+**Q8: the title follows the query.** Chip removal, the group-by chips and the filter sheet's Apply all keep `q`
+(`QueryPage.jsx`, the calls to `go(..., question, ...)`), so a card titled "Sanju Samson … Samson vs pace heavy sides"
+went on to show Axar Patel, Dewald Brevis and Liam Livingstone. Follow-ups also add to the label each time
+("A … B … C … D"). Fix: a filter or group-by changed by hand drops `q`, and the title falls back to the query in words
+(`queryInWords`); a follow-up's label is the follow-up alone, with the earlier question kept only as parser context.
+Check: ask, change the batter in the sheet, and confirm the title names the new batter.
+
+**Q9: "average score" questions.** "Average scores in powerplay of all teams in IPL 2026" was asked three ways in two
+minutes (13 Nov). The parser ran it as a delivery query grouped by batting team, which gives runs per wicket and strike
+rate, not runs per innings. Fix: questions about a team's score per innings ("average score", "average total",
+"how often do they pass 200") go to `query_mode='team_innings'`, which has the phase run rates and totals; add the case
+to the parser's examples and to its tests. Check: the three phrasings return one row per IPL team with powerplay runs
+per innings.
+
+**Q10: Hamilton's old names.** `Westpac Park, Hamilton` and `WestpacTrust Park, Hamilton` (one ODI each, 2001 and
+2003) are Seddon Park under its sponsors' names, but `venue_standardization.py` doesn't map them, so a Seddon Park
+query misses those matches and the connector tried four names on 9 Nov. Fix: map both to `Seddon Park, Hamilton`.
+(`National Stadium, Hamilton` is in Bermuda; leave it.) Check: `get_venue_aliases('Seddon Park, Hamilton')` lists
+all four, and the regression goldens are unchanged.
+
+**Q11: bot questions out of the counts.** `/query?nl=Grayscale` arrived five times since 27 Oct, each from a new id
+with no referrer, from the US. It's a crawler, and it spends a model call each time. Fix: the usage report counts
+plain-English questions from people only (the same rule as `people`), and the parse endpoint answers a repeat of a
+question already in `nl_query_log` from the cache whatever the caller. Check: the week's NL count drops by the
+Grayscale rows.
 
 ## Decisions (user, 5 Nov 2026)
 
