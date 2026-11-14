@@ -16,10 +16,14 @@ def _has_table(db: Session, name: str) -> bool:
 # A referrer from somewhere other than our own site.
 _EXTERNAL_REFERRER = ("COALESCE(NULLIF(split_part(split_part(referrer, '://', 2), '/', 1), ''), '') "
                       "NOT IN ('', :own, 'www.' || :own)")
+# A bot asking a question by URL: no referrer, only /query?nl= or ?q= pages, no query run ("Grayscale", 27 Oct-14 Nov
+# 2026: five ids, US, a page view and a question each). Two events, so it passed the people rule.
+_URL_ASKER = ("bool_and(COALESCE(referrer, '') = '' AND event IN ('page_view', 'nl_search') "
+              "AND (path LIKE '/query?nl=%' OR path LIKE '/query?q=%'))")
 # Last 7 days' people (see `people` below), for the top pages, sources and countries.
 _PEOPLE_7D = f"""
     anon_id IN (SELECT anon_id FROM app_events WHERE ts >= now() - interval '7 days' AND anon_id NOT LIKE 'embed-%'
-                GROUP BY anon_id HAVING COUNT(*) >= 2 OR bool_or({_EXTERNAL_REFERRER}))
+                GROUP BY anon_id HAVING (COUNT(*) >= 2 OR bool_or({_EXTERNAL_REFERRER})) AND NOT {_URL_ASKER})
 """
 
 
@@ -39,12 +43,12 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
     people = rows(f"""
         WITH v AS (
             SELECT date_trunc('week', ts)::date AS week, anon_id, COUNT(*) AS n,
-                   bool_or({_EXTERNAL_REFERRER}) AS from_outside
+                   bool_or({_EXTERNAL_REFERRER}) AS from_outside, {_URL_ASKER} AS url_asker
             FROM app_events WHERE ts >= date_trunc('week', now()) - (:since)::interval AND anon_id NOT LIKE 'embed-%'
             GROUP BY 1, 2
         )
-        SELECT week, COUNT(*) FILTER (WHERE n >= 2 OR from_outside) AS users,
-               COUNT(*) FILTER (WHERE n = 1 AND NOT from_outside) AS crawler_visits,
+        SELECT week, COUNT(*) FILTER (WHERE (n >= 2 OR from_outside) AND NOT url_asker) AS users,
+               COUNT(*) FILTER (WHERE (n = 1 AND NOT from_outside) OR url_asker) AS crawler_visits,
                COUNT(*) AS all_visitor_ids
         FROM v GROUP BY 1 ORDER BY 1 DESC
     """)
@@ -124,10 +128,17 @@ def build_usage_report(db: Session, weeks: int = 8) -> Dict[str, Any]:
         FROM jev_usage_log WHERE ts >= date_trunc('week', now()) - (:since)::interval
         GROUP BY 1 ORDER BY 1 DESC
     """) if _has_table(db, "jev_usage_log") else []
-    nl = rows("""
-        SELECT date_trunc('week', created_at)::date AS week, COUNT(*) AS nl_searches
-        FROM nl_query_log WHERE created_at >= date_trunc('week', now()) - (:since)::interval
-        GROUP BY 1 ORDER BY 1 DESC
+    # Plain-English questions from people (the same rule as `people`), not every parse the log holds: bots asking by
+    # URL were counted (Q11). Model calls and their cost stay in nl_query_log.
+    nl = rows(f"""
+        WITH v AS (
+            SELECT date_trunc('week', ts)::date AS week, anon_id, COUNT(*) AS n, bool_or({_EXTERNAL_REFERRER}) AS from_outside,
+                   {_URL_ASKER} AS url_asker, COUNT(*) FILTER (WHERE event = 'nl_search') AS asked
+            FROM app_events WHERE ts >= date_trunc('week', now()) - (:since)::interval AND anon_id NOT LIKE 'embed-%'
+            GROUP BY 1, 2
+        )
+        SELECT week, SUM(asked) FILTER (WHERE (n >= 2 OR from_outside) AND NOT url_asker)::int AS nl_searches
+        FROM v GROUP BY 1 ORDER BY 1 DESC
     """)
     top_pages = rows(f"""
         SELECT path, COUNT(*) AS views, COUNT(DISTINCT anon_id) AS users
