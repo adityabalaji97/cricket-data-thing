@@ -21,13 +21,17 @@ def test_one_tweet_per_slide_with_tags_and_numbering():
     assert thread[4]["text"].startswith("Verdict: Partly. Holds at the death not in the powerplay")
     assert thread[5]["text"].startswith("Bumrah saves the most")  # a chart slide takes its chart's title
     assert LINK in thread[-1]["text"] and all(LINK not in t["text"] for t in thread[:-1])
-    assert all("#INDvWI #CricketTwitter" in t["text"] for t in thread)
+    # Tags on tweet 1 only (SOCIAL_COPY_PLAN.md S2), the caption's first two.
+    assert "#INDvWI #TeamIndia" in thread[0]["text"]
+    assert all("#" not in t["text"] for t in thread[1:])
+    assert all(t["slides"] == [t["slide"]] for t in thread)
 
 
 def test_every_tweet_fits_and_long_text_is_cut_at_a_word():
     thread = x_thread(slides(title="word " * 120), CAPTION)
     assert all(weight(t["text"]) <= LIMIT for t in thread)
-    assert "…" in thread[1]["text"] and "#INDvWI" in thread[1]["text"]  # the body is cut, never the tags
+    assert "…" in thread[1]["text"] and thread[1]["text"].endswith("2/6")  # the body is cut, never the numbering
+    assert "#INDvWI" in thread[0]["text"]  # nor tweet 1's tags
 
 
 def test_tags_default_when_the_caption_has_none():
@@ -128,6 +132,25 @@ def test_the_first_tweet_carries_the_lead_chart_and_the_hook():
 def test_hand_thread_attaches_the_slide_each_tweet_is_written_about():
     from services.ig_x import hand_thread
 
-    th = hand_thread([(1, "Cover"), (3, "Batting"), (None, "No image"), "Fourth"], "#IPL2027 #IPL")
+    th = hand_thread([(1, "Cover"), ([3, 4, 5], "Batting"), (None, "No image"), "Fourth"], "#IPL2027 #IPL")
     assert [t["slide"] for t in th] == [1, 3, None, 4]
-    assert all(t["text"].endswith("#CricketTwitter") for t in th)
+    assert [t["slides"] for t in th] == [[1], [3, 4, 5], [], [4]]
+    assert th[0]["text"].endswith("#IPL2027 #IPL") and all("#" not in t["text"] for t in th[1:])
+
+
+def test_hand_thread_takes_four_images_at_most():
+    import pytest
+
+    from services.ig_x import hand_thread
+
+    with pytest.raises(ValueError):
+        hand_thread([([1, 2, 3, 4, 5], "Too many")], "#IPL2027")
+
+
+def test_thread_problems_flags_tags_after_tweet_one():
+    from services.social_rules import thread_problems
+
+    ok = [{"n": 1, "text": "Arya 51 off 27 #SMAT", "slides": [1]}, {"n": 2, "text": "Malhotra 83 off 40", "slides": [2, 3]}]
+    assert thread_problems(ok) == []
+    bad = [{"n": 1, "text": "#a #b #c"}, {"n": 2, "text": "x #CricketTwitter", "slides": [1, 2, 3, 4, 5]}]
+    assert len(thread_problems(bad)) == 3

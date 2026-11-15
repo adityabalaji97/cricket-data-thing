@@ -70,3 +70,30 @@ def test_card_anatomy_and_vocabulary():
     # A help line is drawn on the card only with help_on_card; otherwise it's in the info sheet and its length is fine.
     assert not any("help line" in w for w in lint_card(dict(ok, help="h" * 100)))
     assert any("help line" in w for w in lint_card(dict(ok, help="h" * 100, help_on_card=True)))
+
+
+def test_caption_problems():
+    from services.social_rules import caption_problems
+
+    good = "Suryakumar Yadav, 60* off 21: worth 33 more runs than an average batter.\n\nMore.\n.\n#SMAT #IPL2027"
+    assert caption_problems(good) == []
+    assert any("news" in w.lower() for w in caption_problems("News first: Delhi traded 3 players.\n\n#a"))
+    assert any("No number" in w for w in caption_problems("Who owns the pull shot in ODIs?\n\n#a"))
+    assert any("2200" in w for w in caption_problems("Kohli 38. " + "x" * 2300))
+    assert any("hashtags" in w for w in caption_problems("Kohli 38.\n.\n#a #b #c #d #e #f"))
+    assert any("first sentence" in w for w in caption_problems("Kohli " + "word " * 40 + "38."))
+
+
+def test_house_terms_are_jargon_in_a_hook():
+    from services.social_rules import hook_problem
+
+    assert hook_problem("Noor Ahmad saved 41 runs against par since the mega auction.")
+    assert hook_problem("Suryakumar Yadav: 60 not out off 21 balls.") is None
+
+
+def test_reference_decks_may_run_long():
+    from services.social_rules import findings
+
+    deck = [{"type": "image"} for _ in range(12)]
+    assert any(f["rule"] == "slide_count" for f in findings(deck, "spotlight"))
+    assert not any(f["rule"] == "slide_count" for f in findings(deck, "reference"))

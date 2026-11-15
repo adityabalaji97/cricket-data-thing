@@ -1,10 +1,10 @@
 """
-An Instagram carousel as an X thread: one slide per tweet, each with its own line of text and the post's hashtags.
-Every tweet carries the post's lead tag (the fixture, e.g. #INDvWI) and #CricketTwitter; the first mention of each
-player in the thread ("Shai Hope", or "Hope" when only one of the post's players goes by it) becomes a hashtag
-(#ShaiHope), so the thread shows up in each player's search.
+An Instagram carousel as an X thread: one slide per tweet (a hand-written thread may group up to four), each with its
+own line of text. Tweet 1 carries the post's one or two lead tags (the fixture or series, e.g. #INDvWI #IPL2027);
+later tweets carry none, and players are named in plain text (SOCIAL_COPY_PLAN.md S2, 15 Nov 2026: hashtags add little
+reach on X, and "#CameronGreen cost ₹25.20 crore" reads worse than the name).
 
-    x_thread(slides, caption, chart_titles)  ->  [{"n": 1, "text": "...", "slide": 1}, ...]
+    x_thread(slides, caption, chart_titles)  ->  [{"n": 1, "text": "...", "slide": 1, "slides": [1]}, ...]
 
 Tweet 1 is the hook with the lead chart (slide 2) attached and its takeaway, marked as a thread (X gives native images
 more reach than a text cover; lead_chart=False keeps the old hook-slide tweet); each reply is the next slide with the
@@ -20,8 +20,8 @@ from typing import Any, Dict, List, Optional
 LIMIT = 280
 LINK = "hindsightcricket.com/links?utm_source=x"
 LINK_WEIGHT = 23  # X counts every link as 23 characters, whatever its length
-MAX_TAGS = 2      # tags at the end of a tweet: more than two reads as spam on X (player tags sit in the text)
-ALWAYS_TAG = "#CricketTwitter"
+MAX_TAGS = 2      # tags on tweet 1, the only tweet that carries any: more than two reads as spam on X
+MAX_IMAGES = 4    # images X takes on one tweet
 DEFAULT_TAGS = ["#cricket"]
 
 
@@ -32,9 +32,8 @@ def tags_from_caption(caption: str) -> List[str]:
 
 
 def thread_tags(caption: str) -> List[str]:
-    """The tags every tweet ends with: the post's lead tag and #CricketTwitter."""
-    lead = [t for t in tags_from_caption(caption) if t.lower() != ALWAYS_TAG.lower()][:MAX_TAGS - 1]
-    return lead + [ALWAYS_TAG]
+    """Tweet 1's tags: the post's lead tags (the caption's first one or two)."""
+    return tags_from_caption(caption)[:MAX_TAGS]
 
 
 #: Payload keys that hold a player's name in the post visuals (rows of bars, scorecards, dumbbells).
@@ -268,7 +267,8 @@ def _fit_lines(head: str, lines: List[str], suffix: str) -> str:
 def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[Dict[str, str]] = None,
              players: Optional[List[str]] = None, link: Optional[str] = None, lead_chart: bool = True) -> List[Dict[str, Any]]:
     """link: the post's own page (services/ig_links.post_link) for the last tweet; default the bio page. Each tweet is
-    the slide's sentence plus the stat lines that fit (details())."""
+    the slide's sentence plus the stat lines that fit (details()). `players` is kept for the callers; names are no
+    longer tagged."""
     link = link or LINK
     tags = " ".join(thread_tags(caption))
     # (slide number, sentence, stat lines) per tweet: with lead_chart, the hook rides on the lead card's tweet.
@@ -281,41 +281,39 @@ def x_thread(slides: List[Dict[str, Any]], caption: str, chart_titles: Optional[
         hook = str(slides[0].get("text") or "").strip()
         units = [(2, f"{hook}\n\n{slide_text(slides[1], chart_titles or {})}", slide_lines(slides[1]))] + units[2:]
     total = len(units)
-    names = list(dict.fromkeys([*(players or []), *players_in(slides)]))
     suffixes = []
     for i in range(1, total + 1):
         if i == 1:
             suffixes.append(f"\n\nA thread 🧵 1/{total}\n{tags}")
         elif i == total:
-            suffixes.append(f"\n\nFull data, free: {link}\nData: @himganj153 & @TechRadar9\n{i}/{total} {tags}")
+            suffixes.append(f"\n\nFull data, free: {link}\nData: @himganj153 & @TechRadar9\n{i}/{total}")
         else:
-            suffixes.append(f"\n\n{i}/{total} {tags}")
-    # Which stat lines fit is settled first, then players are tagged across what's left: a line dropped for length
-    # mustn't use up a player's first mention (a hashtag is never longer than the name it replaces).
+            suffixes.append(f"\n\n{i}/{total}")
     bodies = [_fit_lines(head, lines, sfx)[: -len(sfx)] for (_n, head, lines), sfx in zip(units, suffixes)]
-    tagged = tag_players(bodies, names)
-    tweets = [{"n": i, "slide": unit[0], "text": _fit(body, sfx)}
-              for i, (unit, body, sfx) in enumerate(zip(units, tagged, suffixes), start=1)]
+    tweets = [{"n": i, "slide": unit[0], "slides": [unit[0]], "text": _fit(body, sfx)}
+              for i, (unit, body, sfx) in enumerate(zip(units, bodies, suffixes), start=1)]
     return tweets
 
 
 def hand_thread(texts: List[Any], caption: str, players: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-    """A hand-written thread with the thread rules applied (docs/social_rules.md, X): each player's first mention as a
-    hashtag, and every tweet ending with the post's lead tag (the caption's first tag, e.g. #NZvIND) and
-    #CricketTwitter. Write the texts without those tags; a tweet that no longer fits raises, so it gets rewritten,
-    not cut.
+    """A hand-written thread with the thread rules applied (docs/social_rules.md, X): tweet 1 ends with the post's lead
+    tags (the caption's first one or two), later tweets carry none, players stay in plain text. A tweet that doesn't
+    fit raises, so it gets rewritten, not cut.
 
-    Each text is a string (it gets the slide with its own number) or (slide, text): the carousel slide the tweet is
-    written around and goes out with (None: no image). The tweets reuse the Instagram images, so write each one about
-    its slide."""
+    Each text is a string (it gets the slide with its own number) or (slides, text): the carousel slide, or a list of up
+    to four, the tweet is written around and goes out with (None: no image). The tweets reuse the Instagram images, so
+    write each one about its slides. `players` is kept for the callers; names are no longer tagged."""
     tags = " ".join(thread_tags(caption))
     pairs = [t if isinstance(t, tuple) else (n, t) for n, t in enumerate(texts, start=1)]
     out = []
-    for n, ((slide, _), text) in enumerate(zip(pairs, tag_players([t for _, t in pairs], players or [])), start=1):
-        tweet = f"{text.rstrip()}\n{tags}"
+    for n, (slide, text) in enumerate(pairs, start=1):
+        slides = [] if slide is None else list(slide) if isinstance(slide, (list, tuple)) else [slide]
+        if len(slides) > MAX_IMAGES:
+            raise ValueError(f"tweet {n} has {len(slides)} images ({MAX_IMAGES} max)")
+        tweet = f"{text.rstrip()}\n{tags}" if n == 1 and tags else text.rstrip()
         if _weight(tweet) > LIMIT:
             raise ValueError(f"tweet {n} is {_weight(tweet)} characters with its tags ({LIMIT} max): {tweet!r}")
-        out.append({"n": n, "slide": slide, "text": tweet})
+        out.append({"n": n, "slide": slides[0] if slides else None, "slides": slides, "text": tweet})
     return out
 
 

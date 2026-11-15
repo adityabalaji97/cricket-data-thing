@@ -253,7 +253,8 @@ Rules:
 - Write a negative number with the word "minus" (e.g. "minus 0.29"), never a minus sign.
 - Each line is one to three short sentences about its chart. When a line uses an advanced metric (runs saved or added
   against an average player, win probability added, Impact), explain it inside that same sentence, the first time,
-  e.g. "he saves 0.8 runs an over compared with an average bowler in the same spot" -- never as a separate definition.%(extra)s
+  e.g. "he saves 0.8 runs an over compared with an average bowler in the same spot" -- never as a separate definition.
+  The house wording: %(gloss)s.%(extra)s
 - Use ONLY numbers that appear in the material below, written as digits exactly as given (e.g. 85%%, 1,024, 0.27).
   Never round, combine, or compute new numbers, and never compute comparisons in words ("twice", "double", "half",
   "three times"): give both numbers instead. If unsure, leave the number out.
@@ -287,7 +288,10 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
     extra = ("\n- Around the middle, turn the story with a re-hook (e.g. \"But here's what the scorecard doesn't show.\")"
              " so people who drift come back. Give the advanced numbers room: that is why this Reel is longer."
              if length == "long" else "")
-    msg = PROMPT % {"k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
+    from services.ig_captions import GLOSS
+
+    gloss = "; ".join(f'{k}: "{v}"' for k, v in GLOSS.items())
+    msg = PROMPT % {"gloss": gloss, "k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
                     "house": "\n".join(x for x in (social_rules.section("Reels"), social_rules.section("Vocabulary")) if x) or "-",
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
     if close:

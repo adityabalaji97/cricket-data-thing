@@ -120,14 +120,44 @@ def note_title(fact: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+#: Tags too broad to help a Short be found: a post's own tags (series, team, player) come first.
+GENERIC_TAGS = {"#cricket", "#cricketstats", "#ipl", "#t20", "#cricketlovers", "#crickettwitter", "#king"}
+YT_TITLE = 60  # characters a Short's title shows in search and the feed without being cut
+
+
+def yt_title(text: str, limit: int = YT_TITLE) -> str:
+    """A Short's title, never cut mid-thought with "…" (SOCIAL_COPY_PLAN.md S4): the whole text when it fits, else the
+    longest run of whole clauses that fits and says something (four words or more), else the words that fit."""
+    text = re.sub(r"\s+", " ", text or "").strip()
+    if len(text) <= limit:
+        return text
+    ends = [m.start() + (1 if m.group(0)[0] in ".?!" else 0) for m in re.finditer(r"[.?!](?=\s)|[,;:](?=\s)| [—–-] ", text)]
+    fits = [e for e in ends if e <= limit and len(text[:e].split()) >= 4]
+    if fits:
+        return text[:max(fits)].rstrip(" ,;:—–-")
+    return text[:limit + 1].rsplit(" ", 1)[0].rstrip(" ,;:·—-")
+
+
 def youtube_copy(fact: Dict[str, Any], caption: str, search_title: Optional[str]) -> Dict[str, str]:
-    """{title, description} for the Short. Hashtags: the first three show above the title on YouTube."""
-    base = search_title or fact.get("title") or ""
-    title = base if len(base) <= 90 else base[:87].rsplit(" ", 1)[0] + "…"
-    tags = ["#cricket", FORMAT_TAG.get(fact.get("kicker") or "", "#cricketstats"), "#shorts"]
+    """{title, description, pinned_comment} for the Short (SOCIAL_COPY_PLAN.md S4).
+
+    title: the post's own `yt_title` (a search phrase: "KKR retentions 2027: who should Kolkata keep?"), else the
+    search title or the hook, shortened by yt_title(), never cut with "…". description: the claim and the link first
+    (YouTube shows two lines), then the caption, then three tags (the first three show above the title): the
+    caption's own specific ones before the format tag, then #shorts. pinned_comment: the caption's question and the link."""
+    own = fact.get("yt_title")
+    title = own if own else yt_title(search_title or fact.get("hook") or fact.get("title") or "")
+    caption_tags = re.findall(r"(?<![\w&])#\w+", (caption or "").strip().splitlines()[-1] if caption else "")
+    specific = [t_ for t_ in caption_tags if t_.lower() not in GENERIC_TAGS]
+    tags = list(dict.fromkeys([*specific, FORMAT_TAG.get(fact.get("kicker") or "", "#cricket")]))[:3] + ["#shorts"]
     body = re.sub(r"\n?\.\n#.*$", "", caption or "", flags=re.S)  # the Instagram caption without its hashtags
-    body = re.sub(r"\n*Free ball-by-ball cricket stats: link in bio\.?", "", body)  # Instagram's line; YouTube gets its own
-    return {"title": f"{title} #shorts", "description": f"{body.strip()}\n\nFull data, free: hindsightcricket.com\n\n{' '.join(tags)}"}
+    body = re.sub(r"\n*Free ball-by-ball cricket stats: link in bio\.?", "", body).strip()
+    claim = (fact.get("hook") or fact.get("title") or "").strip()
+    lead = f"{claim}\nEvery ball, free: https://hindsightcricket.com" if claim and claim not in body[:len(claim) + 5] else \
+        "Every ball, free: https://hindsightcricket.com"
+    question = next((ln.strip() for ln in body.splitlines() if ln.strip().endswith("?")), "")
+    pinned = f"{question} Every player's numbers, free: https://hindsightcricket.com".strip()
+    return {"title": title, "description": f"{lead}\n\n{body}\n\n{' '.join(tags)}", "pinned_comment": pinned}
 
 
 def x_copy(db: Session, carousel_id: str, caption: str, fact: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:

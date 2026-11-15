@@ -28,7 +28,16 @@ PROMPTS = {
     "myth": "Did the verdict surprise you?",
     "reactive": "Who are you backing?",
     "play": "Comment your answer before you swipe.",
-    "spotlight": "What does the data miss?",
+    "spotlight": "Is he in your XI?",  # a pick-one, not "What does the data miss?" (SOCIAL_COPY_PLAN.md S6)
+}
+
+#: One clause per measure, the same in every caption, tweet and Reel (SOCIAL_COPY_PLAN.md S6): a stranger meets
+#: "+27.4" or "−0.08 wins" with no meaning otherwise. Used inline, the first time the measure appears.
+GLOSS = {
+    "runs above par": "runs more than an average player makes from the same situations",
+    "wins added": "how far he moved his side's chance of winning, ball by ball",
+    "win probability added": "how far he moved his side's chance of winning, ball by ball",
+    "Impact": "runs he added to his team's projected total",
 }
 FORMAT_TAGS = {"IPL": "#IPL", "ODI": "#ODI", "T20I": "#T20I", "T20": "#T20"}
 BASE_TAGS = ["#cricket", "#cricketstats"]

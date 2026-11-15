@@ -54,6 +54,7 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 - A "case for a player" post tells a story: career, turning point, the rival's rise, his old role now, the rest of the case, both ways.
 - "The deeper cut" is slide 3.
 - At most 8 slides: Instagram counts how many viewers reach the last one. Fold a slide that only repeats earlier titles into the caption.
+  A reference deck (one slide per team, a round-up people save and send, marked `deck: reference`) may run to 12.
 - Every post leads with a player and a number: the cover, the X thread's first tweet and the Reel's hook. The general picture (the league-wide curve, the trend, the definitions) comes after the players, never first.
 - The cover (slide 1) carries a reason to stop: the hook, and on the hero side of the cover test (services/ig_cover.py) the lead chart's top rows.
 - A chart on the cover never appears again in the deck: the cover takes the lead chart's top rows and the chart leaves the deck, so slide 2 is new (it's the one Instagram re-shows to people who scrolled past). The full chart goes on the X thread's first tweet. This holds for hand-built posts too (ig_cover.without_hero_card; the slide check flags a repeat).
@@ -62,6 +63,22 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 - No list of more than three items in one sentence.
 - A "best" ring marks a column only where the values compare: none where only one row has a value. One measure, one shading scale.
 - Date windows run to today, so a rebuild takes the latest game.
+
+## Captions and YouTube
+
+- Instagram shows about 125 characters before "more": the first sentence is the player, the number and the claim, and
+  finishes inside them. Method and credits go last. Instagram stops at 2,200 characters and 5 hashtags
+  (social_rules.caption_problems warns on all of these).
+- Explain a measure in one clause the first time it appears, in the house words (services/ig_captions.GLOSS): runs
+  above par is "runs more than an average player makes from the same situations"; wins added is "how far he moved his
+  side's chance of winning, ball by ball".
+- Under ±0.25 wins is "about level", not a verdict: the number is noise at that size.
+- Close on a pick-one question about a decision, not a person ("Who would you keep?"), and a send or save prompt where
+  the post is a reference ("Send this to a Mumbai fan", "Save for auction day").
+- Hashtags: 3-5 on Instagram, specific first (series, team, player); no #King, #CricketTwitter or #cricket filler.
+- A Short's title is a search phrase of 60 characters or fewer, never cut with "…" (a post can set `yt_title`). The
+  description opens with the claim and the link; three specific tags, then #shorts. Pin the question as a comment.
+- Every slide has alt text (stored as `facts.alt` when the post is queued).
 
 ## Reels
 
@@ -77,7 +94,10 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 
 - A reply to a viral take is one tweet under 280 characters with four image cards.
 - A thread's first tweet carries the lead chart (slide 2) with the hook and its claim, not a text-only cover: X gives native images more reach, and the first 30 minutes decide most of it. Links only in the last tweet.
-- In a thread, a player's first mention is a hashtag; each tweet ends with the lead tag and #CricketTwitter; credit @himganj153 and @TechRadar9; the last tweet links the post's page. Hand-written threads go through services/ig_x.hand_thread (it applies the tags), and social_rules.thread_problems checks them before a post is queued.
+- Tweet 1 leads with the player and the number, then the claim; the deadline or the news comes after (15 Nov 2026).
+- One or two hashtags, on tweet 1 only (the fixture or series: #INDvNZ, #IPL2027); none after. Players are named in plain text, not as hashtags (replaces the 7 Nov rule of a hashtag per player and #CricketTwitter on every tweet: tags add little reach on X now and read as spam). Credit @himganj153 and @TechRadar9; the last tweet links the post's page.
+- A tweet takes up to four images: group slides rather than run one tweet per slide (a reference deck of 12 is 4 tweets). With two or more, X crops each tile to its middle until tapped, so the tweet's text names who and what is in each image; tweet 1 keeps a single image, which shows tall.
+- Hand-written threads go through services/ig_x.hand_thread (tags on tweet 1, up to four slides a tweet), and social_rules.thread_problems checks them before a post is queued.
 
 ## Appeal
 

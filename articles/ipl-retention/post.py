@@ -91,17 +91,19 @@ def bowling_hook(b):
 
 
 def copy(b):
+    from services.ig_captions import tag
+
     T = TEAMS[b["code"]]
     u, g, big = b["under"], b["bargain"], b["big"]
     # The hook's player: the big price, or the big name where the big price's number rests on a small sample
     # (TEAMS "hook": "big"; LSG, 8 Nov 2026: Mayank Yadav's −0.60 came from 144 balls).
     h = big if T.get("hook") == "big" else u
-    hook = (f"{h['name']}: {crore(h['price'])}, {sg(h['wpa'])} wins since the mega auction. "
-            f"{g['name']}: {crore(g['price'])}, {sg(g['wpa'])}.")
+    hook = (f"{h['name']}: {crore(h['price'])}, {wins_tag(h['wpa'])} since the mega auction. "
+            f"{g['name']}: {crore(g['price'])}, {wins_tag(g['wpa'])}.")
     lead = (b.get("trade") or {}).get("lead")
     if lead:
-        did = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
-        hook = (f"{lead['out']} {did} wins for {T['short']} since the mega auction. "
+        moved = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
+        hook = (f"{lead['out']} {moved} wins for {T['short']} since the mega auction. "
                 f"{lead['in']}, coming in: {sg(lead['in_wpa'])}.")
     hook = bowling_hook(b) or hook
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
@@ -111,15 +113,18 @@ def copy(b):
         verb = "agreed to trade" if "awaiting" in d["source"] else "traded"
         return (f"{T['short']} {verb} {' and '.join(d['outs'])} to {TEAMS[d['other']]['short']} for {' and '.join(d['ins'])} "
                 f"({d['source']}{when})")
-    news = (["News first: " + "; ".join(deal_text(d) for d in tr["deals"]) + ". In the IPL since 2025: "
+    news = (["; ".join(deal_text(d) for d in tr["deals"]) + ". In the IPL since 2025: "
              + "; ".join(tr["lines"]) + "."] if tr else []) + ([T["note"]] if T.get("note") else [])
-    caption = "\n\n".join(news + [
+    # The hook leads (the first 125 characters are all that shows before "more"), the deadline and the news after
+    # (SOCIAL_COPY_PLAN.md S5: "News first:" captions hid the player and the number).
+    caption = "\n\n".join([hook,
         f"{b['team']} have until 17 November to name who they keep for IPL 2027. Here's the case, player by player, from "
-        f"every IPL ball since the 2025 mega auction.",
+        f"every IPL ball since the 2025 mega auction. Wins added: how far a player moved his side's chance of winning, "
+        f"ball by ball."] + news + [
         f"Most wins added in this squad: {b['top']['name']}, {sg(b['top']['wpa'])}. {b['below']} of the {len(b['played'])} who "
         f"played added none or less.",
-        f"The big price: {u['name']} ({crore(u['price'])}), {sg(u['wpa'])} wins. The bargain: {g['name']} ({crore(g['price'])}), "
-        f"{sg(g['wpa'])}. The big name: {big['name']} ({crore(big['price'])}), {sg(big['wpa'])}.",
+        f"The big price: {u['name']} ({crore(u['price'])}), {wins_tag(u['wpa'])}. The bargain: {g['name']} ({crore(g['price'])}), "
+        f"{wins_tag(g['wpa'])}. The big name: {big['name']} ({crore(big['price'])}), {wins_tag(big['wpa'])}.",
         f"Against the winners' template (what IPL playoff sides have had since 2023, role by role, on each player's IPL "
         f"2024-26 at any side): {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
         + (f" Short of playoff level, biggest first: " + "; ".join(gap_text(r) for r in b["gaps"][:3]) + "." if b["gaps"] else "")
@@ -127,8 +132,8 @@ def copy(b):
         *([fits_text(b)] if b.get("fits") else []),
         "Wins added, runs above par and Impact: T20 Primer method. IPL 2025-26, counting each player's record at any side. "
         "Prices: 2026 squad (Cricbuzz). Ball-by-ball data: Himanish Ganjoo & TechRadar, Cricsheet.",
-        "Who would you keep?",
-        f"Free ball-by-ball cricket stats: link in bio.\n.\n#IPL2027 #IPLRetention {T['tag']} #IPL",
+        f"Who would you keep? Send this to a {T['short']} fan.",
+        f"Free ball-by-ball cricket stats: link in bio.\n.\n#IPL2027 #IPLRetention {T['tag']} {tag(h['name'])}",
     ])
     return hook, caption
 
@@ -166,14 +171,15 @@ def thread(b, link):
         full, head = trade_tweet(tr), trade_tweet(tr).split(" Since 2025:")[0]
         wins = next((f"{t}\n\n{wins}" for t in (full, head) if len(f"{t}\n\n{wins}") <= 230), wins)
     lead = (tr or {}).get("lead")
-    opener = (f"{T['short']} have until 17 November to name who they keep for IPL 2027. {h['name']} cost {crore(h['price'])} "
-              f"and added {sg(h['wpa'])} wins since the mega auction. The case, player by player 🧵")
+    # Player and number first (SOCIAL_COPY_PLAN.md S5); the deadline after.
+    opener = (f"{h['name']} cost {T['short']} {crore(h['price'])} and {did(h['wpa'])} since the mega auction. "
+              f"{T['short']} have until 17 November to name who they keep for IPL 2027. The case, player by player 🧵")
     if bowling_hook(b):
-        opener = (f"{T['short']} have until 17 November to name who they keep for IPL 2027. {bowling_hook(b)} "
+        opener = (f"{bowling_hook(b)} {T['short']} have until 17 November to name who they keep for IPL 2027. "
                   "The case, player by player 🧵")
     if lead:
-        did = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
-        opener = (f"{T['short']} have agreed to trade {lead['out']} for {lead['in']} (awaiting BCCI ratification). Since the mega auction, {called(lead['out'])} {did} "
+        moved = f"added {abs(lead['out_wpa']):.2f}" if lead["out_wpa"] > 0 else f"was down {abs(lead['out_wpa']):.2f}"
+        opener = (f"{T['short']} have agreed to trade {lead['out']} for {lead['in']} (awaiting BCCI ratification). Since the mega auction, {called(lead['out'])} {moved} "
                   f"wins for them; {called(lead['in'])}: {sg(lead['in_wpa'])}. The retention case, player by player 🧵")
     texts = [
         (1, opener),
@@ -184,12 +190,12 @@ def thread(b, link):
              f"the most by anyone in any phase." if bc else "Bowling by phase: runs saved against par, every four overs.")),
         *([] if b.get("fits") else [(5, f"Price against wins added. The bargain: {g['name']}, {sg(g['wpa'])} for {crore(g['price'])}. "
             f"The big price: {u['name']}, {sg(u['wpa'])} for {crore(u['price'])}.")]),
-        (6 - bool(b.get("fits")), f"Three calls: {big['name']} ({crore(big['price'])}, {sg(big['wpa'])} wins), {u['name']} ({crore(u['price'])}, "
-            f"{sg(u['wpa'])}) and {g['name']} ({crore(g['price'])}, {sg(g['wpa'])}). The case for and against each."),
+        (6 - bool(b.get("fits")), f"Three calls: {big['name']} ({crore(big['price'])}, {wins_short(big['wpa'])}), {u['name']} ({crore(u['price'])}, "
+            f"{wins_short(u['wpa'])}) and {g['name']} ({crore(g['price'])}, {wins_short(g['wpa'])}). The case for and against each."),
         (7 - bool(b.get("fits")), f"Against what playoff sides have had since 2023: {b['grade']['at_level']} of {b['grade']['of']} roles at their level."
             + (f" Furthest short: {gap_text(b['gaps'][0])}." if b["gaps"] else "")),
         *([(7, fits_tweet(b))] if b.get("fits") else []),
-        (8, f"Who would you keep?\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9"),
+        (8, f"Who would you keep? Send this to a {T['short']} fan.\n\nEvery ball, free: {link}\nData: @himganj153 & @TechRadar9"),
     ]
     from services.ig_x import hand_thread
 
@@ -219,9 +225,29 @@ def trade_tweet(tr):
     return full if len(full) <= 245 else head
 
 
+#: Under this many wins either way, a player is "about level": the number is noise, not a verdict (SOCIAL_COPY_PLAN.md
+#: S5; Impact and WPA barely repeat season to season, docs/social_rules.md, Numbers).
+LEVEL = 0.25
+
+
+def wins_tag(v):
+    """"+1.03 wins", "−0.79 wins", or "about level (−0.08 wins)" for a value within LEVEL of zero."""
+    return f"about level ({sg(v)} wins)" if abs(v) < LEVEL else f"{sg(v)} wins"
+
+
+def wins_short(v):
+    """wins_tag() inside brackets: "about level" or "−0.79 wins"."""
+    return "about level" if abs(v) < LEVEL else f"{sg(v)} wins"
+
+
+def did(v):
+    """Wins added as a verb phrase: "added 1.03 wins", "is down 0.79 wins", "is about level"."""
+    return "is about level" if abs(v) < LEVEL else f"added {abs(v):.2f} wins" if v > 0 else f"is down {abs(v):.2f} wins"
+
+
 def spoken(v):
     """Wins added, as the voice says it."""
-    return f"added {abs(v):.2f} wins" if v > 0 else f"is down {abs(v):.2f} wins" if v < 0 else "added nothing"
+    return did(v)
 
 
 def reel_script(b):
@@ -238,8 +264,8 @@ def reel_script(b):
         r = b["fits"][0]
         o = r["options"][0] if r["options"] else None
         return {"hook": hook,
-                "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
-                          else "Here's the whole squad, by wins added since 2025.",
+                "lines": [("Here's the squad, with this window's trades in. " if b.get("trade") else "Here's the squad. ")
+                          + "Wins added is how far a player moved his side's chance of winning, ball by ball.",
                           f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
                           # The big name already opened the Reel when he's the hook (RCB, 14 Nov 2026): say the big price.
                           (f"{u['name']}, the big price, {spoken(u['wpa'])}, from a small sample. " if h is big
@@ -250,8 +276,8 @@ def reel_script(b):
                           (f"Who's available? {o['name']}, among others{', on numbers from outside the IPL' if o['source'] != 'IPL' else ''}."
                            if o else "And nobody's available to fill it yet.")]}
     return {"hook": hook,
-            "lines": ["Here's the whole squad, with this window's trades in, by wins added since 2025." if b.get("trade")
-                      else "Here's the whole squad, by wins added since 2025.",
+            "lines": [("Here's the squad, with this window's trades in. " if b.get("trade") else "Here's the squad. ")
+                      + "Wins added is how far a player moved his side's chance of winning, ball by ball.",
                       f"Most in the squad: {b['top']['name']}, who {spoken(b['top']['wpa'])}.",
                       (f"And he cost just {say(g)}." if g is b["top"] else f"{g['name']} cost {say(g)} and {spoken(g['wpa'])}."),
                       (f"{u['name']}, the big price, {spoken(u['wpa'])}, from a small sample." if h is big
@@ -337,6 +363,7 @@ def main() -> int:
             "carousel_id": carousel["id"], "slides": n, "render": True, "post_time": "8 pm"}
     # The last tweet links to the team's page (it unfurls with the team preview card, api/og.mjs), not the post.
     fact["x"] = thread(b, team_link(b["team"]))
+    fact["yt_title"] = f"{args.team} retentions 2027: who should {TEAMS[args.team]['short']} keep?"
     fact["youtube"] = youtube_copy(fact, caption, hook)
     ist = timezone(timedelta(hours=5, minutes=30))
     today = date.fromisoformat(args.date) if args.date else datetime.now(ist).date()
