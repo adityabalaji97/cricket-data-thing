@@ -7,6 +7,7 @@ services/content_rules.py.
     findings(slides, kind)      -> [{rule, slide, visual, message}]: each broken rule, by its RULES id
     lint_slides(slides)         -> ["Slide n: what's wrong", ...] for a queued post (shown in the admin as warnings)
     hook_problem(hook)          -> why a Reel hook breaks the rules, or None (the Reel writer's guard rejects it)
+    caption_problems(caption)   -> what an Instagram caption breaks (length, tags, its first line), as warnings
 """
 from __future__ import annotations
 
@@ -30,7 +31,13 @@ TEXT_VISUALS = {"recap_text"}
 #: A count of one with a plural noun ("1 overs"): name the one instead ("the 19th over").
 ONE_PLURAL = re.compile(r"(?<![\d.])\b(?:1|one) (overs|balls|runs|wickets|sixes|fours|matches|innings|games|spells|points)\b", re.I)
 
-JARGON = re.compile(r"\b(impact|wpa|raa|waa|win probability|runs above average|per 100|per hundred)\b", re.I)
+JARGON = re.compile(r"\b(impact|wpa|raa|waa|win probability|runs above average|runs above par|against par|"
+                    r"wins added|per 100|per hundred)\b", re.I)
+
+#: Instagram's limits and the fold (SOCIAL_COPY_PLAN.md S3).
+CAPTION_MAX = 2200     # Instagram refuses a longer caption
+CAPTION_TAGS = 5       # Instagram's hashtag limit
+CAPTION_FOLD = 125     # characters shown before "more"
 
 
 @lru_cache(maxsize=1)
@@ -73,6 +80,8 @@ RULES = {
     "cover_repeat": "the cover's chart repeated in the deck",
     "deeper_cut_slot": "the deeper cut not on its slide",
 }
+#: Kinds of post that are a reference deck (one slide per team, a round-up): saved and sent, so past 8 slides is fine.
+REFERENCE_KINDS = {"reference"}
 
 
 #: What only the drawn slide shows, measured at render (scripts/lib/slide_layout.mjs, stored as facts.layout).
@@ -141,7 +150,7 @@ def findings(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> List[D
         out.append({"rule": "bare_cover", "slide": 1, "visual": None,
                     "message": "no chart on the cover, and no card in the deck that can be one: lead with a chart "
                                "(services/ig_cover.hero_from lists the ones that fit)"})
-    if len(slides or []) > MAX_SLIDES:
+    if len(slides or []) > MAX_SLIDES and kind not in REFERENCE_KINDS:
         out.append({"rule": "slide_count", "slide": None, "visual": None,
                     "message": f"{len(slides)} slides: keep a carousel to {MAX_SLIDES} (completion counts)"})
     for n, s in enumerate(slides or [], 1):
@@ -165,21 +174,46 @@ def lint_slides(slides: List[Dict[str, Any]], kind: Optional[str] = None) -> Lis
 
 
 def thread_problems(tweets: List[Dict[str, Any]], players: Optional[List[str]] = None) -> List[str]:
-    """X thread rules a thread breaks (docs/social_rules.md, X): every tweet ends with #CricketTwitter, every named
-    player is a hashtag at least once, and no tweet is over 280. services/ig_x.hand_thread applies them."""
-    from services.ig_x import ALWAYS_TAG, LIMIT, weight
+    """X thread rules a thread breaks (docs/social_rules.md, X): one or two tags on tweet 1 and none after, at most four
+    images a tweet, nothing over 280. `players` is kept for the callers (names are plain text now)."""
+    from services.ig_x import LIMIT, MAX_IMAGES, MAX_TAGS, weight
 
     out = []
     for t in tweets or []:
-        text = t.get("text") or ""
-        if ALWAYS_TAG.lower() not in text.lower():
-            out.append(f"tweet {t.get('n')}: no {ALWAYS_TAG}")
+        text, n = t.get("text") or "", t.get("n")
+        tags = re.findall(r"(?<![\w&])#\w+", text)
+        if n == 1 and len(tags) > MAX_TAGS:
+            out.append(f"tweet 1: {len(tags)} hashtags ({MAX_TAGS} at most)")
+        if n != 1 and tags:
+            out.append(f"tweet {n}: hashtags after tweet 1 ({' '.join(tags)})")
+        if len(t.get("slides") or []) > MAX_IMAGES:
+            out.append(f"tweet {n}: {len(t['slides'])} images ({MAX_IMAGES} at most)")
         if weight(text) > LIMIT:
-            out.append(f"tweet {t.get('n')}: {weight(text)} characters")
-    joined = " ".join(t.get("text") or "" for t in tweets or [])
-    for name in players or []:
-        if "#" + re.sub(r"[^A-Za-z0-9]", "", name) not in joined:
-            out.append(f"{name} is never a hashtag")
+            out.append(f"tweet {n}: {weight(text)} characters")
+    return out
+
+
+def caption_problems(caption: str) -> List[str]:
+    """What an Instagram caption breaks (SOCIAL_COPY_PLAN.md S3): Instagram's length and hashtag limits, and a first
+    line (all a stranger sees before "more") that doesn't lead with a number or runs past the fold."""
+    c = (caption or "").strip()
+    if not c:
+        return []
+    out = []
+    if len(c) > CAPTION_MAX:
+        out.append(f"Caption is {len(c)} characters: Instagram stops at {CAPTION_MAX}")
+    tags = re.findall(r"(?<![\w&])#\w+", c)
+    if len(tags) > CAPTION_TAGS:
+        out.append(f"{len(tags)} hashtags: Instagram takes {CAPTION_TAGS}")
+    first = c.splitlines()[0].strip()
+    if re.match(r"news first\b", first, re.I):
+        out.append("Caption opens on the news: lead with the player and the number, the news after")
+    elif not re.search(r"\d", first[:CAPTION_FOLD]):
+        out.append(f"No number in the caption's first {CAPTION_FOLD} characters (all that shows before \"more\")")
+    sentence = re.split(r"(?<=[.!?])\s", first, maxsplit=1)[0]
+    if len(sentence) > CAPTION_FOLD:
+        out.append(f"Caption's first sentence is {len(sentence)} characters: only {CAPTION_FOLD} show before \"more\", "
+                   f"so the claim gets cut")
     return out
 
 

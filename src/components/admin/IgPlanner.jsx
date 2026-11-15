@@ -116,6 +116,11 @@ const InstagramTab = ({ pack, copy, toast }) => {
         </Box>
       )}
       <CopyRow label="Caption" text={pack.caption || pack.title} onCopy={copy} multiline />
+      {(facts.alt || []).length > 0 && (
+        // Instagram: Advanced settings → Write alt text, per slide (SOCIAL_COPY_PLAN.md S7).
+        <CopyRow label="Alt text, slide by slide (Advanced settings → Write alt text)"
+          text={facts.alt.map((a, i) => `Slide ${i + 1}: ${a}`).join('\n\n')} onCopy={copy} multiline />
+      )}
     </>
   );
 };
@@ -217,6 +222,7 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
         <>
           <CopyRow label="YouTube Short · title" text={yt.title} onCopy={copy} />
           <CopyRow label="YouTube Short · description" text={yt.description} onCopy={copy} multiline />
+          {yt.pinned_comment && <CopyRow label="YouTube Short · pinned comment (post it, then pin it)" text={yt.pinned_comment} onCopy={copy} multiline />}
         </>
       ) : <Typography sx={{ fontSize: 13, color: C.lo, mt: 1.5 }}>YouTube copy arrives with the next nightly run.</Typography>}
       {reel.srt && (
@@ -228,28 +234,40 @@ const VideoTab = ({ pack, copy, toast, onUpdate }) => {
   );
 };
 
-/** One tweet: its slide, its text; "Copy text" also fetches the image, then "Share image" sends it. */
-const Tweet = ({ tweet, total, url, copy, toast }) => {
-  const { files, busy, tap } = useTwoTapShare(() => fetchImageFiles([url], `hindsight-tweet-${tweet.n}`), `Tweet ${tweet.n}`, toast);
+/** One tweet: its slides (up to four: SOCIAL_COPY_PLAN.md S1), its text; "Get images" fetches them, then "Share images"
+ * sends them all into the same reply. */
+const Tweet = ({ tweet, total, urls, copy, toast }) => {
+  const label = urls.length > 1 ? 'images' : 'image';
+  const { files, busy, tap } = useTwoTapShare(() => fetchImageFiles(urls, `hindsight-tweet-${tweet.n}`), `Tweet ${tweet.n}`, toast);
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 1.25, py: 1.25, borderTop: `1px solid ${C.line}` }}>
-      <Box component="img" src={url} alt={`Slide ${tweet.slide}`} loading="lazy"
-        sx={{ width: 72, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 1, border: `1px solid ${C.line}`, bgcolor: '#14171e' }} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: urls.length > 1 ? '1fr 1fr' : '1fr', gap: 0.5, alignContent: 'start' }}>
+        {urls.map((u, i) => (
+          <Box key={u} component="img" src={u} alt={`Tweet ${tweet.n}, image ${i + 1}`} loading="lazy"
+            sx={{ width: '100%', aspectRatio: urls.length > 1 ? '4 / 5' : '9 / 16', objectFit: 'cover', borderRadius: 1,
+              border: `1px solid ${C.line}`, bgcolor: '#14171e' }} />
+        ))}
+      </Box>
       <Box sx={{ minWidth: 0 }}>
-        <SectionLabel>{tweet.n === 1 ? 'Tweet 1 · the post' : `Reply ${tweet.n - 1} of ${total - 1}`}</SectionLabel>
+        <SectionLabel>{tweet.n === 1 ? 'Tweet 1 · the post' : `Reply ${tweet.n - 1} of ${total - 1}`}{urls.length > 1 ? ` · ${urls.length} images` : ''}</SectionLabel>
         <Typography sx={{ fontSize: 13, color: C.hi, whiteSpace: 'pre-wrap', lineHeight: 1.4, overflowWrap: 'anywhere', mt: 0.5 }}>
           {tweet.text}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, mt: 0.75 }}>
           <Button size="small" onClick={() => copy(tweet.text, `Tweet ${tweet.n}`)} sx={{ color: C.lime, fontWeight: 700, minHeight: 36, px: 0 }}>Copy text</Button>
-          <Button size="small" onClick={tap} disabled={busy} sx={{ color: C.mid, minHeight: 36 }}>
-            {busy ? 'Loading…' : files ? 'Share image' : 'Get image'}
-          </Button>
+          {urls.length > 0 && (
+            <Button size="small" onClick={tap} disabled={busy} sx={{ color: C.mid, minHeight: 36 }}>
+              {busy ? 'Loading…' : files ? `Share ${label}` : `Get ${label}`}
+            </Button>
+          )}
         </Box>
       </Box>
     </Box>
   );
 };
+
+/** The slides a tweet goes out with: its `slides` (up to four), else its one `slide`. */
+const tweetSlides = (t) => (Array.isArray(t.slides) && t.slides.length ? t.slides : t.slide ? [t.slide] : []);
 
 const XTab = ({ pack, copy, toast }) => {
   const thread = (pack.facts || {}).x;
@@ -258,10 +276,11 @@ const XTab = ({ pack, copy, toast }) => {
   return (
     <>
       <Typography sx={{ fontSize: 12, color: C.lo }}>
-        Post tweet 1 with its image, then reply to it with each next tweet. Copy the text, then share the image into the
-        same reply.
+        Post tweet 1 with its image, then reply to it with each next tweet. Copy the text, then share its images (up to
+        four) into the same reply.
       </Typography>
-      {thread.map((t) => <Tweet key={t.n} tweet={t} total={thread.length} url={urls[t.slide - 1]} copy={copy} toast={toast} />)}
+      {thread.map((t) => <Tweet key={t.n} tweet={t} total={thread.length} copy={copy} toast={toast}
+        urls={tweetSlides(t).map((s) => urls[s - 1]).filter(Boolean).slice(0, 4)} />)}
     </>
   );
 };

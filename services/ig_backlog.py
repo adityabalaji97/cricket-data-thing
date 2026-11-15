@@ -572,6 +572,22 @@ def retitle_deep_cut(db: Session, angle_key: str) -> Dict[str, Any]:
     return {"status": "retitled", "title": title, "carousel_id": carousel["id"], "slides": len(slides)}
 
 
+def alt_texts(slides: List[Dict[str, Any]]) -> List[str]:
+    """Alt text per slide (SOCIAL_COPY_PLAN.md S7): what the slide says, for screen readers and Instagram's search. A
+    card's title and its top stat lines (services/ig_x.details), the hook's text, or a hand-built slide's own `alt`."""
+    from services.ig_x import details, slide_text
+
+    out = []
+    for s in slides or []:
+        if s.get("alt"):
+            out.append(str(s["alt"]))
+            continue
+        lines = details(s.get("card") or {}) if s.get("type") == "card" else []
+        text = " ".join([slide_text(s, {}), *[l.rstrip(".") + "." for l in lines[:3]]]).strip()
+        out.append(text[:400])
+    return out
+
+
 def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog",
                 post_by: Optional[Any] = None) -> None:
     """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench). The carousel's
@@ -589,10 +605,19 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
             slides_ = (data or {}).get("slides") or []
             if slides_ and slides_[0].get("cover"):
                 fact["cover"] = slides_[0]["cover"]  # the cover A/B (services/ig_cover.py)
-            got = lint_slides(slides_, fact.get("kind"))
+            # A reference deck (one slide per team: SOCIAL_COPY_PLAN.md S8) may run past 8 slides.
+            got = lint_slides(slides_, "reference" if fact.get("deck") == "reference" else fact.get("kind"))
             warnings += [w for w in got if w not in warnings]
+            if not fact.get("alt"):
+                fact["alt"] = alt_texts(slides_)
         except Exception:  # pragma: no cover - a check never blocks a post
             logger.exception("social rules check failed for %s", cid)
+    try:
+        from services.social_rules import caption_problems
+
+        warnings += [w for w in caption_problems(caption) if w not in warnings]
+    except Exception:  # pragma: no cover
+        logger.exception("caption check failed for %s", post.get("key"))
     conn.execute(text("""
         INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
                                    rule_warnings, status, source, channel, planned_for, pillar, caption, post_by)

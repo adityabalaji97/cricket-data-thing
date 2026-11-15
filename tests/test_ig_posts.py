@@ -181,8 +181,17 @@ def test_note_tables_and_youtube_copy():
     assert ig_notes.card_table(card).splitlines()[:3] == ["| # | Player | Strike rate |", "|---|---|---|", "| 1 | A B | 150.0 |"]
     yt = ig_notes.youtube_copy({"kicker": "IPL"}, "Who?\n\nAnswer.\n\nFree ball-by-ball cricket stats: link in bio.\n.\n#a #b",
                                "Best finisher in IPL since 2023: Impact compared")
-    assert yt["title"].endswith("#shorts") and len(yt["title"]) <= 100
-    assert "link in bio" not in yt["description"] and yt["description"].endswith("#cricket #IPL #shorts")
+    # SOCIAL_COPY_PLAN.md S4: a search phrase, never cut; the caption's own tags, then the format, then #shorts.
+    assert yt["title"] == "Best finisher in IPL since 2023: Impact compared"
+    assert "link in bio" not in yt["description"] and yt["description"].endswith("#a #b #IPL #shorts")
+    assert yt["description"].startswith("Every ball, free: https://hindsightcricket.com")
+    assert yt["pinned_comment"].startswith("Who?")
+    # Whole clauses only: the 62-character first sentence doesn't fit 60, so the clause before it does.
+    assert ig_notes.yt_title("Cameron Green: ₹25.20 crore, −0.08 wins since the mega auction. Ajinkya Rahane: ₹1.50 crore") == \
+        "Cameron Green: ₹25.20 crore"
+    assert ig_notes.yt_title("Virat Kohli: ₹21 crore, +1.36 wins since the mega auction. Next") == \
+        "Virat Kohli: ₹21 crore, +1.36 wins since the mega auction."
+    assert "…" not in ig_notes.yt_title("word " * 40)
 
 
 def test_innings_scorecards_one_card_per_innings_batting_with_strike_rate(monkeypatch):
