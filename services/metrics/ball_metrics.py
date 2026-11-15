@@ -42,9 +42,19 @@ def prepare_states(deliveries: pd.DataFrame, par_by_match: pd.DataFrame, lam_by_
     prev_runs = grouped["inns_runs"].shift(1).fillna(0)
     prev_wkts = grouped["inns_wkts"].shift(1).fillna(0)
     prev_balls = grouped["inns_balls"].shift(1).fillna(0)
+    wicket = df["out"].astype(bool).astype(int)
 
+    # A gap in the feed (overs missing mid-innings, 15 Nov 2026: SMAT Punjab v Haryana lost three) would hand the next
+    # ball every run, wicket and ball of the gap. Where the legal-ball count jumps by more than this ball, its own state
+    # before is rebuilt from the ball itself (its runs, wicket and legality) instead of the last ball we hold.
+    gap = (df["inns_balls"] - prev_balls) != legal
+    prev_runs = prev_runs.where(~gap, df["inns_runs"] - df["score"].fillna(0))
+    prev_wkts = prev_wkts.where(~gap, df["inns_wkts"] - wicket)
+    prev_balls = prev_balls.where(~gap, df["inns_balls"] - legal)
+
+    df["feed_gap"] = gap
     df["legal"] = legal
-    df["wicket"] = df["out"].astype(bool).astype(int)  # the flag, for player figures (RAA/WAA)
+    df["wicket"] = wicket  # the flag, for player figures (RAA/WAA)
     df["allot"] = allot
     df["runs_before"] = prev_runs
     df["wkts_before"] = prev_wkts.clip(upper=MAX_WICKETS)

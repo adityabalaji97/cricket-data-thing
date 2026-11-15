@@ -119,3 +119,25 @@ def test_small_buckets_shrink_toward_their_parent():
     assert league_mean < par["tiny0"] < 210 - 15
     g7_raw = np.mean([r["first_total"] for r in rows if r["ground"] == "G7"])
     assert abs(par["g7_0"] - g7_raw) < 2
+
+
+def test_a_gap_in_the_feed_stays_with_the_gap():
+    # Three balls missing mid-innings (a feed that dropped overs): the next ball keeps its own run, not the gap's.
+    full = _toy_innings()
+    df = full.drop(index=[1, 2, 3]).reset_index(drop=True)
+    par = pd.DataFrame({"p_match": ["m1"], "par": [160.0], "lam": [1.0]})
+    states = prepare_states(df, par, par)
+    after_gap = states[states["ball"] == 5].iloc[0]
+    assert bool(after_gap.feed_gap)
+    assert after_gap.team_runs == 6
+    assert after_gap.balls_before - after_gap.balls_after == 1
+    assert after_gap.wkts_before == after_gap.wkts_after
+    # Complete innings are untouched.
+    assert not prepare_states(full, par, par)["feed_gap"].any()
+
+
+def test_a_missing_start_is_a_gap_too():
+    df = _toy_innings().iloc[2:].reset_index(drop=True)
+    par = pd.DataFrame({"p_match": ["m1"], "par": [160.0], "lam": [1.0]})
+    first = prepare_states(df, par, par).iloc[0]
+    assert bool(first.feed_gap) and first.team_runs == 0 and first.wkts_before == 0

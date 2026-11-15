@@ -9,6 +9,11 @@ T20 and load them into metric_models / match_par / ball_metrics (migration 003).
     python scripts/compute_primer_metrics.py full --write
     # Nightly: score matches that have no ball_metrics yet with the stored models:
     python scripts/compute_primer_metrics.py incremental --write
+    # Rescore given matches (their ball_metrics are replaced), e.g. after a fix or a feed backfill:
+    python scripts/compute_primer_metrics.py incremental --matches 1546665 --write
+
+Innings with balls missing from the feed are listed as "feed gaps" (each ball after a gap is scored from its own
+state, services/metrics/ball_metrics.prepare_states, so the gap's runs don't land on it).
 
 `full` fits the DL curve, par shrinkage and the RAA/WAA models, writes the models to
 ml/models/primer/ (commit them: incremental runs need them) and, with --write, truncates and
@@ -226,8 +231,10 @@ def run_incremental(args) -> None:
             SELECT DISTINCT dd.p_match FROM delivery_details dd
             WHERE dd.format = :f AND dd.gender = :g
               AND dd.competition <> ALL(:excluded)
-              AND NOT EXISTS (SELECT 1 FROM ball_metrics bm WHERE bm.p_match = dd.p_match)
-        """), {"f": FORMAT, "g": GENDER, "excluded": list(EXCLUDED_COMPETITIONS)})]
+              AND (CAST(:m AS text[]) IS NULL AND NOT EXISTS (SELECT 1 FROM ball_metrics bm WHERE bm.p_match = dd.p_match)
+                   OR dd.p_match = ANY(CAST(:m AS text[])))
+        """), {"f": FORMAT, "g": GENDER, "excluded": list(EXCLUDED_COMPETITIONS),
+               "m": args.matches.split(",") if args.matches else None})]
     if stored is None:
         raise SystemExit("No stored metric model: run `full --write` first.")
     params = DLParams.from_dict(stored["dl"] if isinstance(stored, dict) else json.loads(stored)["dl"])
@@ -246,12 +253,17 @@ def run_incremental(args) -> None:
     runs_model, wkts_model = load_models(MODELS_DIR)
     balls = compute(df, params, new_par, runs_model, wkts_model, version)
     log.info("scored %s balls in %s matches", len(balls), balls["p_match"].nunique())
+    gaps = balls[balls["feed_gap"]].groupby(["p_match", "inns"]).size()
+    for (m, inns), n in gaps.items():
+        log.warning("feed gap: match %s innings %s has %s ball(s) after missing balls; scored from their own state", m, inns, n)
     if not args.write:
         return
     raw = engine.raw_connection()
     try:
         cur = raw.cursor()
         ids = tuple(new_par["p_match"].astype(str))
+        if args.matches:  # a rescore replaces what's stored
+            cur.execute("DELETE FROM ball_metrics WHERE p_match IN %s", (ids,))
         cur.execute("DELETE FROM match_par WHERE p_match IN %s", (ids,))
         _copy_into("match_par", new_par.assign(format=FORMAT, gender=GENDER, version=version),
                    ["p_match", "format", "gender", "par", "lam", "par_source", "version"], cur)
@@ -270,6 +282,7 @@ def main() -> None:
     parser.add_argument("--write", action="store_true", help="write to the database (default: compute and report only)")
     parser.add_argument("--version", type=int, default=1, help="model version for a full run")
     parser.add_argument("--cache", help="parquet path to cache the full export between runs")
+    parser.add_argument("--matches", help="incremental: rescore these match ids (comma-separated), replacing their metrics")
     args = parser.parse_args()
     (run_full if args.mode == "full" else run_incremental)(args)
 
