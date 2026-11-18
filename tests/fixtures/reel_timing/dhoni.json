@@ -1,0 +1,192 @@
+{
+ "voice": "marin",
+ "model": "gpt-realtime-2.1-mini",
+ "lines": [
+  "Dhoni finishes off in style: 2,950 runs in the last four overs of IPL games.",
+  "Next best: Kieron Pollard, 1,708.",
+  "More than half his IPL runs came there.",
+  "Dharamshala, 2010: 16 needed off Irfan Pathan's last over. Four, two, six, six.",
+  "Since 2015, two of his innings were each worth almost a whole win. Nobody else has two.",
+  "Thank you, MS. Send this to a Chennai fan."
+ ],
+ "lengths": [
+  5.536,
+  3.437,
+  2.321,
+  7.277,
+  5.089,
+  2.321
+ ],
+ "starts": [
+  0.0,
+  5.656,
+  9.213,
+  11.655,
+  19.051,
+  24.261
+ ],
+ "words": [
+  [
+   0.0,
+   0.26,
+   0.68,
+   0.92,
+   1.16,
+   2.08,
+   3.0,
+   3.28,
+   3.46,
+   3.6,
+   3.86,
+   4.04,
+   4.32,
+   4.56,
+   4.96
+  ],
+  [
+   5.656,
+   6.056,
+   6.916,
+   6.936,
+   7.876
+  ],
+  [
+   9.213,
+   9.473,
+   9.673,
+   9.933,
+   10.133,
+   10.533,
+   10.733,
+   10.973
+  ],
+  [
+   11.655,
+   13.355,
+   13.655,
+   14.035,
+   14.375,
+   14.635,
+   15.055,
+   15.475,
+   15.635,
+   16.294,
+   16.954,
+   17.613,
+   18.272
+  ],
+  [
+   19.051,
+   19.311,
+   20.531,
+   20.611,
+   20.911,
+   20.911,
+   21.111,
+   21.311,
+   21.571,
+   21.751,
+   22.031,
+   22.211,
+   22.431,
+   23.191,
+   23.351,
+   23.551,
+   23.731
+  ],
+  [
+   24.261,
+   24.521,
+   24.621,
+   25.441,
+   25.541,
+   25.681,
+   25.761,
+   25.921,
+   26.101
+  ]
+ ],
+ "captions": [
+  [
+   0.0,
+   2.08,
+   "Dhoni finishes off in style:"
+  ],
+  [
+   2.08,
+   4.04,
+   "2,950 runs in the last four"
+  ],
+  [
+   4.04,
+   5.536,
+   "overs of IPL games."
+  ],
+  [
+   5.656,
+   6.916,
+   "Next best:"
+  ],
+  [
+   6.916,
+   9.093,
+   "Kieron Pollard, 1,708."
+  ],
+  [
+   9.213,
+   10.733,
+   "More than half his IPL runs"
+  ],
+  [
+   10.733,
+   11.534,
+   "came there."
+  ],
+  [
+   11.655,
+   13.655,
+   "Dharamshala, 2010:"
+  ],
+  [
+   13.655,
+   16.954,
+   "16 needed off Irfan Pathan's last over. Four,"
+  ],
+  [
+   16.954,
+   18.932,
+   "two, six, six."
+  ],
+  [
+   19.051,
+   20.531,
+   "Since 2015,"
+  ],
+  [
+   20.531,
+   21.571,
+   "two of his innings were each"
+  ],
+  [
+   21.571,
+   23.191,
+   "worth almost a whole win."
+  ],
+  [
+   23.191,
+   24.14,
+   "Nobody else has two."
+  ],
+  [
+   24.261,
+   25.441,
+   "Thank you, MS."
+  ],
+  [
+   25.441,
+   26.582,
+   "Send this to a Chennai fan."
+  ]
+ ],
+ "audio": 26.664
+}

@@ -1,0 +1,331 @@
+{
+ "team": "RCB",
+ "fps": 30,
+ "duration": 31.392,
+ "chapters": [
+  {
+   "label": "Patidar",
+   "start": 0,
+   "end": 12.695
+  },
+  {
+   "label": "Each side",
+   "start": 12.695,
+   "end": 20.555
+  },
+  {
+   "label": "No IPL side",
+   "start": 20.555,
+   "end": 26.434
+  },
+  {
+   "label": "Bid or pass",
+   "start": 26.434,
+   "end": 31.392
+  }
+ ],
+ "scenes": [
+  {
+   "kind": "hero_card",
+   "start": 0,
+   "end": 12.695,
+   "team": "RCB",
+   "kicker": "SMAT round 2 · 16 Nov · the IPL's Indians",
+   "data": {
+    "name": "Rajat Patidar",
+    "team": "RCB",
+    "corner": "RCB · Madhya Pradesh",
+    "from": 40,
+    "value": 135,
+    "done": "*",
+    "detail": "off 48 balls",
+    "sub": {
+     "value": 62.4,
+     "format": "signed1",
+     "label": "runs above par",
+     "gloss": "more than an average batter from the same spots",
+     "at": 4.406
+    },
+    "badge": {
+     "text": "The most by any IPL player",
+     "at": 8.386
+    }
+   }
+  },
+  {
+   "kind": "team_best",
+   "start": 12.695,
+   "end": 20.555,
+   "kicker": "Each franchise's best · runs above par",
+   "data": {
+    "format": "signed1",
+    "rows": [
+     {
+      "team": "RCB",
+      "code": "RCB",
+      "name": "Rajat Patidar",
+      "label": "Patidar",
+      "value": 62.4,
+      "detail": "135* off 48"
+     },
+     {
+      "team": "MI",
+      "code": "MI",
+      "name": "Suryakumar Yadav",
+      "label": "Suryakumar",
+      "value": 45.0,
+      "detail": "82 off 29"
+     },
+     {
+      "team": "CSK",
+      "code": "CSK",
+      "name": "Sanju Samson",
+      "label": "Samson",
+      "value": 26.4,
+      "detail": "47 off 16"
+     },
+     {
+      "team": "SRH",
+      "code": "SRH",
+      "name": "Ravichandran Smaran",
+      "label": "Smaran",
+      "value": 19.6,
+      "detail": "68 off 39"
+     },
+     {
+      "team": "DC",
+      "code": "DC",
+      "name": "Abishek Porel",
+      "label": "Porel",
+      "value": 18.4,
+      "detail": "53 off 26"
+     },
+     {
+      "team": "LSG",
+      "code": "LSG",
+      "name": "Mayank Yadav",
+      "label": "Mayank",
+      "value": 11.9,
+      "detail": "4/12 in 3"
+     },
+     {
+      "team": "PBKS",
+      "code": "PBKS",
+      "name": "Shashank Singh",
+      "label": "Shashank",
+      "value": 9.3,
+      "detail": "2/19 in 3"
+     },
+     {
+      "team": "RR",
+      "code": "RR",
+      "name": "Ravi Singh",
+      "label": "Ravi",
+      "value": 9.1,
+      "detail": "21 off 11"
+     },
+     {
+      "team": "KKR",
+      "code": "KKR",
+      "name": "Angkrish Raghuvanshi",
+      "label": "Raghuvanshi",
+      "value": 4.7,
+      "detail": "4 off 3"
+     },
+     {
+      "team": "GT",
+      "code": "GT",
+      "name": "Jayant Yadav",
+      "label": "Jayant",
+      "value": 3.4,
+      "detail": "2/24 in 4"
+     }
+    ]
+   },
+   "beats": [
+    {
+     "at": 12.695,
+     "key": "Suryakumar Yadav"
+    },
+    {
+     "at": 15.36,
+     "key": "Sanju Samson"
+    },
+    {
+     "at": 18.114,
+     "key": "Mayank Yadav"
+    }
+   ]
+  },
+  {
+   "kind": "pool_count",
+   "start": 20.555,
+   "end": 26.434,
+   "kicker": "Round 2 · no IPL side",
+   "data": {
+    "count": 324,
+    "label": "played with no IPL side",
+    "card": {
+     "name": "Shivalik Sharma",
+     "corner": "Baroda",
+     "from": 30,
+     "value": 101,
+     "done": "*",
+     "detail": "off 39 balls",
+     "line": "+55.3 runs above par",
+     "tag": "Last IPL squad: Mumbai, 2024 · unsold at the 2025 auction",
+     "at": 22.735
+    }
+   }
+  },
+  {
+   "kind": "pick_one",
+   "start": 26.434,
+   "end": 31.392,
+   "captions": false,
+   "kicker": "IPL auction · 16 December",
+   "data": {
+    "question": "Shivalik Sharma:",
+    "lit": "bid or pass?",
+    "sub": "Comment one word.",
+    "options": [
+     "Bid",
+     "Pass"
+    ],
+    "send": {
+     "text": "Send this to your team's fans",
+     "at": 29.154
+    },
+    "credit": [
+     "Runs above par, bat + ball · one game · SMAT round 2, 16 Nov",
+     "hindsightcricket.com · Data: Himanish Ganjoo & TechRadar, Cricsheet"
+    ]
+   }
+  }
+ ],
+ "timing": {
+  "lines": [
+   "Rajat Patidar: 135 not out, off 48 balls.",
+   "That is 62 runs more than an average batter makes from the same spots: the most by any IPL player in round two of the Mushtaq Ali Trophy.",
+   "Suryakumar Yadav, 82 off 29.",
+   "Sanju Samson, 47 off 16.",
+   "Mayank Yadav, four for 12.",
+   "But the best of the rest has no IPL team. Shivalik Sharma, 101 not out off 39.",
+   "Bid or pass on 16 December? Send this to your team's fans."
+  ],
+  "starts": [
+   0.0,
+   4.406,
+   12.695,
+   15.36,
+   18.114,
+   20.555,
+   26.434
+  ],
+  "lengths": [
+   4.286,
+   8.17,
+   2.545,
+   2.634,
+   2.321,
+   5.759,
+   4.286
+  ],
+  "words": [
+   [
+    0.0,
+    0.42,
+    1.34,
+    2.08,
+    2.4,
+    2.9,
+    3.12,
+    3.56
+   ],
+   [
+    4.406,
+    4.666,
+    4.786,
+    5.206,
+    5.546,
+    5.906,
+    6.086,
+    6.286,
+    6.486,
+    6.746,
+    6.986,
+    7.146,
+    7.266,
+    7.486,
+    8.386,
+    8.486,
+    8.726,
+    8.926,
+    9.366,
+    9.826,
+    10.126,
+    10.426,
+    10.666,
+    10.906,
+    11.126,
+    11.266,
+    11.666,
+    11.886
+   ],
+   [
+    12.695,
+    13.315,
+    13.935,
+    14.215,
+    14.495
+   ],
+   [
+    15.36,
+    15.98,
+    16.6,
+    17.06,
+    17.4
+   ],
+   [
+    18.114,
+    18.614,
+    19.114,
+    19.614,
+    19.774
+   ],
+   [
+    20.555,
+    20.795,
+    21.075,
+    21.395,
+    21.515,
+    21.635,
+    21.895,
+    22.155,
+    22.355,
+    22.735,
+    23.535,
+    23.775,
+    24.395,
+    24.895,
+    25.195,
+    25.375,
+    25.595
+   ],
+   [
+    26.434,
+    26.794,
+    27.014,
+    27.334,
+    27.574,
+    28.034,
+    29.154,
+    29.174,
+    29.414,
+    29.514,
+    29.754,
+    30.154
+   ]
+  ]
+ }
+}

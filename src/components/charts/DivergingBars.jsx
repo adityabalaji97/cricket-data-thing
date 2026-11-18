@@ -22,6 +22,7 @@ const DivergingBars = ({
   labelWidth = 72,
   ariaLabel,
   span,
+  growRow, // motion Reels: (i) => 0..1, row i's bar length so far (src/components/ig/reel/motion.js); absent = drawn whole
 }) => {
   const valid = rows.filter((r) => r.value != null && !Number.isNaN(Number(r.value)));
   if (!valid.length) return null;
@@ -30,10 +31,10 @@ const DivergingBars = ({
 
   return (
     <Box role="list" aria-label={ariaLabel} sx={{ display: 'grid', gap: 0.5 }}>
-      {valid.map((r) => {
+      {valid.map((r, i) => {
         const v = Number(r.value);
         const small = r.sample != null && r.sample < minSample;
-        const width = (Math.abs(v) / max) * 50;
+        const width = (Math.abs(v) / max) * 50 * (growRow ? growRow(i) : 1);
         const heading = r.group && r.group !== lastGroup ? r.group : null;
         lastGroup = r.group || lastGroup;
         return (

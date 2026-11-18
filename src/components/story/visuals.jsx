@@ -9,19 +9,34 @@ import { colors, fonts } from '../../theme/hindsightDark';
 import { useStoryNav } from './StoryNav';
 import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 import { POST_VISUALS } from './postVisuals';
+import { countText, deal, draw, enterSx, grow, reveal, ringOn } from '../ig/reel/motion';
+
+/** M3b: a mark landing in a Reel (opacity), `stagger` seconds after the one before; undefined on a card and once in. */
+const dotIn = (motion, i, stagger = 0.03) => {
+  if (!motion) return undefined;
+  const p = reveal({ ...motion, plan: { stagger, enter: 0.3, ...motion.plan } }, i);
+  return p >= 1 ? undefined : { opacity: p };
+};
+
+/** M3b: a line chart drawn left to right in a Reel (the same rule as postVisuals' lineDraw). {} on a card. */
+const lineDraw = (motion) => {
+  if (!motion) return {};
+  const p = draw(motion, 0.15, motion.plan?.draw ?? 2.5);
+  return p >= 1 ? {} : { clipPath: `inset(0 ${(1 - p) * 88}% 0 0)` };
+};
 
 /**
  * Renderers for the `visual` each card declares (services/preview_cards). A card's payload is
  * exactly what its renderer draws; reused components run in `bare` mode, since the story card
  * supplies the title and frame.
  */
-const Stat = ({ payload }) => (
+const Stat = ({ payload, motion }) => (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
     <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 96, lineHeight: 1, color: colors.accent }}>
-      {payload.value}
+      {countText(payload.value, grow(motion, 0))}
     </Typography>
     {payload.caption && (
-      <Typography sx={{ mt: 1.5, fontSize: 16, color: colors.textMed }}>{payload.caption}</Typography>
+      <Typography sx={{ mt: 1.5, fontSize: 16, color: colors.textMed, ...(motion ? enterSx(reveal(motion, 6)) : {}) }}>{payload.caption}</Typography>
     )}
   </Box>
 );
@@ -29,7 +44,7 @@ const Stat = ({ payload }) => (
 const svgText = { fontFamily: fonts.mono, fontSize: 12 };
 
 /** Par: the number, its trend in words, and par season by season (a line: no zero baseline needed). */
-const Par = ({ payload }) => {
+const Par = ({ payload, motion }) => {
   const series = payload.series || [];
   const W = 300; const H = 120; const padX = 22; const top = 26; const bottom = 96;
   const values = series.map((r) => r.value);
@@ -40,7 +55,7 @@ const Par = ({ payload }) => {
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.5 }}>
       <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 96, lineHeight: 1, color: colors.accent }}>
-        {payload.value}
+        {countText(payload.value, grow(motion, 0))}
       </Typography>
       {payload.caption && <Typography sx={{ fontSize: 16, color: colors.textMed }}>{payload.caption}</Typography>}
       {series.length > 1 && (
@@ -48,9 +63,10 @@ const Par = ({ payload }) => {
           <polyline
             points={series.map((r, i) => `${x(i)},${y(r.value)}`).join(' ')}
             fill="none" stroke={colors.textFaint} strokeWidth="2" strokeLinejoin="round"
+            {...(motion && draw(motion, 0.6, 1.6) < 1 ? { pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1 - draw(motion, 0.6, 1.6) } : {})}
           />
           {series.map((r, i) => (
-            <g key={r.year}>
+            <g key={r.year} style={motion && draw(motion, 0.6, 1.6) < (i + 1) / series.length ? { opacity: 0 } : undefined}>
               <circle cx={x(i)} cy={y(r.value)} r={i === last ? 6 : 4.5} fill={i === last ? colors.accent : colors.textLo} stroke={colors.surface1} strokeWidth="2">
                 <title>{`${r.year}: par ${r.value} (${r.n} ${r.n === 1 ? 'match' : 'matches'})`}</title>
               </circle>
@@ -65,14 +81,16 @@ const Par = ({ payload }) => {
 };
 
 /** Chase record with its likely range against an even split (MATCH_PREVIEW_VIZ_PLAN.md, B4). */
-const ChaseBand = ({ payload }) => {
+const ChaseBand = ({ payload, motion }) => {
   const W = 300; const x = (pct) => 10 + (pct * (W - 20)) / 100;
-  const pct = Math.round((100 * payload.chase_wins) / Math.max(1, payload.decided));
+  const pct0 = Math.round((100 * payload.chase_wins) / Math.max(1, payload.decided));
+  const g = grow(motion, 2);
+  const pct = g >= 1 ? pct0 : Math.round(pct0 * g);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
       <Box component="svg" viewBox={`0 0 ${W} 112`} role="img" aria-label={`${pct}% of chases won; likely range ${payload.lo} to ${payload.hi}%`} sx={{ width: '100%' }}>
         <line x1="10" x2={W - 10} y1="50" y2="50" stroke={colors.borderStrong} strokeWidth="10" strokeLinecap="round" />
-        <rect x={x(payload.lo)} y="40" width={Math.max(4, x(payload.hi) - x(payload.lo))} height="20" rx="10" fill={colors.blue} fillOpacity="0.35">
+        <rect x={x(payload.lo)} y="40" width={Math.max(4, x(payload.hi) - x(payload.lo))} height="20" rx="10" fill={colors.blue} fillOpacity={motion && reveal(motion, 4) < 1 ? 0.35 * reveal(motion, 4) : '0.35'}>
           <title>{`Likely range ${payload.lo}–${payload.hi}%`}</title>
         </rect>
         <line x1={x(50)} x2={x(50)} y1="28" y2="72" stroke={colors.textLo} strokeDasharray="3 3" />
@@ -110,11 +128,17 @@ const Legend = ({ items }) => (
 );
 
 /** A1: the story's headline numbers; each tile opens its card. */
-const Tiles = ({ payload }) => {
+/** A tile dealt in (scale with overshoot), 0.35s after the one before, the ring on the tile the voice names. */
+const tileMotion = (motion, i, key) => {
+  const p = deal({ ...motion, plan: { stagger: 0.35, ...motion.plan } }, i);
+  return { ...(p >= 1 ? {} : { opacity: Math.min(1, Math.max(0, p * 2)), transform: `scale(${0.7 + 0.3 * p})` }), ...ringOn(motion, key) };
+};
+
+const Tiles = ({ payload, motion }) => {
   const { openCard } = useStoryNav();
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: 'minmax(0, 1fr)', gap: 1 }}>
-      {payload.tiles.map((t) => (
+      {payload.tiles.map((t, i) => (
         <Box
           key={`${t.card}-${t.label}`}
           component="button"
@@ -127,13 +151,14 @@ const Tiles = ({ payload }) => {
             color: 'inherit', px: 1.25, py: { xs: 0.5, sm: 1 }, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.25, overflow: 'hidden',
             cursor: openCard ? 'pointer' : 'default', font: 'inherit', minHeight: 0,
             '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: 2 },
+            ...(motion ? tileMotion(motion, i, t.label) : {}),
           }}
         >
           <Typography noWrap sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo }}>
             {t.label}
           </Typography>
           <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: { xs: 26, sm: 30 }, lineHeight: 1.05, color: colors.textHi, fontVariantNumeric: 'tabular-nums' }}>
-            {t.value}
+            {countText(t.value, motion ? grow({ ...motion, plan: { stagger: 0.35, ...motion.plan } }, i) : 1)}
           </Typography>
           <Typography noWrap sx={{ fontSize: { xs: 12, sm: 13 }, color: colors.textMed, lineHeight: 1.25 }}>{t.sub}</Typography>
         </Box>
@@ -146,7 +171,7 @@ const Tiles = ({ payload }) => {
  * B1: every first innings by season, defended or chased down, against a line near par. Optional: legend [won, lost]
  * labels for another split, no line (line null), callouts:[{year, total, label, place?}] ringing named points.
  */
-const TotalsScatter = ({ payload }) => {
+const TotalsScatter = ({ payload, motion }) => {
   const W = 300; const H = 220; const left = 34; const right = 8; const top = 10; const bottom = 196;
   const totals = payload.points.map((p) => p.total);
   const ref = payload.line != null ? [payload.line] : [];
@@ -174,7 +199,7 @@ const TotalsScatter = ({ payload }) => {
         )}
         {payload.points.map((p, i) => {
           const dot = (
-            <circle cx={x(p.year, i)} cy={y(p.total)} r="4.5" fill={p.won ? SERIES[0] : SERIES[1]}
+            <circle cx={x(p.year, i)} cy={y(p.total)} r="4.5" fill={p.won ? SERIES[0] : SERIES[1]} style={dotIn(motion, i, 0.02)}
               fillOpacity={p.recent ? 0.95 : 0.3} stroke={colors.surface1} strokeWidth="1.5">
               <title>{`${p.year}: ${p.total}, ${p.won ? 'defended' : 'chased down'}${p.match_id ? ' · tap for the scorecard' : ''}`}</title>
             </circle>
@@ -204,7 +229,7 @@ const TotalsScatter = ({ payload }) => {
 };
 
 /** B2: average score at the end of each over, here and across the competition. */
-const Worm = ({ payload }) => {
+const Worm = ({ payload, motion }) => {
   const W = 300; const H = 210; const left = 30; const right = 8; const top = 22; const bottom = 186;
   const n = payload.overs.length;
   const max = Math.ceil(Math.max(...payload.here, ...payload.all) / 50) * 50;
@@ -216,7 +241,7 @@ const Worm = ({ payload }) => {
   const hereAbove = lastHere >= lastAll;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Average score by over: ${payload.here_label} ${Math.round(lastHere)}, ${payload.all_label} ${Math.round(lastAll)} after ${payload.overs[n - 1]} overs`} sx={{ width: '100%' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Average score by over: ${payload.here_label} ${Math.round(lastHere)}, ${payload.all_label} ${Math.round(lastAll)} after ${payload.overs[n - 1]} overs`} sx={{ width: '100%', ...lineDraw(motion) }}>
         {ticks.map((v) => (
           <g key={v}>
             <line x1={left} x2={W - right} y1={y(v)} y2={y(v)} stroke={colors.border} />
@@ -238,11 +263,12 @@ const Worm = ({ payload }) => {
 };
 
 /** B3: run rate by phase here minus the competition's. */
-const PhaseDiverging = ({ payload }) => (
+const PhaseDiverging = ({ payload, motion }) => (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.5 }}>
     <DivergingBars
       span={3}
       labelWidth={150}
+      growRow={motion ? (i) => grow({ ...motion, plan: { stagger: 0.3, ...motion.plan } }, i) : undefined}
       ariaLabel={`Runs per over by phase, here minus the ${payload.comparison} average`}
       rows={payload.rows.map((r) => ({
         key: r.phase, label: `${PHASE_LABEL[r.phase]} · ${r.here.toFixed(1)} v ${r.all.toFixed(1)}`, value: r.diff,
@@ -254,20 +280,23 @@ const PhaseDiverging = ({ payload }) => (
   </Box>
 );
 
+/** Motion for PaceSpin: each phase's bar grows out from the left, 0.3s after the one above (1 with no motion). */
+const psg = (motion, i) => (motion ? grow({ ...motion, plan: { stagger: 0.3, ...motion.plan } }, i) : 1);
+
 /** B5: share of balls by spin and pace in each phase, with the competition's spin share as a tick. */
-const PaceSpin = ({ payload }) => (
+const PaceSpin = ({ payload, motion }) => (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
-    {payload.rows.map((r) => (
-      <Box key={r.label || r.phase}>
+    {payload.rows.map((r, i) => (
+      <Box key={r.label || r.phase} sx={motion ? enterSx(reveal({ ...motion, plan: { stagger: 0.3, ...motion.plan } }, i)) : undefined}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
           <Typography sx={{ fontSize: 14, color: colors.textHi }}>{r.label || PHASE_LABEL[r.phase]}</Typography>
           <Typography sx={{ fontSize: 14, color: colors.textHi, fontFamily: fonts.mono }}>{`spin ${r.spin_pct}%`}</Typography>
         </Box>
         <Box component="svg" viewBox="0 0 300 26" role="img" aria-label={`${r.label || PHASE_LABEL[r.phase]}: spin ${r.spin_pct}% of balls${r.spin_pct_all == null ? '' : `, ${r.spin_pct_all}% ${payload.by_side ? payload.comparison : `across the ${payload.comparison}`}`}`} sx={{ width: '100%', display: 'block' }}>
-          <rect x="0" y="2" width={Math.max(0, 3 * r.spin_pct - 1)} height="20" rx="4" fill={KIND_COLORS.spin}>
+          <rect x="0" y="2" width={Math.max(0, 3 * r.spin_pct - 1) * psg(motion, i)} height="20" rx="4" fill={KIND_COLORS.spin}>
             <title>{`Spin: ${r.spin_balls} balls, ${r.spin_wickets} wickets, ${r.spin_econ ?? '–'} an over`}</title>
           </rect>
-          <rect x={3 * r.spin_pct + 1} y="2" width={Math.max(0, 300 - 3 * r.spin_pct - 1)} height="20" rx="4" fill={KIND_COLORS.pace}>
+          <rect x={3 * r.spin_pct * psg(motion, i) + 1} y="2" width={Math.max(0, 300 - 3 * r.spin_pct - 1) * psg(motion, i)} height="20" rx="4" fill={KIND_COLORS.pace}>
             <title>{`Pace: ${r.pace_balls} balls, ${r.pace_wickets} wickets, ${r.pace_econ ?? '–'} an over`}</title>
           </rect>
           {r.spin_pct_all != null && <line x1={3 * r.spin_pct_all} x2={3 * r.spin_pct_all} y1="0" y2="26" stroke={colors.textHi} strokeWidth="2" />}
@@ -284,7 +313,7 @@ const PaceSpin = ({ payload }) => (
 );
 
 /** B6: share of boundaries to each zone; behind the batter at the top, leg side on the right. */
-const BoundaryZones = ({ payload }) => {
+const BoundaryZones = ({ payload, motion }) => {
   const cx = 150; const cy = 120; const R = 104;
   // Zones are stored from the batter's side. A right-hander: third man top-left, fine leg top-right, round to point.
   // A left-hander is drawn mirrored (leg side on the left), so their shots point the way they went.
@@ -304,13 +333,14 @@ const BoundaryZones = ({ payload }) => {
           const z = payload.zones.find((q) => q.zone === zn);
           const a = rad(centre(i)); const lx = cx + R * 0.64 * Math.cos(a); const ly = cy + R * 0.64 * Math.sin(a);
           const isTop = zn === payload.top;
+          const g = motion ? grow({ ...motion, plan: { stagger: 0.15, ...motion.plan } }, i) : 1;
           return (
             <g key={zn}>
-              <path d={wedge(i)} fill={SERIES[0]} fillOpacity={0.12 + (0.7 * z.pct) / max} stroke={isTop ? colors.accent : colors.surface1} strokeWidth={isTop ? 2.5 : 2}>
+              <path d={wedge(i)} fill={SERIES[0]} fillOpacity={g >= 1 ? 0.12 + (0.7 * z.pct) / max : 0.12 + (0.7 * z.pct * g) / max} stroke={isTop ? colors.accent : colors.surface1} strokeWidth={isTop ? 2.5 : 2}>
                 <title>{`${z.name}: ${z.pct}% of boundaries (usually ${z.usual_pct}%)`}</title>
               </path>
               <text x={lx} y={ly - 3} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 11, fill: colors.textHi }}>{z.name}</text>
-              <text x={lx} y={ly + 11} textAnchor="middle" style={{ ...svgText, fill: colors.textHi }}>{`${z.pct.toFixed(0)}%`}</text>
+              <text x={lx} y={ly + 11} textAnchor="middle" style={{ ...svgText, fill: colors.textHi }}>{`${(g >= 1 ? z.pct : z.pct * g).toFixed(0)}%`}</text>
             </g>
           );
         })}
@@ -375,22 +405,27 @@ export const pairColors = (team1, team2) => {
 const signed = (v, digits = 0) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(digits)}`;
 
 /** C1: each side against the competition average, per phase, bat and ball. */
-const Dumbbell = ({ payload }) => {
+const Dumbbell = ({ payload, motion }) => {
   const [c1, c2] = pairColors(payload.team1, payload.team2);
   const span = Math.max(10, Math.ceil(Math.max(...payload.rows.flatMap((r) => [Math.abs(r.team1), Math.abs(r.team2)])) / 5) * 5);
   const W = 300; const left = 84; const right = 66; const rowH = 22;
   const x = (v) => left + ((v + span) / (2 * span)) * (W - left - right);
   const groups = ['Batting', 'Bowling'].filter((g) => payload.rows.some((r) => r.group === g));
   let y = 0;
+  let k = -1;
   const marks = [];
   groups.forEach((g) => {
     y += 14;
     marks.push(<text key={`${g}-h`} x="0" y={y} style={{ ...svgText, fontSize: 11, fill: colors.textLo, letterSpacing: '0.08em' }}>{g.toUpperCase()}</text>);
     payload.rows.filter((r) => r.group === g).forEach((r) => {
       y += rowH;
-      const a = x(r.team1); const b = x(r.team2);
+      k += 1;
+      // Motion: both ends appear, then the second slides out from the first along the connector.
+      const gr = grow(motion, k);
+      const a = x(r.team1); const b = gr >= 1 ? x(r.team2) : a + (x(r.team2) - a) * gr;
+      const enter = reveal(motion, k);
       marks.push(
-        <g key={`${g}-${r.phase}`}>
+        <g key={`${g}-${r.phase}`} style={enter >= 1 ? undefined : { opacity: enter }}>
           <text x="0" y={y + 4} style={{ fontFamily: fonts.body, fontSize: 13, fill: colors.textHi }}>{PHASE_LABEL[r.phase].replace(' overs', '')}</text>
           <line x1={Math.min(a, b)} x2={Math.max(a, b)} y1={y} y2={y} stroke={colors.borderStrong} strokeWidth="3" />
           <circle cx={a} cy={y} r="7" fill={c1} stroke={colors.surface1} strokeWidth="2"><title>{`${payload.team1} ${g.toLowerCase()}, ${PHASE_LABEL[r.phase].toLowerCase()}: ${signed(r.team1, 1)} per 100 balls`}</title></circle>
@@ -417,7 +452,7 @@ const Dumbbell = ({ payload }) => {
 };
 
 /** C2: rank among the competition's sides, per phase; a full bar is first. */
-const RankBars = ({ payload }) => {
+const RankBars = ({ payload, motion }) => {
   const [c1, c2] = pairColors(payload.team1, payload.team2);
   const groups = ['batting', 'bowling'];
   return (
@@ -426,9 +461,11 @@ const RankBars = ({ payload }) => {
         <Box key={g}>
           <Typography sx={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.08em', color: colors.textLo, textTransform: 'uppercase', mb: 0.5 }}>{g}</Typography>
           {payload.rows.filter((r) => r.group === g).map((r) => {
-            const len = (rank) => Math.max(0.04, (r.of - rank + 1) / r.of);
+            const k = payload.rows.indexOf(r);
+            const len = (rank) => Math.max(0.04, (r.of - rank + 1) / r.of) * grow(motion, k);
             return (
-              <Box key={r.phase} sx={{ display: 'grid', gridTemplateColumns: '70px 1fr 54px', gap: 1, alignItems: 'center', mb: 0.75 }}>
+              <Box key={r.phase} sx={{ display: 'grid', gridTemplateColumns: '70px 1fr 54px', gap: 1, alignItems: 'center', mb: 0.75,
+                ...(motion ? { ...enterSx(reveal(motion, k), { dx: -14, dy: 0 }), ...ringOn(motion, r.phase) } : {}) }}>
                 <Typography sx={{ fontSize: 13, color: colors.textHi }}>{PHASE_LABEL[r.phase].replace(' overs', '')}</Typography>
                 <Box component="svg" viewBox="0 0 200 20" role="img" aria-label={`${payload.team1} ${r.team1} of ${r.of}, ${payload.team2} ${r.team2} of ${r.of}`} sx={{ width: '100%', display: 'block' }}>
                   <rect x="0" y="1" width={200 * len(r.team1)} height="7" rx="3.5" fill={c1}><title>{`${payload.team1}: ${r.team1} of ${r.of}`}</title></rect>
@@ -447,7 +484,7 @@ const RankBars = ({ payload }) => {
 };
 
 /** C3: each side's Elo before every match over the last year. */
-const EloLines = ({ payload }) => {
+const EloLines = ({ payload, motion }) => {
   const teams = payload.series.map((s) => s.team);
   const cols = pairColors(teams[0], teams[1]);
   const all = payload.series.flatMap((s) => s.points);
@@ -466,7 +503,7 @@ const EloLines = ({ payload }) => {
   const labelNudge = (i) => (close ? (ends[i] >= ends[1 - i] ? -7 : 7) : 0);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={payload.series.map((s) => `${s.team} ${s.points[s.points.length - 1].elo}`).join(', ')} sx={{ width: '100%' }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={payload.series.map((s) => `${s.team} ${s.points[s.points.length - 1].elo}`).join(', ')} sx={{ width: '100%', ...lineDraw(motion) }}>
         {ticks.map((v) => (
           <g key={v}>
             <line x1={left} x2={W - right} y1={y(v)} y2={y(v)} stroke={colors.border} />
@@ -494,7 +531,7 @@ const EloLines = ({ payload }) => {
 };
 
 /** C4: team1's chance of winning after every ball of the last meeting, and both scores. */
-const LastMeeting = ({ payload }) => {
+const LastMeeting = ({ payload, motion }) => {
   const [c1, c2] = pairColors(payload.team1, payload.team2);
   const path = payload.path || [];
   const W = 300; const H = 170; const left = 34; const right = 6; const top = 10; const bottom = 150;
@@ -518,7 +555,8 @@ const LastMeeting = ({ payload }) => {
               <text x={x(brk) + 4} y={top + 10} style={{ ...svgText, fontSize: 11, fill: colors.textLo }}>{`${chaser} chase`}</text>
             </g>
           )}
-          <path d={path.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.wp)}`).join(' ')} fill="none" stroke={c1} strokeWidth="2" />
+          <path d={path.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.wp)}`).join(' ')} fill="none" stroke={c1} strokeWidth="2"
+            {...(motion && draw(motion) < 1 ? { pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1 - draw(motion) } : {})} />
         </Box>
       )}
       <Box sx={{ display: 'grid', gap: 0.75 }}>
@@ -527,7 +565,7 @@ const LastMeeting = ({ payload }) => {
             <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: inn.side === payload.team1 ? c1 : c2, flexShrink: 0 }} />
             <Typography sx={{ fontSize: 15, color: colors.textHi, minWidth: 64 }}>{inn.side || '—'}</Typography>
             <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 24, color: colors.textHi, fontVariantNumeric: 'tabular-nums' }}>
-              {`${inn.runs}/${inn.wickets}`}
+              {`${motion ? countText(String(inn.runs), draw(motion)) : inn.runs}/${inn.wickets}`}
             </Typography>
             <Typography sx={{ fontSize: 13, color: colors.textLo }}>{`${Math.floor(inn.balls / 6)}.${inn.balls % 6} overs`}</Typography>
           </Box>
@@ -538,16 +576,17 @@ const LastMeeting = ({ payload }) => {
 };
 
 /** C6: each side's last XI in batting order. */
-const Xis = ({ payload }) => (
+const Xis = ({ payload, motion }) => (
   <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, alignContent: 'center' }}>
-    {payload.sides.map((s) => (
+    {payload.sides.map((s, j) => (
       <Box key={s.team} sx={{ minWidth: 0 }}>
         <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em', color: colors.accent, textTransform: 'uppercase' }}>{s.team}</Typography>
         <Typography sx={{ fontSize: 12, color: colors.textLo, mb: 0.75 }} noWrap>
           {`v ${s.opponent}, ${new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
         </Typography>
         {s.players.map((p, i) => (
-          <Typography key={p} noWrap sx={{ fontSize: 14, lineHeight: 1.6, color: colors.textMed }}>
+          <Typography key={p} noWrap sx={{ fontSize: 14, lineHeight: 1.6, color: colors.textMed,
+            ...(motion ? { ...enterSx(Math.min(1, deal(motion, i * 2 + j)), { dx: 0, dy: 8 }), ...ringOn(motion, p) } : {}) }}>
             <Box component="span" sx={{ display: 'inline-block', width: 20, fontFamily: fonts.mono, fontSize: 11, color: colors.textFaint }}>{i + 1}</Box>
             {p}
             {s.earlier?.[p] && (
@@ -569,14 +608,15 @@ const sideColor = (side, team1, team2) => {
 };
 
 /** D1: likely edge per batter-bowler pair (bar either side of the middle); the scoreline is what happened. */
-const Battles = ({ payload }) => {
+const Battles = ({ payload, motion }) => {
   const span = Math.max(20, ...payload.rows.map((r) => Math.abs(r.edge)));
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.25 }}>
-      {payload.rows.map((r) => {
-        const w = (50 * Math.abs(r.edge)) / span;
+      {payload.rows.map((r, i) => {
+        const w = ((50 * Math.abs(r.edge)) / span) * grow(motion, i);
         return (
-          <Box key={`${r.batter}-${r.bowler}`} sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 1, alignItems: 'center' }}>
+          <Box key={`${r.batter}-${r.bowler}`} sx={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 1, alignItems: 'center',
+            ...(motion ? { ...enterSx(reveal(motion, i), { dx: -14, dy: 0 }), ...ringOn(motion, `${r.batter} v ${r.bowler}`) } : {}) }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography noWrap sx={{ fontSize: 14, color: colors.textHi }}>{`${r.batter} v ${r.bowler}`}</Typography>
               <Typography noWrap sx={{ fontSize: 12, color: colors.textLo, fontFamily: fonts.mono }}>
@@ -598,15 +638,16 @@ const Battles = ({ payload }) => {
 };
 
 /** D2: ranked bars for players from both XIs, coloured by side. */
-const PlayerBars = ({ payload, teams }) => {
+const PlayerBars = ({ payload, teams, motion }) => {
   const rows = payload.rows;
   const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
   const sides = [...new Set(rows.map((r) => r.side))];
   const [t1, t2] = teams || sides;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: payload.extra === 'detail' ? 0.4 : 0.75 }}>
-      {rows.map((r) => (
-        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '112px 1fr 44px', gap: 1, alignItems: 'center' }}>
+      {rows.map((r, i) => (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: '112px 1fr 44px', gap: 1, alignItems: 'center',
+          ...(motion ? { ...enterSx(reveal(motion, i), { dx: -14, dy: 0 }), ...ringOn(motion, r.name) } : {}) }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography noWrap sx={{ fontSize: 13, color: colors.textHi }}>{r.name}</Typography>
             {payload.extra === 'detail' && r.detail && (
@@ -614,10 +655,10 @@ const PlayerBars = ({ payload, teams }) => {
             )}
           </Box>
           <Box sx={{ position: 'relative', height: 14 }}>
-            <Box sx={{ position: 'absolute', left: 0, top: 2, height: 10, borderRadius: '0 4px 4px 0', width: `${Math.max(3, (100 * Math.max(0, r.value)) / max)}%`, bgcolor: sideColor(r.side, t1, t2), opacity: r.value > 0 ? 1 : 0.35 }} />
+            <Box sx={{ position: 'absolute', left: 0, top: 2, height: 10, borderRadius: '0 4px 4px 0', width: `${Math.max(3, (100 * Math.max(0, r.value)) / max) * grow(motion, i)}%`, bgcolor: r.value < 0 ? colors.red : sideColor(r.side, t1, t2), opacity: r.value !== 0 ? 1 : 0.35 }} />  {/* below par red (owner, 18 Nov) */}
           </Box>
           <Typography sx={{ fontSize: 13, color: colors.textMed, fontFamily: fonts.mono, textAlign: 'right' }}>
-            {`${payload.signed ? signed(r.value, payload.decimals || 0) : r.value.toFixed(payload.decimals || 0)}${payload.unit || ''}`}
+            {`${payload.signed ? signed(grow(motion, i) >= 1 ? r.value : r.value * grow(motion, i), payload.decimals || 0) : (grow(motion, i) >= 1 ? r.value : r.value * grow(motion, i)).toFixed(payload.decimals || 0)}${payload.unit || ''}`}
           </Typography>
         </Box>
       ))}
@@ -654,7 +695,7 @@ const FormStrips = ({ payload, teams }) => {
 };
 
 /** D4: record here against elsewhere; above the diagonal is better here. */
-const SuitsScatter = ({ payload, teams }) => {
+const SuitsScatter = ({ payload, teams, motion }) => {
   const [t1, t2] = teams || [];
   const vals = payload.rows.flatMap((r) => [r.here, r.elsewhere]);
   const span = Math.max(20, Math.ceil(Math.max(...vals.map(Math.abs)) / 10) * 10);
@@ -691,10 +732,10 @@ const SuitsScatter = ({ payload, teams }) => {
         <line x1={x(-span)} y1={y(-span)} x2={x(span)} y2={y(span)} stroke={colors.textFaint} strokeDasharray="4 4" />
         <line x1={x(0)} x2={x(0)} y1={top} y2={bottom} stroke={colors.border} />
         <line x1={left} x2={W - right} y1={y(0)} y2={y(0)} stroke={colors.border} />
-        {payload.rows.map((r) => {
+        {payload.rows.map((r, i) => {
           const l = label(r);
           return (
-            <g key={r.name}>
+            <g key={r.name} style={dotIn(motion, i, 0.08)}>
               {home.has(r.name) && <circle cx={x(r.elsewhere)} cy={y(r.here)} r="8.5" fill="none" stroke={colors.textHi} strokeWidth="1.2" />}
               <circle cx={x(r.elsewhere)} cy={y(r.here)} r="5" fill={sideColor(r.side, t1, t2)} stroke={colors.surface1} strokeWidth="1.5">
                 <title>{`${r.name}: ${signed(r.here)} here (${r.balls_here} balls), ${signed(r.elsewhere)} elsewhere`}</title>
@@ -766,12 +807,12 @@ const GroundInnings = ({ payload, teams }) => {
 };
 
 /** D5: milestones within reach, one line each. */
-const Milestones = ({ payload, teams }) => {
+const Milestones = ({ payload, teams, motion }) => {
   const [t1, t2] = teams || [];
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2.25 }}>
-      {payload.rows.map((m) => (
-        <Box key={`${m.player}-${m.stat}`}>
+      {payload.rows.map((m, i) => (
+        <Box key={`${m.player}-${m.stat}`} sx={motion ? { ...enterSx(reveal({ ...motion, plan: { stagger: 0.5, ...motion.plan } }, i)), ...ringOn(motion, m.player) } : undefined}>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'baseline' }}>
             <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: sideColor(m.side, t1, t2), flexShrink: 0, transform: 'translateY(-1px)' }} />
             <Typography sx={{ fontSize: 15, color: colors.textHi, lineHeight: 1.35 }}>
@@ -783,7 +824,7 @@ const Milestones = ({ payload, teams }) => {
             // How far along: the total against the target, so the gap left is the bit that stands out.
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, pl: 2.1 }}>
               <Box sx={{ position: 'relative', flex: 1, height: 8, borderRadius: 4, bgcolor: colors.surface2 }}>
-                <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4, width: `${Math.min(100, (100 * m.total) / m.target)}%`, bgcolor: sideColor(m.side, t1, t2) }} />
+                <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4, width: `${Math.min(100, (100 * m.total) / m.target) * (motion ? grow({ ...motion, plan: { stagger: 0.5, ...motion.plan } }, i) : 1)}%`, bgcolor: sideColor(m.side, t1, t2) }} />
               </Box>
               <Typography sx={{ fontSize: 13, color: colors.textMed, fontFamily: fonts.mono, flexShrink: 0 }}>{`${m.total}/${m.target}`}</Typography>
             </Box>
@@ -797,7 +838,7 @@ const Milestones = ({ payload, teams }) => {
 /** D6: the bowler's share of balls by line and length; a dot marks 1.5× the usual share or more. */
 const LENGTH_LABEL = { FULL_TOSS: 'Full toss', YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
 const LINE_LABEL = { DOWN_LEG: 'Leg', ON_THE_STUMPS: 'Stumps', OUTSIDE_OFFSTUMP: 'Off', WIDE_OUTSIDE_OFFSTUMP: 'Wide' };
-const PitchUsage = ({ payload }) => {
+const PitchUsage = ({ payload, motion }) => {
   const cw = 50; const ch = 30; const x0 = 98; const y0 = 20;
   const max = Math.max(...payload.grid.map((g) => g.pct), 1);
   const cell = (line, length) => payload.grid.find((g) => g.line === line && g.length === length);
@@ -817,7 +858,7 @@ const PitchUsage = ({ payload }) => {
               const c = cell(l, len);
               const standout = c.usual_pct > 0 && c.pct >= 2 && c.pct / c.usual_pct >= 1.5;
               return (
-                <g key={l}>
+                <g key={l} style={dotIn(motion, i * lines.length + j, 0.06)}>
                   <rect x={x0 + j * cw + 1} y={y0 + i * ch + 1} width={cw - 2} height={ch - 2} rx="5" fill={SERIES[0]} fillOpacity={0.08 + (0.8 * c.pct) / max}>
                     <title>{`${LENGTH_LABEL[len]}, ${LINE_LABEL[l]}: ${c.pct}% of balls (usually ${c.usual_pct}%)`}</title>
                   </rect>

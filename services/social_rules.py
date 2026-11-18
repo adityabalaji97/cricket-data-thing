@@ -226,3 +226,172 @@ def hook_problem(hook: str) -> Optional[str]:
     if m:
         return f"the hook uses a metric name ({m.group(0)!r}): say it in plain words, explain the metric later"
     return None
+
+
+# --- Motion Reels (MOTION_REEL_PLAN.md M7): checks on a reel spec and on its recorded video. ---------------------------
+#
+# The frame and the numbers live in src/components/ig/reel/frame.json, read by the Reel page too, so the page and these
+# checks can't drift apart.
+
+REEL_FRAME_FILE = Path(__file__).resolve().parents[1] / "src" / "components" / "ig" / "reel" / "frame.json"
+#: Kinds whose ring is on a decision with both sides shown at the same size (no single negative mark is singled out).
+REEL_BOTH_SIDES = {"case_board", "pick_one", "keep_try"}
+#: Average advance of a character, in em, for the faces the Reel fits to one line (motion.js EM_PER_CHAR).
+REEL_EM = {"mono": 0.6 + 0.14, "display": 0.5}
+
+
+@lru_cache(maxsize=1)
+def reel_frame() -> Dict[str, Any]:
+    import json
+    return json.loads(REEL_FRAME_FILE.read_text())
+
+
+def reel_captions(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The caption lines a spec shows: its `captions`, or built from its voice `timing` exactly as the Reel page does
+    (motion.js captionsFromTiming): break at sentence ends and colons, at commas after two words, at five words and
+    before a word that would pass 30 characters;
+    a one-word orphan joins the line before, or takes a word from a full one."""
+    if spec.get("captions"):
+        return spec["captions"]
+    timing = spec.get("timing")
+    if not timing:
+        return []
+    caps: List[List[Dict[str, Any]]] = []
+    for li, line in enumerate(timing["lines"]):
+        cur: List[Dict[str, Any]] = []
+        ws = line.split(" ")
+        for wi, w in enumerate(ws):
+            if cur and len(" ".join([x["w"] for x in cur] + [w])) > reel_frame()["rules"]["captionChars"]:
+                caps.append(cur)  # one line: a word that would pass the limit starts the next
+                cur = []
+            cur.append({"w": w, "at": timing["words"][li][wi], "li": li})
+            brk = re.search(r"[.?!:]$", w) or (w.endswith(",") and len(cur) >= 2) or len(cur) >= 5
+            if brk or wi == len(ws) - 1:
+                caps.append(cur)
+                cur = []
+    for i in range(len(caps) - 1, 0, -1):
+        if len(caps[i]) == 1 and caps[i][0]["li"] == caps[i - 1][0]["li"]:
+            if len(caps[i - 1]) < 5 and len(" ".join(x["w"] for x in caps[i - 1] + caps[i])) <= reel_frame()["rules"]["captionChars"]:
+                caps[i - 1].extend(caps[i])
+                del caps[i]
+            else:
+                caps[i].insert(0, caps[i - 1].pop())
+    return [{"start": c[0]["at"], "words": [{"w": x["w"], "at": x["at"]} for x in c]} for c in caps]
+
+
+def _overlaps(a: Dict[str, float], b: Dict[str, float]) -> bool:
+    return a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]
+
+
+def _fit_px(text: str, width: float, most: float, face: str) -> float:
+    return min(most, width / (max(1, len(text or "")) * REEL_EM[face]))
+
+
+def _item_value(payload: Any, key: str) -> Optional[float]:
+    """The number a ring's key points at in a scene's payload or data: a row, chip or player named `key` (name, label,
+    short or key), or a grid cell "<row> · <column>". None when the key names nothing with a number."""
+    if not isinstance(payload, dict):
+        return None
+    if " · " in key and payload.get("cols") and payload.get("rows"):
+        row, col = key.rsplit(" · ", 1)
+        if col in payload["cols"]:
+            j = payload["cols"].index(col)
+            for r in payload["rows"]:
+                if r.get("name") == row and j < len(r.get("cells") or []):
+                    cell = r["cells"][j]
+                    return cell.get("value") if isinstance(cell, dict) else None
+    found: List[float] = []
+
+    def walk(o: Any) -> None:
+        if isinstance(o, dict):
+            names = {o.get(k) for k in ("name", "label", "short", "key", "n")}
+            if key in names:
+                for k in ("value", "v", "subject"):
+                    if isinstance(o.get(k), (int, float)):
+                        found.append(o[k])
+                        return
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk(payload)
+    return found[0] if found else None
+
+
+def reel_problems(spec: Dict[str, Any]) -> List[str]:
+    """What a motion Reel's spec breaks (docs/social_rules.md, Reels; MOTION_REEL_PLAN.md M7): length, scene order and
+    minimum time on screen, how long a lit item holds before the next, caption size, the closing scene's captions,
+    kicker and send-line sizes, the frame against Instagram's overlays, and a ring on a below-par mark (no-blame: a
+    negative number is never singled out, except inside a decision that shows both sides). The longest still stretch
+    needs the recorded video: reel_still_problems()."""
+    F = reel_frame()
+    R = F["rules"]
+    out: List[str] = []
+    scenes = spec.get("scenes") or []
+    if not scenes:
+        return ["The Reel has no scenes"]
+    d = spec.get("duration") or 0
+    if not (R["lengthMin"] <= d <= R["lengthMax"]):
+        out.append(f"The Reel runs {d:.1f}s: keep it {R['lengthMin']}-{R['lengthMax']}s")
+    if scenes[0].get("start") != 0:
+        out.append("The first scene must start at 0 (frame 0 is never empty)")
+    for i, s in enumerate(scenes):
+        a, b = s.get("start", 0), s.get("end", 0)
+        name = f"Scene {i + 1} ({s.get('kind')})"
+        if i and a < scenes[i - 1].get("start", 0):
+            out.append(f"{name} starts before the scene before it")
+        if b - a < R["sceneMin"]:
+            out.append(f"{name} is on screen {b - a:.1f}s: a must-read number needs {R['sceneMin']}s")
+        beats = sorted((x for x in (s.get("beats") or []) if x.get("key") is not None), key=lambda x: x["at"])
+        for x, y in zip(beats, beats[1:]):
+            if y["at"] - x["at"] < R["dwellMin"] - 1e-3:
+                out.append(f"{name}: {x['key']} is lit {y['at'] - x['at']:.2f}s before {y['key']}: hold each {R['dwellMin']}s")
+        if s.get("kind") not in REEL_BOTH_SIDES:
+            body = s.get("payload") or s.get("data")
+            for x in beats:
+                v = _item_value(body, x["key"])
+                if v is not None and v < 0:
+                    out.append(f"{name}: the ring lands on {x['key']} ({v:+g}), a below-par mark: no-blame, ring the case "
+                               f"for or a regular's number instead")
+        if s.get("kicker") and _fit_px(s["kicker"], F["kicker"]["w"], 30, "mono") < R["kickerMinPx"]:
+            out.append(f"{name}: the kicker is too long for one line ({len(s['kicker'])} characters)")
+        send = ((s.get("data") or {}).get("send") or {}).get("text")
+        if send and _fit_px(send, F["content"]["w"], 66, "display") < R["sendMinPx"]:
+            out.append(f"{name}: the send line is too long for one line ({len(send)} characters)")
+    if scenes[-1].get("captions") is not False:
+        out.append("The closing scene must turn captions off (the send line is the caption)")
+    for i, c in enumerate(reel_captions(spec)):
+        words = [w["w"] for w in c.get("words") or []]
+        if len(words) > R["captionWords"]:
+            out.append(f"Caption {i + 1} has {len(words)} words: at most {R['captionWords']}")
+        if len(" ".join(words)) > R["captionChars"]:
+            out.append(f"Caption {i + 1} is {len(' '.join(words))} characters: at most {R['captionChars']} (one line)")
+    for box in ("chapters", "kicker", "content", "caption"):
+        for k in F["keepClear"]:
+            if _overlaps(F[box], k):
+                out.append(f"The frame's {box} sits in Instagram's {k['name']}")
+    return out
+
+
+def reel_still_problems(video: str, limit: Optional[float] = None) -> List[str]:
+    """The longest still stretch in a recorded Reel's content zone (docs/social_rules.md: something moves at least every
+    0.8s; the closing scene's breathing tiles count as moving). ffmpeg's freezedetect on the content zone, cropped from
+    the frame (frame.json), at -55dB: calibrated on the round-2 Reel, where it finds the ranked bars holding still
+    between beats and passes the hero card's slow bob; the glow behind is under that floor. Record the video with the
+    visuals' bob off (scripts/record_ig_reel.mjs --nodrift): the bob alone would always pass."""
+    import subprocess
+    F = reel_frame()
+    lim = limit if limit is not None else F["rules"]["stillMax"]
+    c = F["content"]
+    run = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-vf",
+                          f"crop={c['w']}:{c['h']}:{c['x']}:{c['y']},freezedetect=n=-55dB:d={lim}", "-an", "-f", "null", "-"],
+                         capture_output=True, text=True)
+    out = []
+    starts = [float(x) for x in re.findall(r"freeze_start: ([\d.]+)", run.stderr)]
+    durs = [float(x) for x in re.findall(r"freeze_duration: ([\d.]+)", run.stderr)]
+    for a, dur in zip(starts, durs):
+        out.append(f"Nothing moves from {a:.1f}s for {dur:.1f}s: something must change every {lim}s")
+    if len(starts) > len(durs):  # still to the end of the video
+        out.append(f"Nothing moves from {starts[-1]:.1f}s to the end: something must change every {lim}s")
+    return out

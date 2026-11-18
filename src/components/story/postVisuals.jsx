@@ -6,6 +6,7 @@ import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 import { InningsClue } from '../games/GuessInningsGame';
 import PlayerLink from '../common/PlayerLink';
 import OverseasMark from '../common/OverseasMark';
+import { deal, draw, enterSx, grow, reveal, ring, ringOn, ringPulse } from '../ig/reel/motion';
 
 /**
  * Visuals for Instagram post cards (services/ig_posts): one question answered from several angles. Same contract as
@@ -17,6 +18,37 @@ import OverseasMark from '../common/OverseasMark';
  */
 
 const mono = { fontFamily: fonts.mono, fontSize: 12 };
+
+/*
+ * Motion (motion Reels, src/components/ig/reel/motion.js): a kind in MOTION_KINDS takes an optional `motion` prop. With
+ * none, every helper below gives the finished state ({} or 1), so a card draws exactly as it always has.
+ */
+/** Row i entering from the left (or right), the ring on the row the voice names. */
+const rowMotion = (motion, i, key, dx = -14) => (motion ? { ...enterSx(reveal(motion, i), { dx, dy: 0 }), ...ringOn(motion, key) } : {});
+/** v scaled by a motion fraction, untouched once it is 1 (a null stays null, so fmt still prints "–"). */
+const part = (v, g) => (g >= 1 ? v : v * g);
+/** Below par draws red, on the cards and in the Reels alike (owner's decision, 18 Nov 2026; MOTION_REEL_PLAN decision 4). */
+const belowPar = (v) => v != null && v < 0;
+/** A chip or tile dealt in (scale with overshoot from 0.6), the ring on the one the voice names: {} on a card. */
+const dealMotion = (motion, i, key) => {
+  if (!motion) return {};
+  const p = deal(motion, i);
+  // landed once its 0.45s deal (overshoot included) has played: then the card's own markup
+  const landed = reveal({ ...motion, plan: { stagger: 0.08, ...motion.plan, enter: 0.45 } }, i) >= 1;
+  return { ...(landed ? {} : { opacity: Math.min(1, Math.max(0, p * 2)), transform: `scale(${0.6 + 0.4 * p})` }), ...ringOn(motion, key) };
+};
+/**
+ * A line chart drawn left to right in a Reel (M3b): the plot revealed at constant speed from the left axis (the first
+ * `keep` of the width stays (12%: the axis labels; race_lines keeps its names column), over plan.draw seconds (2.5). {} on a
+ * card and once drawn.
+ */
+const lineDraw = (motion, keep = 0.12) => {
+  if (!motion) return {};
+  const p = draw(motion, 0.15, motion.plan?.draw ?? 2.5);
+  return p >= 1 ? {} : { clipPath: `inset(0 ${(1 - p) * (1 - keep) * 100}% 0 0)` };
+};
+/** An SVG group's opacity while it enters; undefined once in. */
+const gStyle = (p) => (p >= 1 ? undefined : { opacity: p });
 
 /** Number formats named by the backend (services/ig_posts/angles.py FORMATS). */
 export const fmt = (value, kind = 'dec1') => {
@@ -74,7 +106,7 @@ const Legend = ({ items }) => (
 const nameColumn = (names, base, most = 190) => Math.round(Math.min(most, Math.max(base,
   7.2 * Math.max(0, ...names.map((n) => String(n || '').length)))));
 
-const Scorecard = ({ payload }) => {
+const Scorecard = ({ payload, motion }) => {
   const { metrics, rows } = payload;
   const cols = `${nameColumn(rows.map((r) => r.name), payload.label_width || 92, 150)}px repeat(${metrics.length}, 1fr)`;
   return (
@@ -85,8 +117,8 @@ const Scorecard = ({ payload }) => {
           <Typography key={m.key} sx={{ fontSize: 11, color: colors.textLo, textAlign: 'center', lineHeight: 1.15 }}>{m.label}</Typography>
         ))}
       </Box>
-      {rows.map((r) => (
-        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: cols, gap: '4px', alignItems: 'center' }}>
+      {rows.map((r, i) => (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: cols, gap: '4px', alignItems: 'center', ...rowMotion(motion, i, r.name) }}>
           <Typography noWrap sx={{ fontSize: 13, color: r.highlight ? colors.accent : colors.textHi, fontWeight: r.highlight ? 600 : 400 }}>
             {r.short || surname(r.name)}
           </Typography>
@@ -154,7 +186,7 @@ const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax], avoid = []) => {
  * payload: {x:{label,format,higher_better}, y:{...}, z?:{label}, points:[{name, short, x, y, zp?, highlight?, label?}], box}
  * Several highlighted points are all named in lime; the box is drawn only for a single subject.
  */
-const ScatterPlus = ({ payload }) => {
+const ScatterPlus = ({ payload, motion }) => {
   const { points, x: X, y: Y, z: Z } = payload;
   const W = 300; const H = 214; const L = 8; const R = 8; const T = 18; const B = 184;
   // Robust to the field's outliers, but always wide enough for the named and numbered players (never pinned to an edge).
@@ -191,6 +223,11 @@ const ScatterPlus = ({ payload }) => {
     return [[sx(p.x), sy(p.y)], ...xs];
   });
   const markers = spreadMarkers(keyed, sx, sy, [L + 8, W - R - 8, T + 8, B - 8], avoid);
+  // Motion (M3b): the field fades in dim, the numbered players land one by one, then the subject's dot grows and his
+  // name slides in; the ring follows the voice (by name). All 1 on a card.
+  const cloudP = grow(motion, 0);
+  const markP = (i) => reveal(motion && { ...motion, plan: { delay: 0.8, stagger: 0.25, ...motion.plan } }, i);
+  const subP = motion ? Math.min(1, reveal({ ...motion, plan: { delay: 0.8 + 0.25 * markers.length + 0.2, enter: 0.45, ...motion.plan } }, 0)) : 1;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${Y.label} against ${X.label}`} sx={{ width: '100%' }}>
@@ -205,27 +242,28 @@ const ScatterPlus = ({ payload }) => {
         {points.filter((p) => !p.highlight && !p.label).map((p) => {
           const op = Z && p.zp != null ? 0.18 + 0.8 * (p.zp / 100) : 0.55;
           const inBox = subject && better(p, 'x', subject) && better(p, 'y', subject);
-          return <circle key={p.name} cx={sx(p.x)} cy={sy(p.y)} r="3.5" fill={Z ? colors.accent : '#7c8aa5'} fillOpacity={op}
+          return <circle key={p.name} cx={sx(p.x)} cy={sy(p.y)} r="3.5" fill={Z ? colors.accent : '#7c8aa5'} fillOpacity={cloudP >= 1 ? op : op * cloudP}
             stroke={inBox ? colors.textHi : 'none'} strokeWidth="1" />;
         })}
         {/* Leader lines first, so none runs over another player's marker. */}
         {markers.filter((m) => m.moved).map((m) => (
-          <g key={`${m.name}-leader`}>
+          <g key={`${m.name}-leader`} style={gStyle(markP(markers.indexOf(m)))}>
             <line x1={m.dx} y1={m.dy} x2={m.mx} y2={m.my} stroke={colors.textMed} strokeWidth="0.8" />
             <circle cx={m.dx} cy={m.dy} r="2.5" fill={colors.textHi} />
           </g>
         ))}
         {markers.map((m, i) => (
-          <g key={m.name}>
+          <g key={m.name} style={gStyle(markP(i))}>
             <circle cx={m.mx} cy={m.my} r="7.5" fill={colors.textHi} stroke={colors.bg} strokeWidth="1.5" />
+            {ring(motion, m.name) > 0 && <circle cx={m.mx} cy={m.my} r={11 + 3 * ringPulse(motion)} fill="none" stroke={colors.textHi} strokeWidth="1.5" strokeOpacity={ring(motion, m.name)} />}
             <text x={m.mx} y={m.my + 3.5} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 10, fontWeight: 700, fill: colors.bg }}>{i + 1}</text>
           </g>
         ))}
         {subjects.map((s) => (
           <g key={s.name}>
-            <circle cx={sx(s.x)} cy={sy(s.y)} r="7" fill={colors.accent} stroke={colors.bg} strokeWidth="2" />
+            <circle cx={sx(s.x)} cy={sy(s.y)} r={subP >= 1 ? '7' : 7 * subP} fill={colors.accent} stroke={colors.bg} strokeWidth="2" />
             <text x={tag(s).x} y={tag(s).y} textAnchor={tag(s).left ? 'end' : 'start'}
-              style={{ fontFamily: fonts.body, fontSize: 13, fontWeight: 600, fill: colors.accent }}>
+              style={{ fontFamily: fonts.body, fontSize: 13, fontWeight: 600, fill: colors.accent, ...(subP >= 1 ? {} : { opacity: subP }) }}>
               {tag(s).text}
             </text>
           </g>
@@ -258,18 +296,19 @@ const ScatterPlus = ({ payload }) => {
  * payload: {metric:{label, format, signed}, rows:[{name, value, team?, highlight?, detail?}], label_width?}
  * (label_width: px for the name column when the detail lines are long; 110 by default)
  */
-const MetricBars = ({ payload }) => {
+const MetricBars = ({ payload, motion }) => {
   const { rows, metric } = payload;
   const signed = metric.signed || rows.some((r) => r.value < 0);
   const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1e-9);
   const nameCol = nameColumn(rows.map((r) => r.name), payload.label_width || 110);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.7 }}>
-      {rows.map((r) => {
-        const width = (100 * Math.abs(r.value)) / max / (signed ? 2 : 1);
-        const color = r.highlight ? colors.accent : teamColour(r.team, '#5b6b85');
+      {rows.map((r, i) => {
+        const g = grow(motion, i); // the bar grows from the par line, its value counting with it
+        const width = ((100 * Math.abs(r.value)) / max / (signed ? 2 : 1)) * g;
+        const color = belowPar(r.value) ? colors.red : r.highlight ? colors.accent : teamColour(r.team, '#5b6b85');
         return (
-          <Box key={`${r.name}-${r.detail || ''}`} sx={{ display: 'grid', gridTemplateColumns: `${nameCol}px 1fr 58px`, gap: 1, alignItems: 'center' }}>
+          <Box key={`${r.name}-${r.detail || ''}`} sx={{ display: 'grid', gridTemplateColumns: `${nameCol}px 1fr 58px`, gap: 1, alignItems: 'center', ...rowMotion(motion, i, r.name) }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography noWrap sx={{ fontSize: 13, color: r.highlight ? colors.accent : colors.textHi, fontWeight: r.highlight ? 600 : 400 }}>{r.name}</Typography>
               {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}
@@ -281,7 +320,7 @@ const MetricBars = ({ payload }) => {
                 left: signed ? (r.value >= 0 ? '50%' : `${50 - width}%`) : 0, width: `${Math.max(2, width)}%`,
               }} />
             </Box>
-            <Typography sx={{ ...mono, fontSize: 13, color: colors.textMed, textAlign: 'right' }}>{fmt(r.value, metric.format)}</Typography>
+            <Typography sx={{ ...mono, fontSize: 13, color: colors.textMed, textAlign: 'right' }}>{fmt(part(r.value, g), metric.format)}</Typography>
           </Box>
         );
       })}
@@ -297,7 +336,7 @@ const MetricBars = ({ payload }) => {
  * absolute: values are counts, each bar as long as its total against the longest (games played, split by result).
  */
 export const SHARE_COLOURS = [colors.accent, '#5b6b85', '#e66767'];
-const ShareBars = ({ payload }) => {
+const ShareBars = ({ payload, motion }) => {
   const { groups, rows } = payload;
   // absolute: segment values are counts and a bar's length is its total (games played), against the longest bar.
   const most = payload.absolute ? Math.max(...rows.map((r) => r.segments.reduce((t, seg) => t + seg.value, 0)), 1) : 100;
@@ -307,8 +346,8 @@ const ShareBars = ({ payload }) => {
   };
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.1 }}>
-      {rows.map((r) => (
-        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `${payload.label_width || 96}px 1fr`, gap: 1, alignItems: 'center' }}>
+      {rows.map((r, i) => (
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `${payload.label_width || 96}px 1fr`, gap: 1, alignItems: 'center', ...rowMotion(motion, i, r.name) }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography noWrap sx={{ fontSize: 13, color: colors.textHi, fontWeight: 600 }}>{r.name}</Typography>
             {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}
@@ -316,7 +355,7 @@ const ShareBars = ({ payload }) => {
           {/* absolute: the bar is as long as its total against the longest; its segments share that length in
               proportion (flex), so the gaps between them never push it past the column. */}
           <Box sx={{ display: 'flex', height: 26, gap: '2px',
-            width: payload.absolute ? `${(100 * r.segments.reduce((t, seg) => t + seg.value, 0)) / most}%` : '100%' }}>
+            width: payload.absolute ? `${((100 * r.segments.reduce((t, seg) => t + seg.value, 0)) / most) * grow(motion, i)}%` : `${100 * grow(motion, i)}%` }}>
             {r.segments.filter((seg) => seg.value > 0).map((seg) => {
               const width = (100 * seg.value) / most;
               const shown = payload.absolute ? width >= 7 : seg.value >= 9;
@@ -347,7 +386,7 @@ const ShareBars = ({ payload }) => {
  * team: the node takes that team's colour (src/utils/teamPalette.json). flow_column: every band takes the colour of
  * the node it passes through in that column (an opponent's colour all the way to the result), not the result's.
  */
-const Sankey = ({ payload }) => {
+const Sankey = ({ payload, motion }) => {
   const { columns, links } = payload;
   const W = 300; const H = payload.height || 236; const nodeW = 9; const gap = 10; const top = 30;
   const total = Math.max(...columns.map((col) => col.reduce((t, n) => t + Math.max(
@@ -378,7 +417,7 @@ const Sankey = ({ payload }) => {
   });
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%', ...lineDraw(motion, 0.1) }}
         aria-label={links.map((l) => `${pos[l.source].node.label} to ${pos[l.target].node.label}: ${l.value}`).join('; ')}>
         {bands.map((b, i) => (
           <path key={i} d={b.d} fill="none" stroke={b.colour} strokeOpacity={b.colour === colors.textLo ? 0.22 : 0.5} strokeWidth={Math.max(1, b.w)} />
@@ -445,7 +484,7 @@ const raceName = (name) => {
   return SHARED_SURNAMES.test(s) ? name : s;
 };
 
-const RaceLines = ({ payload }) => {
+const RaceLines = ({ payload, motion }) => {
   // The finish line, not the race: a dot where each reached the target (the fastest first), a dashed line at the
   // fastest, and a bar for how much longer the others took. The running totals overlapped into one tangle; the
   // answer is the finishing order and the gaps, so that's what's drawn. Dots on a range axis (not bars from zero):
@@ -464,7 +503,7 @@ const RaceLines = ({ payload }) => {
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img"
         aria-label={`${payload.unit} to ${payload.target} ${payload.measure}: ${rows.map((r) => `${r.name} ${r.reached_at}`).join(', ')}`}
-        sx={{ width: '100%' }}>
+        sx={{ width: '100%', ...lineDraw(motion, 0.34) }}>
         <line x1={sx(best)} x2={sx(best)} y1={T - 8} y2={H - 6} stroke={colors.textFaint} strokeDasharray="3 4" />
         <text x={sx(best)} y={T - 11} textAnchor="middle" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>fastest</text>
         {rows.map((r, i) => {
@@ -536,7 +575,7 @@ const Forest = ({ payload }) => {
  * One metric across ordered buckets, with 95% intervals where known.
  * payload: {metric:{label, format}, buckets:[{label, value, lo?, hi?, n}], baseline?}
  */
-const BucketBars = ({ payload }) => {
+const BucketBars = ({ payload, motion }) => {
   const W = 300; const H = 210; const L = 10; const R = 10; const T = 18; const B = 168;
   const vals = payload.buckets.flatMap((b) => [b.value, b.lo ?? b.value, b.hi ?? b.value, 0]);
   const lo = Math.min(...vals); const hi = Math.max(...vals);
@@ -548,9 +587,11 @@ const BucketBars = ({ payload }) => {
         <line x1={L} x2={W - R} y1={sy(0)} y2={sy(0)} stroke={colors.borderStrong} />
         {payload.buckets.map((b, i) => {
           const x = L + i * bw + bw * 0.2; const w = bw * 0.6;
-          const top = Math.min(sy(b.value), sy(0)); const h = Math.abs(sy(b.value) - sy(0));
+          const g = grow(motion, i); // from the zero line
+          const h = Math.abs(sy(b.value) - sy(0)) * g;
+          const top = g >= 1 ? Math.min(sy(b.value), sy(0)) : b.value >= 0 ? sy(0) - h : sy(0);
           return (
-            <g key={b.label}>
+            <g key={b.label} style={gStyle(reveal(motion, i))}>
               <rect x={x} y={top} width={w} height={Math.max(1, h)} rx="3" fill={b.value >= 0 ? SERIES[0] : '#e66767'} />
               {b.lo != null && (
                 <line x1={x + w / 2} x2={x + w / 2} y1={sy(b.lo)} y2={sy(b.hi)} stroke={colors.textHi} strokeWidth="1.5" />
@@ -575,7 +616,7 @@ const BucketBars = ({ payload }) => {
  * payload: {series:[a, b], format, rows:[{label, a, b, highlight?}], values?, full_labels?, no_diff?} (full_labels: row labels as
  * given, not shortened to a surname)
  */
-const PairDumbbell = ({ payload }) => {
+const PairDumbbell = ({ payload, motion }) => {
   // no_diff: no b − a column (a chart whose two series aren't a before/after, where a difference reads as noise).
   const W = 300; const rowH = 30; const H = payload.rows.length * rowH + 26; const L = payload.values ? 130 : 104;
   const R = (payload.values ? 70 : 44) - (payload.no_diff ? 34 : 0);
@@ -588,20 +629,23 @@ const PairDumbbell = ({ payload }) => {
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={payload.series.join(' against ')} sx={{ width: '100%' }}>
         {payload.rows.map((r, i) => {
           const y = i * rowH + 16;
+          // Both ends appear, then the connector stretches from the first to the second.
+          const g = grow(motion, i);
+          const bx = g >= 1 ? sx(r.b) : sx(r.a) + (sx(r.b) - sx(r.a)) * g;
           return (
-            <g key={r.label}>
+            <g key={r.label} style={gStyle(reveal(motion, i))}>
               <text x="0" y={y + 4} style={{ fontFamily: fonts.body, fontSize: 12, fill: r.highlight ? colors.accent : colors.textHi }}>{payload.full_labels ? r.label : surname(r.label)}</text>
-              <line x1={sx(r.a)} x2={sx(r.b)} y1={y} y2={y} stroke={colors.borderStrong} strokeWidth="3" />
+              <line x1={sx(r.a)} x2={bx} y1={y} y2={y} stroke={colors.borderStrong} strokeWidth="3" />
               <circle cx={sx(r.a)} cy={y} r="5" fill={ca} />
-              <circle cx={sx(r.b)} cy={y} r="5" fill={cb} />
-              {payload.values && (
+              <circle cx={bx} cy={y} r="5" fill={cb} />
+              {payload.values && g >= 1 && (
                 <>
                   <text x={sx(Math.min(r.a, r.b)) - 8} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: r.a <= r.b ? ca : cb }}>{fmt(Math.min(r.a, r.b), payload.format)}</text>
                   <text x={sx(Math.max(r.a, r.b)) + 8} y={y + 4} style={{ ...mono, fontSize: 10, fill: r.a <= r.b ? cb : ca }}>{fmt(Math.max(r.a, r.b), payload.format)}</text>
                 </>
               )}
               {!payload.no_diff && (
-                <text x={W} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textMed }}>{fmt(r.b - r.a, payload.format === 'int' ? 'signed0' : 'signed1')}</text>
+                <text x={W} y={y + 4} textAnchor="end" style={{ ...mono, fontSize: 11, fill: colors.textMed }}>{fmt(part(r.b - r.a, g), payload.format === 'int' ? 'signed0' : 'signed1')}</text>
               )}
             </g>
           );
@@ -622,7 +666,7 @@ const PairDumbbell = ({ payload }) => {
  * 0 (runs above average) is drawn as the zero line only.
  * payload: {metric:{label, format, signed}, series:[player, field], rows:[{label, subject, field, highlight?}]}
  */
-const DeepCompare = ({ payload }) => {
+const DeepCompare = ({ payload, motion }) => {
   const { metric, rows, series } = payload;
   const signed = metric.signed;
   const vals = rows.flatMap((r) => [r.subject, r.field ?? 0, 0]);
@@ -639,8 +683,9 @@ const DeepCompare = ({ payload }) => {
   const showField = !signed || rows.some((r) => r.field);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: rows.length > 3 ? 1 : 1.5 }}>
-      {rows.map((r) => (
-        <Box key={r.label}>
+      {rows.map((r, i) => (
+        // Rows flip in alternately from the left and the right; both bars grow from zero.
+        <Box key={r.label} sx={rowMotion(motion, i, r.label, i % 2 ? 14 : -14)}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
             <Typography sx={{ fontSize: 14, fontWeight: r.highlight ? 700 : 500, color: r.highlight ? colors.textHi : colors.textMed }}>{r.label}</Typography>
             <Typography sx={{ ...mono, fontSize: 13, color: r.highlight ? colors.accent : colors.textHi }}>
@@ -648,8 +693,8 @@ const DeepCompare = ({ payload }) => {
               {showField && <Box component="span" sx={{ color: colors.textLo }}>{`  v ${fmt(r.field, metric.format)}`}</Box>}
             </Typography>
           </Box>
-          {bar(r.subject, r.highlight ? colors.accent : 'rgba(182,242,74,.45)', 12)}
-          {showField && <Box sx={{ mt: '3px' }}>{bar(r.field ?? 0, colors.borderStrong, 6)}</Box>}
+          {bar(part(r.subject, grow(motion, i)), belowPar(r.subject) ? colors.red : r.highlight ? colors.accent : 'rgba(182,242,74,.45)', 12)}
+          {showField && <Box sx={{ mt: '3px' }}>{bar(part(r.field ?? 0, grow(motion, i)), colors.borderStrong, 6)}</Box>}
         </Box>
       ))}
       <Legend items={showField ? [[series[0], colors.accent], [series[1], colors.borderStrong]] : [[series[0], colors.accent]]} />
@@ -665,7 +710,7 @@ const DeepCompare = ({ payload }) => {
  * payload: {batting_team, bowling_team, accent, bowl_accent, has_impact,
  *           batting:[{name, runs, balls, sr, impact, not_out}], bowling:[{name, figures, wickets, impact}]}
  */
-const InningsScorecard = ({ payload }) => {
+const InningsScorecard = ({ payload, motion }) => {
   const { batting, bowling, has_impact: hasImpact } = payload;
   // A full innings is up to 11 batters and 8 bowlers: rows tighten as they add up, so the card never scrolls.
   const dense = batting.length + bowling.length > 14;
@@ -694,8 +739,8 @@ const InningsScorecard = ({ payload }) => {
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: dense ? 0.75 : 1 }}>
       <Box>
         {head([`${payload.batting_team} batting${payload.overs ? ` · ${payload.overs} ov` : ''}`, 'R (B)', 'SR', ...(hasImpact ? ['Impact'] : [])], batCols, batColour)}
-        {batting.map((r) => (
-          <Box key={r.name} sx={{ ...row, gridTemplateColumns: batCols }}>
+        {batting.map((r, i) => (
+          <Box key={r.name} sx={{ ...row, gridTemplateColumns: batCols, ...rowMotion(motion, i, r.name) }}>
             <Typography sx={name}>{r.name}{r.not_out ? '*' : ''}</Typography>
             <Typography sx={{ ...num, color: colors.textHi }}>{r.runs} ({r.balls})</Typography>
             <Typography sx={num}>{r.sr != null ? Math.round(r.sr) : ''}</Typography>
@@ -705,8 +750,8 @@ const InningsScorecard = ({ payload }) => {
       </Box>
       <Box>
         {head([`${payload.bowling_team} bowling`, 'O-M-R', 'W', ...(hasImpact ? ['Impact'] : [])], bowlCols, bowlColour)}
-        {bowling.map((r) => (
-          <Box key={r.name} sx={{ ...row, gridTemplateColumns: bowlCols }}>
+        {bowling.map((r, i) => (
+          <Box key={r.name} sx={{ ...row, gridTemplateColumns: bowlCols, ...rowMotion(motion, batting.length + 1 + i, r.name) }}>
             <Typography sx={name}>{r.name}</Typography>
             <Typography sx={num}>{r.figures}</Typography>
             <Typography sx={{ ...num, color: colors.textHi }}>{r.wickets}</Typography>
@@ -733,11 +778,12 @@ const InningsWagon = ({ payload }) => (
  * upto: draw the line only to that many points, on the whole chase's axis, with the chance at that ball beside the
  * dot (a replay: the same chart drawn a little further on each slide). Bands past it aren't drawn.
  */
-export const WinProbLine = ({ payload }) => {
+export const WinProbLine = ({ payload, motion }) => {
   const { points } = payload;
   const W = 300; const H = 200; const L = 30; const R = 10; const T = 16; const B = 176;
   const n = points.length;
-  const shown = Math.min(n, payload.upto || n);
+  const drawn = motion ? Math.max(1, Math.ceil(n * draw(motion, 0.15, motion.plan?.draw ?? 3))) : n;
+  const shown = Math.min(n, payload.upto || n, drawn);
   const bands = (payload.bands || []).filter((b) => b.i1 < shown);
   const sx = (i) => L + ((i + 1) / n) * (W - L - R); // x 0 is the start of the innings (payload.start)
   const sy = (v) => B - (v / 100) * (B - T);
@@ -802,7 +848,7 @@ export const WinProbLine = ({ payload }) => {
  * the rest fade, so the wheel can tell one moment of an innings.
  * payload: {shots:[{x, y, runs, highlight?, label?}], left_handed?, compact?}
  */
-export const ShotWheel = ({ payload }) => {
+export const ShotWheel = ({ payload, motion }) => {
   const size = 300; const c = size / 2; const rope = size * (payload.compact ? 0.46 : 0.38);
   const shots = (payload.shots || []).filter((d) => d.runs > 0 && d.x != null && (d.x !== 150 || d.y !== 150));
   const far = Math.max(1, ...shots.filter((d) => d.runs < 4).map((d) => Math.hypot(d.x - 150, d.y - 150)));
@@ -829,10 +875,13 @@ export const ShotWheel = ({ payload }) => {
           </>
         )}
         {order.map((d, i) => {
-          const [x2, y2] = end(d, 1);
+          // motion: each ray grows from the stumps to its end, the innings' shots spread over plan.rays seconds (1.6)
+          const g = motion ? grow({ ...motion, plan: { stagger: (motion.plan?.rays ?? 1.6) / Math.max(1, order.length), grow: 0.3, ...motion.plan } }, i) : 1;
+          const [xe, ye] = end(d, 1);
+          const x2 = g >= 1 ? xe : c + (xe - c) * g; const y2 = g >= 1 ? ye : c + (ye - c) * g;
           const dim = focus && !d.highlight;
           return (
-            <g key={i}>
+            <g key={i} style={g > 0 ? undefined : { opacity: 0 }}>
               <line x1={c} y1={c} x2={x2} y2={y2} stroke={ink(d.runs)} strokeWidth={d.highlight ? 3.2 : d.runs >= 4 ? 2 : 1.3}
                 strokeLinecap="round" opacity={dim ? 0.28 : 0.95} />
               {d.highlight && <circle cx={x2} cy={y2} r="4" fill={ink(d.runs)} stroke={colors.bg} strokeWidth="1.5" />}
@@ -861,7 +910,7 @@ export const ShotWheel = ({ payload }) => {
  * ball and what happened below it (W, 6nb, wd, 3b...), the highlighted ball in the accent, wickets in red.
  * payload: {team, start, balls:[{tag, wp, highlight?, wicket?}]}
  */
-const BallSteps = ({ payload }) => {
+const BallSteps = ({ payload, motion }) => {
   const { balls } = payload;
   const W = 300; const H = 190; const L = 30; const R = 8; const T = 22; const B = 150;
   const n = balls.length;
@@ -883,12 +932,12 @@ const BallSteps = ({ payload }) => {
             <text x={L - 6} y={sy(v) + 4} textAnchor="end" style={{ ...mono, fontSize: 10, fill: colors.textLo }}>{`${v}%`}</text>
           </g>
         ))}
-        <path d={d} fill="none" stroke={colour} strokeWidth="2" strokeLinejoin="round" />
+        <path d={d} fill="none" stroke={colour} strokeWidth="2" strokeLinejoin="round" style={lineDraw(motion && { ...motion, plan: { draw: 0.45 * balls.length, ...motion.plan } }, L / W)} />
         {balls.map((b, i) => {
           const hi = b.highlight; const ink = b.wicket ? colors.red : hi ? colors.accent : colors.textHi;
           const y = sy(b.wp); const above = y > T + 14;
           return (
-            <g key={i}>
+            <g key={i} style={gStyle(reveal(motion && { ...motion, plan: { stagger: 0.45, delay: 0.1, ...motion.plan } }, i))}>
               <circle cx={sx(i)} cy={y} r={hi ? 4.5 : 3} fill={hi ? colors.accent : colour} stroke={colors.bg} strokeWidth="1.5" />
               <text x={sx(i)} y={above ? y - 8 : y + 15} textAnchor="middle"
                 style={{ ...mono, fontSize: 9.5, fontWeight: hi ? 700 : 400, fill: hi ? colors.accent : colors.textMed }}>{`${Math.round(b.wp)}%`}</text>
@@ -909,8 +958,11 @@ const BallSteps = ({ payload }) => {
  * overs each still had left before it.
  * payload: {team, mark, overs, rows:[{name, kind:'pace'|'spin'|'other', cells:[{o, runs}], left}]}
  */
-const BowlingPlan = ({ payload }) => {
+const BowlingPlan = ({ payload, motion }) => {
   const { rows, mark } = payload;
+  // Motion: the innings fills over by over (0.1s an over), every bowler's row at once, so the plan reads in the order
+  // it was bowled; the marked over's ring lands when the innings reaches it. 20 (all) on a card.
+  const upto = motion ? Math.floor((motion.t - motion.start - 0.2) / (motion.plan?.over_every ?? 0.1)) + 1 : 20;
   const kindColour = { pace: SERIES[0], spin: SERIES[1], other: '#5b6b85' };
   const cols = '74px repeat(20, 1fr) 30px';
   const head = (o) => (o === 1 || o % 5 === 0 || o === mark ? o : '');
@@ -930,7 +982,7 @@ const BowlingPlan = ({ payload }) => {
           <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: cols, gap: '2px', alignItems: 'center' }}>
             <Typography noWrap sx={{ fontSize: 12, color: colors.textHi }}>{r.short || raceName(r.name)}</Typography>
             {Array.from({ length: 20 }, (_, i) => {
-              const o = i + 1; const runs = at[o]; const isMark = o === mark;
+              const o = i + 1; const runs = o <= upto ? at[o] : undefined; const isMark = o === mark && o <= upto;
               return (
                 <Box key={o} title={runs != null ? `Over ${o}: ${runs} runs` : undefined} sx={{
                   height: 24, borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -956,11 +1008,11 @@ const BowlingPlan = ({ payload }) => {
  * shows them (services/ig_posts/recap_series.how_it_was_won).
  * payload: {headline, bullets:[string]}
  */
-const RecapText = ({ payload }) => (
+const RecapText = ({ payload, motion }) => (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.5 }}>
-    <Typography sx={{ fontSize: 19, fontWeight: 700, color: colors.textHi, lineHeight: 1.25 }}>{payload.headline}</Typography>
-    {payload.bullets.map((b) => (
-      <Box key={b} sx={{ display: 'grid', gridTemplateColumns: '10px 1fr', gap: 1, alignItems: 'baseline' }}>
+    <Typography sx={{ fontSize: 19, fontWeight: 700, color: colors.textHi, lineHeight: 1.25, ...rowMotion(motion, 0) }}>{payload.headline}</Typography>
+    {payload.bullets.map((b, i) => (
+      <Box key={b} sx={{ display: 'grid', gridTemplateColumns: '10px 1fr', gap: 1, alignItems: 'baseline', ...rowMotion(motion, 2 + 4 * i) }}>
         <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: colors.accent, transform: 'translateY(-2px)' }} />
         <Typography sx={{ fontSize: 14.5, color: colors.textMed, lineHeight: 1.4 }}>{b}</Typography>
       </Box>
@@ -973,7 +1025,7 @@ const RecapText = ({ payload }) => (
  * was last level or ahead marked (services/ig_posts/recap_series.score_race).
  * payload: {series:[{team, values:[runs], wickets:[count]}], mark}
  */
-const ScoreRace = ({ payload }) => {
+const ScoreRace = ({ payload, motion }) => {
   const { series, mark } = payload;
   const W = 300; const H = 180; const L = 30; const R = 40; const T = 12; const B = 152;
   const top = Math.max(...series.flatMap((s) => s.values), 1);
@@ -982,7 +1034,7 @@ const ScoreRace = ({ payload }) => {
   const tones = series.map((s, i) => teamColour(s.team, SERIES[i]));
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%', ...lineDraw(motion) }}
         aria-label={series.map((s) => `${s.team}: ${s.values[mark - 1]} after ${mark} overs, ${s.values[s.values.length - 1]} at the end`).join('; ')}>
         {[0, 100, 200].filter((v) => v <= top).map((v) => (
           <g key={v}>
@@ -1048,7 +1100,7 @@ const ScoreRace = ({ payload }) => {
  */
 const PITCH_LINES = { WIDE_OUTSIDE_OFFSTUMP: 'Wide off', OUTSIDE_OFFSTUMP: 'Off', ON_THE_STUMPS: 'Stumps', DOWN_LEG: 'Leg', WIDE_DOWN_LEG: 'Wide leg' };
 const PITCH_LENGTHS = { YORKER: 'Yorker', FULL: 'Full', GOOD_LENGTH: 'Good', SHORT_OF_A_GOOD_LENGTH: 'Back of length', SHORT: 'Short' };
-const PitchMap = ({ payload }) => {
+const PitchMap = ({ payload, motion }) => {
   const { metric, cells, min_balls: minBalls = 10 } = payload;
   const lines = payload.hand === 'LHB' ? [...payload.lines].reverse() : payload.lines;
   const lengths = payload.lengths;
@@ -1089,7 +1141,7 @@ const PitchMap = ({ payload }) => {
           const ok = c && c.balls >= minBalls;
           const p = ok ? paint(c.value) : null;
           return (
-            <g key={`${len}-${line}`}>
+            <g key={`${len}-${line}`} style={gStyle(reveal(motion && { ...motion, plan: { stagger: 0.06, ...motion.plan } }, i * lines.length + j))}>
               <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="6"
                 fill={ok ? p.fill : 'none'} fillOpacity={ok ? p.opacity : 0}
                 stroke={ok && c.highlight ? colors.textHi : colors.border} strokeWidth={ok && c.highlight ? 2.5 : 1}>
@@ -1127,7 +1179,7 @@ const PitchMap = ({ payload }) => {
  * payload: {x:{label, ticks:[x...]}, y:{label, format}, series:[{name, points:[{x, y}], highlight?, dashed?}],
  *           span?:{from, to, label}, callouts?:[{series, x, place?:'below'|'above-left'}]}
  */
-const MetricLines = ({ payload }) => {
+const MetricLines = ({ payload, motion }) => {
   const { series, x: X, y: Y, span, callouts = [] } = payload;
   const W = 300; const H = 210; const L = 30; const R = 66; const T = 18; const B = 182;
   const xs = series.flatMap((s) => s.points.map((p) => p.x)); const ys = series.flatMap((s) => s.points.map((p) => p.y));
@@ -1151,7 +1203,7 @@ const MetricLines = ({ payload }) => {
   const last = (s) => s.points[s.points.length - 1];
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%', ...lineDraw(motion) }}
         aria-label={series.map((s) => `${s.name}: ${fmt(s.points[0].y, Y.format)} at ${X.label} ${s.points[0].x}, ${fmt(last(s).y, Y.format)} at ${last(s).x}`).join('; ')}>
         <text x={0} y={10} style={{ ...mono, fontSize: 11, fill: colors.textLo }}>{`↑ ${Y.label}`}</text>
         {span && (
@@ -1226,13 +1278,14 @@ const KeepTry = ({ payload }) => (
  * Statistical twins, step 1 ("the inputs"): one player's percentile on each feature the twin search compares, grouped,
  * 0 to 100 against the pool. payload: {rows:[{label, group, value}], pool}
  */
-const PercentileStrip = ({ payload }) => {
+const PercentileStrip = ({ payload, motion }) => {
   const rows = payload.rows || [];
   const W = 300; const L = 128; const R = 26; const rowH = rows.length > 18 ? 13.5 : 16;
   const groups = []; rows.forEach((r) => { if (!groups.length || groups[groups.length - 1].group !== r.group) groups.push({ group: r.group, rows: [] }); groups[groups.length - 1].rows.push(r); });
   const H = rows.length * rowH + groups.length * 13 + 16;
   const sx = (v) => L + (v / 100) * (W - L - R);
   let y = 12;
+  let k = -1;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Percentiles" sx={{ width: '100%' }}>
@@ -1246,13 +1299,15 @@ const PercentileStrip = ({ payload }) => {
               <text x="0" y={head} style={{ ...mono, fontSize: 7.5, letterSpacing: '0.1em', fill: colors.textLo }}>{g.group.toUpperCase()}</text>
               {g.rows.map((r) => {
                 const cy = y + rowH / 2; y += rowH;
+                k += 1;
+                const p = grow(motion, k);
                 return (
-                  <g key={r.label}>
+                  <g key={r.label} style={gStyle(reveal(motion, k))}>
                     <text x="0" y={cy + 3.2} style={{ fontFamily: fonts.body, fontSize: 9.5, fill: colors.textHi }}>{r.label}</text>
                     <line x1={sx(0)} x2={sx(100)} y1={cy} y2={cy} stroke={colors.borderStrong} strokeWidth="1" />
                     <line x1={sx(50)} x2={sx(50)} y1={cy - 3} y2={cy + 3} stroke={colors.textGhost} />
-                    <circle cx={sx(r.value)} cy={cy} r="3.6" fill={colors.accent} />
-                    <text x={W} y={cy + 3.2} textAnchor="end" style={{ ...mono, fontSize: 8.5, fill: colors.textMed }}>{Math.round(r.value)}</text>
+                    <circle cx={sx(part(r.value, p))} cy={cy} r="3.6" fill={colors.accent} />
+                    <text x={W} y={cy + 3.2} textAnchor="end" style={{ ...mono, fontSize: 8.5, fill: colors.textMed }}>{Math.round(part(r.value, p))}</text>
                   </g>
                 );
               })}
@@ -1268,7 +1323,7 @@ const PercentileStrip = ({ payload }) => {
  * Statistical twins, step 2 ("the method"): the player at the centre, his nearest players on spokes whose length is the
  * distance, labelled with it. payload: {center, spokes:[{name, distance, highlight?}]}
  */
-const DistanceStar = ({ payload }) => {
+const DistanceStar = ({ payload, motion }) => {
   const spokes = payload.spokes || [];
   const W = 300; const c = W / 2; const R = 112;
   const max = Math.max(...spokes.map((s) => s.distance));
@@ -1277,13 +1332,15 @@ const DistanceStar = ({ payload }) => {
       <Box component="svg" viewBox={`-34 0 ${W + 68} ${W}`} role="img" aria-label={`Distances from ${payload.center}`} sx={{ width: '100%' }}>
         {spokes.map((s, i) => {
           const a = -Math.PI / 2 + (i / spokes.length) * 2 * Math.PI;
-          const r = 34 + (s.distance / max) * (R - 34);
+          // motion: each spoke grows out from the centre to its distance, one after another
+          const g = grow(motion && { ...motion, plan: { stagger: 0.12, ...motion.plan } }, i);
+          const r = 34 + (s.distance / max) * (R - 34) * g;
           const x = c + r * Math.cos(a); const y = c + r * Math.sin(a);
           const mx = c + r * 0.58 * Math.cos(a); const my = c + r * 0.58 * Math.sin(a);
           const lx = c + (r + 12) * Math.cos(a); const ly = c + (r + 12) * Math.sin(a);
           const col = s.highlight ? colors.accent : colors.textLo;
           return (
-            <g key={s.name}>
+            <g key={s.name} style={gStyle(reveal(motion && { ...motion, plan: { stagger: 0.12, ...motion.plan } }, i))}>
               <line x1={c} y1={c} x2={x} y2={y} stroke={s.highlight ? colors.accent : colors.borderStrong} strokeWidth={s.highlight ? 1.6 : 1} />
               <circle cx={x} cy={y} r={s.highlight ? 4.5 : 3.5} fill={col} />
               <text x={mx} y={my - 3} textAnchor="middle" style={{ ...mono, fontSize: 8.5, fill: s.highlight ? colors.accent : colors.textMed }}>{s.distance}</text>
@@ -1304,7 +1361,7 @@ const DistanceStar = ({ payload }) => {
  * 10 points), angle from an MDS of their likeness to each other; brighter = closer. payload:
  * {center, points:[{name, distance, angle, label?, highlight?}], ring_step}
  */
-const TwinCloud = ({ payload }) => {
+const TwinCloud = ({ payload, motion }) => {
   const pts = payload.points || [];
   const W = 300; const c = W / 2; const R = 138;
   const step = payload.ring_step || 10;
@@ -1323,11 +1380,13 @@ const TwinCloud = ({ payload }) => {
             )}
           </g>
         ))}
-        {sorted.map((p) => {
+        {sorted.map((p, i) => {
           const [x, y] = pos(p);
           const near = 1 - p.distance / outer;
+          // motion: the cloud lands in its drawing order, quickly (0.01s a dot)
+          const inP = motion ? reveal({ ...motion, plan: { stagger: 0.01, enter: 0.3, ...motion.plan } }, i) : 1;
           return <circle key={p.name} cx={x} cy={y} r={p.highlight ? 4.2 : 2.2} fill={p.highlight ? colors.textHi : colors.textLo}
-            opacity={p.highlight ? 1 : Math.max(0.15, near * near)} />;
+            opacity={p.highlight ? 1 : Math.max(0.15, near * near)} style={inP >= 1 ? undefined : { opacity: inP * (p.highlight ? 1 : Math.max(0.15, near * near)) }} />;
         })}
         {pts.filter((p) => p.label).map((p) => {
           const [x, y] = pos(p);
@@ -1352,7 +1411,7 @@ const TwinCloud = ({ payload }) => {
  * payload: {games:[{label, period, top, bottom, marked, note?}], periods:[{key, label}], top:{label, format, higher_better},
  *           bottom:{label, format}, marked_label, unmarked_label}
  */
-const GameTimeline = ({ payload }) => {
+const GameTimeline = ({ payload, motion }) => {
   const { games, periods } = payload;
   const W = 300; const L = 4; const R = 4; const n = games.length;
   const T1 = 28; const H1 = 92; const GAP = 30; const T2 = T1 + H1 + GAP; const H2 = 92; const H = T2 + H2 + 6;
@@ -1376,7 +1435,7 @@ const GameTimeline = ({ payload }) => {
   const edge = (i) => L + (i / n) * (W - L - R);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%', ...lineDraw(motion) }}
         aria-label={`${payload.top.label} and ${payload.bottom.label}, game by game: ${spans.map((p) => `${p.label} ${fmt(p.topAvg, payload.top.format)} and ${fmt(p.botAvg, payload.bottom.format)}`).join('; ')}`}>
         {spans.map((p, k) => (
           <g key={p.key}>
@@ -1448,7 +1507,7 @@ const GameTimeline = ({ payload }) => {
  * payload: {bids:[{n, team, price}], teams:[{key, label, colour?}], unit, marks:[{n, text}],
  *           phases?:[{from, to, label}]} (phases: stretches of the war shaded and named, e.g. who was bidding against whom)
  */
-const BidTrail = ({ payload }) => {
+const BidTrail = ({ payload, motion }) => {
   const { bids, teams } = payload;
   const W = 300; const H = 214; const L = 34; const R = 10; const T = 16; const B = 186;
   const n = bids.length;
@@ -1460,7 +1519,7 @@ const BidTrail = ({ payload }) => {
   const counts = Object.fromEntries(teams.map((t) => [t.key, bids.filter((b) => b.team === t.key).length]));
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%' }}
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} role="img" sx={{ width: '100%', ...lineDraw(motion) }}
         aria-label={`${n} bids from ${fmt(bids[0].price, 'dec2')} to ${fmt(bids[n - 1].price, 'dec2')} ${payload.unit}: ${(payload.marks || []).map((m) => m.text).join('; ')}`}>
         {ticks.map((v) => (
           <g key={v}>
@@ -1512,14 +1571,14 @@ const BidTrail = ({ payload }) => {
  * payload: {hand:'RHB'|'LHB', pair:[{label, zones:{1..8: pct}}, {label, zones}], highlight?:[zone], note?}
  */
 const ZONE_NAMES = { 1: 'Fine leg', 2: 'Square leg', 3: 'Midwicket', 4: 'Long on', 5: 'Long off', 6: 'Cover', 7: 'Point', 8: 'Third man' };
-const ZonePair = ({ payload }) => {
+const ZonePair = ({ payload, motion }) => {
   const lefty = payload.hand === 'LHB';
   const order = lefty ? [1, 8, 7, 6, 5, 4, 3, 2] : [8, 1, 2, 3, 4, 5, 6, 7];
   const hi = new Set(payload.highlight || []);
   const max = Math.max(...payload.pair.flatMap((p) => Object.values(p.zones)));
   const rad = (deg) => (deg * Math.PI) / 180;
   const centre = (i) => -112.5 + i * 45;
-  const wheel = (p, ox) => {
+  const wheel = (p, ox, w) => {
     const cx = ox; const cy = 92; const R = 66;
     const wedge = (i) => {
       const a0 = rad(centre(i) - 22.5); const a1 = rad(centre(i) + 22.5);
@@ -1528,13 +1587,15 @@ const ZonePair = ({ payload }) => {
     return (
       <g key={p.label}>
         {order.map((zn, i) => {
-          const v = p.zones[zn] ?? p.zones[String(zn)] ?? 0;
+          const v0 = p.zones[zn] ?? p.zones[String(zn)] ?? 0;
+          const g = grow(motion, w * 9 + i); // wedge by wedge, the second wheel after the first
+          const v = g >= 1 ? v0 : Math.round(v0 * g);
           const a = rad(centre(i)); const lx = cx + R * 0.66 * Math.cos(a); const ly = cy + R * 0.66 * Math.sin(a);
           return (
             <g key={zn}>
-              <path d={wedge(i)} fill={colors.accent} fillOpacity={0.08 + (0.62 * v) / max}
+              <path d={wedge(i)} fill={colors.accent} fillOpacity={0.08 + (0.62 * part(v0, g)) / max}
                 stroke={hi.has(zn) ? colors.textHi : colors.surface1} strokeWidth={hi.has(zn) ? 2 : 1.5}>
-                <title>{`${p.label}, ${ZONE_NAMES[zn]}: ${v}% of runs`}</title>
+                <title>{`${p.label}, ${ZONE_NAMES[zn]}: ${v0}% of runs`}</title>
               </path>
               <text x={lx} y={ly + 4} textAnchor="middle"
                 style={{ fontFamily: fonts.mono, fontSize: 11, fontWeight: hi.has(zn) ? 700 : 500, fill: colors.textHi, paintOrder: 'stroke', stroke: colors.bg, strokeWidth: 2.5 }}>
@@ -1552,8 +1613,8 @@ const ZonePair = ({ payload }) => {
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <Box component="svg" viewBox="0 0 300 186" role="img" sx={{ width: '100%' }}
         aria-label={payload.pair.map((p) => `${p.label}: ${Object.entries(p.zones).map(([z, v]) => `${ZONE_NAMES[z]} ${v}%`).join(', ')}`).join('; ')}>
-        {wheel(payload.pair[0], 76)}
-        {wheel(payload.pair[1], 224)}
+        {wheel(payload.pair[0], 76, 0)}
+        {wheel(payload.pair[1], 224, 1)}
       </Box>
       <Typography sx={{ fontSize: 12.5, color: colors.textLo, mt: 0.5, whiteSpace: 'nowrap' }}>
         {payload.note || `Share of runs · behind the batter at the top, leg side on the ${lefty ? 'left' : 'right'}`}
@@ -1571,24 +1632,27 @@ const pfs = (payload, n) => (payload && payload.page ? Math.max(11, n) : n);
  * from the team's colour at the best to grey at or below zero, the value written on the chip.
  * payload: {colour, format, groups:[{label, players:[{name, value, sub?}]}], legend?:[strong, weak]}
  */
-const SquadBoard = ({ payload }) => {
+const SquadBoard = ({ payload, motion }) => {
   const all = payload.groups.flatMap((g) => g.players.map((p) => p.value ?? 0));
   const max = Math.max(...all, 0.01);
   const shade = (v) => (v == null || v <= 0 ? 0 : Math.min(1, v / max));
   // Compact: the role label beside its row, so a 25-man squad fits the cover.
+  let k = -1; // reading-order index of each chip (motion)
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.6, justifyContent: 'center' }}>
       {payload.groups.filter((g) => g.players.length).map((g) => (
         <Box key={g.label} sx={{ display: 'grid', gridTemplateColumns: payload.page ? '1fr' : '62px minmax(0, 1fr)', columnGap: 0.75, rowGap: payload.page ? 0.4 : 0, alignItems: 'start' }}>
           <Typography sx={{ ...mono, fontSize: pfs(payload, 9), letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.textLo, pt: '4px', lineHeight: 1.2 }}>{g.label}</Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          <Box data-motion-group={motion ? g.label : undefined} sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {g.players.map((p) => {
+              k += 1;
               const t = shade(p.value);
+              const dm = dealMotion(motion && { ...motion, plan: { stagger: 0.03, ...motion.plan } }, k, p.name);
               const ink = t > 0.55 ? (payload.ink || '#0b0d12') : null;
               return (
-                <Box key={p.name} sx={{ display: 'inline-flex', alignItems: 'baseline', gap: 0.5, borderRadius: '6px', px: 0.7, py: 0.2,
+                <Box key={p.name} data-motion-key={motion ? p.name : undefined} sx={{ display: 'inline-flex', alignItems: 'baseline', gap: 0.5, borderRadius: '6px', px: 0.7, py: 0.2,
                   border: `1px solid ${t > 0 ? payload.colour : colors.borderStrong}`,
-                  bgcolor: t > 0 ? `${payload.colour}${Math.round(40 + t * 175).toString(16).padStart(2, '0')}` : 'transparent' }}>
+                  bgcolor: t > 0 ? `${payload.colour}${Math.round(40 + t * 175).toString(16).padStart(2, '0')}` : 'transparent', ...dm }}>
                   <Typography component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: ink || colors.textHi, whiteSpace: 'nowrap' }}>{p.name}</Typography>
                   <Typography component="span" sx={{ ...mono, fontSize: pfs(payload, 10), color: ink || (p.value > 0 ? colors.textHi : colors.textLo) }}>
                     {p.value == null ? '' : fmt(p.value, payload.format || 'signed2')}
@@ -1609,7 +1673,7 @@ const SquadBoard = ({ payload }) => {
  * small line under it; empty cells stay blank. Bowlers by phase, a side's phase ranks.
  * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?}|null]}], format, higher_better, mid, legend?:[good, bad]}
  */
-const GridHeat = ({ payload }) => {
+const GridHeat = ({ payload, motion }) => {
   const vals = payload.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c.value));
   const mid = payload.mid ?? 0;
   const spread = Math.max(...vals.map((v) => Math.abs(v - mid)), 0.01);
@@ -1624,18 +1688,23 @@ const GridHeat = ({ payload }) => {
         <span />
         {payload.cols.map((c) => <Typography key={c} sx={{ ...mono, fontSize: 10.5, color: colors.textLo, textAlign: 'center' }}>{c}</Typography>)}
       </Box>
-      {payload.rows.map((r) => (
+      {payload.rows.map((r, ri) => (
         <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'stretch' }}>
-          <Box sx={{ minWidth: 0, alignSelf: 'center' }}>
+          <Box sx={{ minWidth: 0, alignSelf: 'center', ...(motion ? enterSx(reveal(motion, ri), { dx: -14, dy: 0 }) : {}) }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</Typography>
             {r.sub && <Typography sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{r.sub}</Typography>}
           </Box>
           {r.cells.map((c, i) => {
-            if (!c) return <Box key={i} sx={{ borderRadius: '6px', bgcolor: 'rgba(255,255,255,0.03)' }} />;
+            // motion: column i fills 0.7s after column i-1, each cell 0.1s after the one above
+            const g = motion ? grow({ ...motion, plan: { stagger: 0.1, delay: 0.4 + i * 0.7, grow: 0.4, ...motion.plan } }, ri) : 1;
+            if (!c) return <Box key={i} sx={{ borderRadius: '6px', bgcolor: 'rgba(255,255,255,0.03)', ...(g >= 1 ? {} : { opacity: g }) }} />;
             const t = tone(c.value);
+            const a = g >= 1 ? t.a : t.a * g;
+            const key = `${r.name} · ${payload.cols[i]}`;
             return (
-              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(t.a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: 0.5 }}>
-                <Typography sx={{ ...mono, fontSize: 13, fontWeight: 700, color: colors.textHi }}>{c.text ?? fmt(c.value, payload.format)}</Typography>
+              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: 0.5,
+                ...(motion ? { ...(g >= 1 ? {} : { opacity: Math.min(1, g * 3) }), ...ringOn(motion, key) } : {}) }}>
+                <Typography sx={{ ...mono, fontSize: 13, fontWeight: 700, color: colors.textHi }}>{g >= 1 ? (c.text ?? fmt(c.value, payload.format)) : fmt(c.value * g, payload.format || 'signed1')}</Typography>
                 {c.sub && <Typography sx={{ ...mono, fontSize: 9.5, color: colors.textMed }}>{c.sub}</Typography>}
               </Box>
             );
@@ -1652,10 +1721,12 @@ const GridHeat = ({ payload }) => {
  * him and the number against. No verdict: the reader decides.
  * payload: {colour, cases:[{tag, name, price, for, against}]}
  */
-const CaseBoard = ({ payload }) => (
+const caseStep = (motion, i) => (motion ? { ...motion, plan: { stagger: motion.plan?.case_every ?? 2.3, ...motion.plan } } : undefined);
+const CaseBoard = ({ payload, motion }) => (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center' }}>
-    {payload.cases.map((c) => (
-      <Box key={c.name} sx={{ border: `1px solid ${colors.borderStrong}`, borderLeft: `4px solid ${payload.colour}`, borderRadius: '10px', px: 1.25, py: 0.9 }}>
+    {payload.cases.map((c, ci) => (
+      <Box key={c.name} sx={{ border: `1px solid ${colors.borderStrong}`, borderLeft: `4px solid ${payload.colour}`, borderRadius: '10px', px: 1.25, py: 0.9,
+        ...(motion ? { ...enterSx(reveal(caseStep(motion), ci), { dx: 0, dy: 14 }), ...ringOn(motion, c.name) } : {}) }}>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
           <Typography sx={{ ...mono, fontSize: pfs(payload, 10), letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textLo }}>{c.tag}</Typography>
           <Typography sx={{ ...mono, fontSize: 11.5, color: colors.textMed, ml: 'auto' }}>{c.price}</Typography>
@@ -1675,10 +1746,12 @@ const CaseBoard = ({ payload }) => (
           ))
         ) : (
           <>
-            <Typography sx={{ fontSize: 12.5, color: colors.textHi, mt: 0.3 }}>
+            <Typography sx={{ fontSize: 12.5, color: colors.textHi, mt: 0.3,
+              ...(motion ? enterSx(reveal({ ...caseStep(motion), start: motion.start + 0.3 }, ci), { dx: -16, dy: 0 }) : {}) }}>
               <Box component="span" sx={{ color: colors.accent, fontWeight: 700 }}>For </Box>{c.for}
             </Typography>
-            <Typography sx={{ fontSize: 12.5, color: colors.textHi }}>
+            <Typography sx={{ fontSize: 12.5, color: colors.textHi,
+              ...(motion ? enterSx(reveal({ ...caseStep(motion), start: motion.start + 0.55 }, ci), { dx: 16, dy: 0 }) : {}) }}>
               <Box component="span" sx={{ color: colors.red, fontWeight: 700 }}>Against </Box>{c.against}
             </Typography>
           </>
@@ -1695,13 +1768,13 @@ const CaseBoard = ({ payload }) => (
  * payload: {colour, rows:[{label, holders, place, playoff_place, status, value_text}], scale_label}
  */
 const STATUS_COLOUR = { short: '#e0a43a' };
-const TemplateBoard = ({ payload }) => {
+const TemplateBoard = ({ payload, motion }) => {
   // Verdict colours are semantic, not the team's: lime at playoff level (CSK's yellow would read as amber).
   const statusColour = (s) => (s === 'playoff level' ? colors.accent : s === 'short' ? STATUS_COLOUR.short : colors.red);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.55 }}>
-      {payload.rows.map((r) => (
-        <Box key={r.label}>
+      {payload.rows.map((r, i) => (
+        <Box key={r.label} sx={motion ? { ...enterSx(reveal({ ...motion, plan: { stagger: 0.12, ...motion.plan } }, i), { dx: 0, dy: 10 }), ...ringOn(motion, r.label) } : undefined}>
           {/* On the page the value takes its own line: at 11px, label + status + value don't fit 390px (13 Nov 2026 audit). */}
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, lineHeight: 1.15, flexWrap: payload.page ? 'wrap' : 'nowrap' }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.label}</Typography>
@@ -1711,7 +1784,7 @@ const TemplateBoard = ({ payload }) => {
           <Box sx={{ position: 'relative', height: 11, mt: '2px' }}>
             <Box sx={{ position: 'absolute', left: 0, right: 0, top: 4.5, height: 2, borderRadius: 1, bgcolor: colors.borderStrong }} />
             <Box sx={{ position: 'absolute', left: `${r.playoff_place}%`, top: 0, width: 2, height: 11, ml: '-1px', bgcolor: colors.textMed }} />
-            <Box sx={{ position: 'absolute', left: `${Math.max(1.5, Math.min(98.5, r.place))}%`, top: 0.5, width: 10, height: 10, ml: '-5px', borderRadius: '50%',
+            <Box sx={{ position: 'absolute', left: `${Math.max(1.5, Math.min(98.5, r.place)) * (motion ? grow({ ...motion, plan: { stagger: 0.12, delay: 0.3, grow: 0.5, ...motion.plan } }, i) : 1)}%`, top: 0.5, width: 10, height: 10, ml: '-5px', borderRadius: '50%',
               bgcolor: statusColour(r.status), border: `1.5px solid ${colors.bg}` }} />
           </Box>
           {r.holders && <Typography sx={{ fontSize: pfs(payload, 10), color: colors.textLo, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.holders}</Typography>}
@@ -1734,10 +1807,10 @@ const STRIP_BAT = '91,155,240';
 const STRIP_BOWL = '182,242,74';
 const STRIP_COLS = 'repeat(6, 1fr) 4px repeat(9, 1fr) 4px repeat(5, 1fr)';
 const stripSum = (a) => (a || []).reduce((x, y) => x + y, 0);
-const StripCells = ({ shares, rgb, k, h }) => (
+const StripCells = ({ shares, rgb, k, h, upto = 20 }) => (
   <Box sx={{ display: 'grid', gridTemplateColumns: STRIP_COLS, gap: '2px', height: h }}>
     {Array.from({ length: 20 }, (_, i) => {
-      const v = shares ? shares[i] || 0 : 0;
+      const v = shares && i < upto ? shares[i] || 0 : 0;
       return (
         <React.Fragment key={i}>
           {(i === 6 || i === 15) && <span />}
@@ -1747,8 +1820,10 @@ const StripCells = ({ shares, rgb, k, h }) => (
     })}
   </Box>
 );
-const OverStrips = ({ payload }) => {
+const OverStrips = ({ payload, motion }) => {
   const anyBat = payload.rows.some((r) => stripSum(r.bat) > 0.2);
+  // motion: overs fill in order, 0.1s an over (plan.over_every); 20 on a card
+  const upto = motion ? Math.max(0, Math.floor((motion.t - motion.start - 0.2) / (motion.plan?.over_every ?? 0.1)) + 1) : 20;
   return (
   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
     <Box sx={{ display: 'flex', gap: 2, fontSize: 12, color: colors.textLo }}>
@@ -1775,8 +1850,8 @@ const OverStrips = ({ payload }) => {
             {r.sub && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.sub}</Typography>}
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            {b && <StripCells shares={r.bat} rgb={STRIP_BAT} k={3.2} h={b && w ? 15 : 26} />}
-            {w && <StripCells shares={r.bowl} rgb={STRIP_BOWL} k={1.2} h={b && w ? 15 : 26} />}
+            {b && <StripCells shares={r.bat} rgb={STRIP_BAT} k={3.2} h={b && w ? 15 : 26} upto={upto} />}
+            {w && <StripCells shares={r.bowl} rgb={STRIP_BOWL} k={1.2} h={b && w ? 15 : 26} upto={upto} />}
           </Box>
         </Box>
       );
@@ -1793,12 +1868,13 @@ const OverStrips = ({ payload }) => {
  * payload: {rows:[{label, status, now, playoff, like:[{name, value}], options:[{name, value, overseas?, source?}],
  *           none?}], note?}
  */
-const GapFits = ({ payload }) => {
+const GapFits = ({ payload, motion }) => {
   const statusColour = (s) => (s === 'playoff level' ? colors.accent : s === 'short' ? STATUS_COLOUR.short : colors.red);
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1.6 }}>
-      {payload.rows.map((r) => (
-        <Box key={r.label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.45 }}>
+      {payload.rows.map((r, ri) => (
+        <Box key={r.label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.45,
+          ...(motion ? { ...enterSx(reveal({ ...motion, plan: { stagger: 0.6, ...motion.plan } }, ri)), ...ringOn(motion, r.label) } : {}) }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.label}</Typography>
             <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{r.status}</Typography>
@@ -1807,9 +1883,10 @@ const GapFits = ({ payload }) => {
           <Typography noWrap sx={{ fontSize: 11.5, color: colors.textLo }}>
             Like {r.like.map((x) => `${x.name} (${x.value})`).join(', ')}
           </Typography>
-          {r.options.length ? r.options.map((o) => (
+          {r.options.length ? r.options.map((o, oi) => (
             <Box key={o.name} sx={{ display: 'grid', gridTemplateColumns: '1fr auto 92px', gap: 1, alignItems: 'baseline', pl: 1.25,
-              borderLeft: `2px solid ${colors.borderStrong}` }}>
+              borderLeft: `2px solid ${colors.borderStrong}`,
+              ...(motion ? { ...enterSx(reveal({ ...motion, start: motion.start + 0.25 + oi * 0.2, plan: { stagger: 0.6, ...motion.plan } }, ri), { dx: -14, dy: 0 }), ...ringOn(motion, o.name) } : {}) }}>
               <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                 <Typography noWrap sx={{ fontSize: 13, color: colors.textHi }}>{o.name}</Typography>
                 {o.overseas && <OverseasMark size={13} />}
@@ -1826,6 +1903,26 @@ const GapFits = ({ payload }) => {
     </Box>
   );
 };
+
+/**
+ * Kinds that read the optional `motion` prop ({ t, start, end, lit, plan }, src/components/ig/reel/motion.js) and move
+ * themselves in a motion Reel. Without the prop they draw exactly as on their card. Other kinds play the Reel fallback.
+ */
+export const MOTION_KINDS = new Set([
+  'metric_bars', 'share_bars', 'scorecard', 'bucket_bars', 'pair_dumbbell', 'deep_compare', 'innings_scorecard', 'recap_text',
+  'percentile_strip',
+  // visuals.jsx kinds (the match-preview visuals) that read it too
+  'zone_pair',
+  'stat', 'tiles', 'rank_bars', 'player_bars', 'dumbbell', 'xis', 'battles', 'pace_spin', 'last_meeting',
+  'par', 'chase_band', 'phase_diverging', 'milestones',
+  // M3a: boards and heat grids
+  'squad_board', 'grid_heat', 'case_board', 'template_board', 'gap_fits',
+  // M3b: lines over time (drawn left to right)
+  'win_prob_line', 'race_lines', 'score_race', 'metric_lines', 'game_timeline', 'bid_trail', 'worm', 'elo_lines',
+  'scatter_plus', 'bowling_plan', 'twin_cloud', 'distance_star', 'totals_scatter', 'suits_scatter',
+  // M3c: field and pitch, flows
+  'shot_wheel', 'ball_steps', 'pitch_map', 'sankey', 'over_strips', 'boundary_zones', 'pitch_usage',
+]);
 
 export const POST_VISUALS = {
   gap_fits: GapFits,

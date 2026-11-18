@@ -294,7 +294,11 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
     msg = PROMPT % {"gloss": gloss, "k": len(bs), "hook": hook, "charts": charts, "say": L["say"], "spoken": L["spoken"], "extra": extra,
                     "house": "\n".join(x for x in (social_rules.section("Reels"), social_rules.section("Vocabulary")) if x) or "-",
                     "notes": f"\nAlso on the slides (may be used in the lines, e.g. the doubts):\n{notes}\n" if notes else ""}
-    if close:
+    if close == PICK_ONE:
+        msg += ("\nEnd the last line with a question about a decision that offers exactly two short choices, joined by "
+                "\"or\" (\"Name: keep or release?\", \"Kohli or Rohit?\"), so viewers can answer in one word; both "
+                "sides of the decision should be fair, never a question about a player's worth.")
+    elif close:
         msg += f"\nEnd the last line with exactly this question: \"{close}\""
     if feedback:
         msg += (f"\nYour last attempt was rejected ({feedback}). Fix that"
@@ -809,9 +813,10 @@ def make_short(carousel_id: str) -> bool:
 
 def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = None, base: str = SITE,
          store: bool = True, out: Optional[Path] = None, plan: Optional[Dict[str, Any]] = None,
-         length: str = "short") -> Optional[Dict[str, Any]]:
+         length: str = "short", motion: Optional[bool] = None) -> Optional[Dict[str, Any]]:
     """Build the v2 Reel. plan: a script already made (the same script in several voices); else one is written.
-    length: "short" (about 25-30s) or "long" (45-60s, up to 5 charts)."""
+    length: "short" (about 25-30s) or "long" (45-60s, up to 5 charts). motion (default REEL_MOTION=1): the motion
+    Reel (make_motion) when the plan has its closing pick-one (plan["close"]), else, or on any failure, v2 as before."""
     if not shutil.which("ffmpeg"):
         return None
     hook = next((s.get("text") for s in slides if s.get("type") == "hook"), "") or ""
@@ -821,9 +826,44 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
     if len(bs) < 2:
         return None
     if plan is None or not plan.get("script"):
-        sc, source = script(hook, bs, notes_of(slides), length, (plan or {}).get("close", ""))
-        plan = {"script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
+        # the motion Reel needs a two-choice closing question: ask for one unless the caller gave the question
+        close = (plan or {}).get("close") or (PICK_ONE if (MOTION if motion is None else motion) else "")
+        sc, source = script(hook, bs, notes_of(slides), length, close if isinstance(close, str) else "")
+        plan = {**(plan or {}), "script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
     sc, voice = plan["script"], voice or VOICE
+    voiced = None
+    if MOTION if motion is None else motion:
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            mp4 = out or (tmp / "reel.mp4")
+            try:
+                made = make_motion(carousel_id, slides, plan, voice, base, mp4, tmp)
+            except MotionFailed as exc:  # a motion failure never costs the post its Reel: v2 below
+                logger.warning("motion reel for %s: %s; v2 instead", carousel_id, exc)
+                made, voiced = None, exc.voiced
+            except Exception:
+                logger.exception("motion reel for %s failed; v2 instead", carousel_id)
+                made = None
+            if made:
+                if store:
+                    _store(carousel_id, mp4, made["seconds"])
+                return {"seconds": made["seconds"], "script": made["script"], "source": plan.get("source"),
+                        "voice": voice, "beats": plan["beats"], "length": plan.get("length", length), "motion": True,
+                        "spec": made["spec"], "mp4": str(out) if out else None}
+            if out is not None and Path(out).exists():
+                Path(out).unlink()  # a partial motion recording never stands in for the Reel
+    try:
+        return _make_v2(carousel_id, plan, sc, voice, base, store, out, length, voiced)
+    except Exception:
+        if out is not None and Path(out).exists():
+            Path(out).unlink()
+        raise
+
+
+def _make_v2(carousel_id: str, plan: Dict[str, Any], sc: Dict[str, Any], voice: str, base: str, store: bool,
+             out: Optional[Path], length: str, voiced: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The v2 Reel: each beat's chart revealed, voiced line by line, captions burned in. voiced: lines the motion path
+    already voiced (its closing line included), reused rather than voiced again."""
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
         got = record(carousel_id, plan["beats"], tmp / "frames", base)
@@ -831,14 +871,20 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
             raise RuntimeError(f"recording failed: {got['failed']}")
         # One voice session, one response per line: each line's length is known exactly, so each chart arrives
         # with its line (no transcription needed to time it).
-        segments = [sc["hook"], *sc["lines"]]
         voice_file = tmp / "voice.mp3"
-        lengths = voice_lines(segments, voice, voice_file)
+        if voiced and voiced.get("audio"):
+            # the motion path's voice: its lines (hook, beats, close) and lengths; the close rides on the last beat
+            segments, lengths = list(voiced["lines"]), list(voiced["lengths"])
+            voice_file.write_bytes(voiced["audio"])
+        else:
+            segments = [sc["hook"], *sc["lines"]]
+            lengths = voice_lines(segments, voice, voice_file)
         spoken_len = sum(lengths) + GAP * (len(lengths) - 1)
         starts, captions = align(segments, lengths)
         hook_end = starts[1]
         # Beat 1 carries the hook and its line; each other beat starts with its line. A short tail after the last word.
-        cuts = [0.0] + starts[2:] + [spoken_len + 0.6]
+        # (with the motion path's voice, its closing line rides on the last beat: no cut for it)
+        cuts = [0.0] + starts[2:len(plan["beats"]) + 1] + [spoken_len + 0.6]
         durations = [round(b - a, 3) for a, b in zip(cuts, cuts[1:])]
         mp4 = out or (tmp / "reel.mp4")
         subtitles = srt(captions)
@@ -850,19 +896,136 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
         if seconds > MAX_SECONDS:
             logger.warning("reel v2 for %s is %.1fs", carousel_id, seconds)
         if store:
-            from sqlalchemy import text
-
-            from database import engine
-
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    INSERT INTO ig_reels (carousel_id, mp4, seconds) VALUES (:c, :m, :s)
-                    ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
-                """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
-            make_short(carousel_id)
+            _store(carousel_id, mp4, seconds)
     return {"seconds": seconds, "script": sc, "source": plan["source"], "voice": voice, "beats": plan["beats"],
             "length": plan.get("length", length), "srt": subtitles,
             "mp4": str(out) if out else None}
+
+
+# ---- the motion Reel (MOTION_REEL_PLAN.md M6) ------------------------------------------------------------------------
+#
+# The same beats, script, guard and voice as v2; the record + compose steps swapped for the motion Reel page
+# (src/components/ig/reel) recorded frame by frame (scripts/record_ig_reel.mjs). Switched on with REEL_MOTION=1 (or
+# make(..., motion=True)); it needs the script's closing pick-one (plan["close"]), and any failure falls back to the
+# v2 path, so a post never loses its Reel.
+
+MOTION = os.getenv("REEL_MOTION") == "1"
+#: script(close=PICK_ONE): ask the script writer for a two-choice closing question (the motion Reel's pick-one).
+PICK_ONE = "<pick-one>"
+
+
+def motion_close(sc: Dict[str, Any], close: Any = "", team: Optional[str] = None
+                 ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    """(script, close) for the motion Reel's closing pick-one (decision 3: a decision with both sides the same size).
+    close: a dict already made (returned as is), or the legacy string (scripts/make_reel_v2.py --close, the question
+    the last line ends on), or empty: the last line's closing question. The question must offer two short choices
+    ("keep or release?", "Kohli or Rohit?"); otherwise (None, and the motion Reel isn't made: v2 instead). The question
+    moves off the last beat's line onto the closing line, followed by the send line, so it's said once."""
+    if isinstance(close, dict):
+        return sc, close
+    last = (sc.get("lines") or [""])[-1].strip()
+    q = (close or "").strip()
+    if not q:
+        m = re.search(r"([^.!?]*\?)\s*$", last)
+        q = m.group(1).strip() if m else ""
+    if not q.endswith("?"):
+        return sc, None
+    head, _, lit = q.rpartition(":")
+    lit = lit.strip() if head else q
+    sides = [x.strip(" ?").split() for x in re.split(r"\s+or\s+", lit.rstrip("?"))]
+    if len(sides) != 2 or not all(1 <= len(x) <= 2 for x in sides):
+        return sc, None
+    options = [" ".join(x).capitalize() for x in sides]
+    rest = last[: len(last) - len(q)].rstrip() if last.endswith(q) else last
+    lines = list(sc["lines"])
+    send = f"Send this to a {team} fan" if team else "Send this to someone who'd argue"
+    if rest:  # the question moves to the close
+        lines[-1] = rest
+        line = f"{q} {send}."
+    else:     # the line is only the question: it stays, the close says the send line
+        line = f"{send}."
+    return {**sc, "lines": lines}, {"line": line, "question": f"{head.strip()}:" if head else "", "lit": lit,
+                                    "options": options, "send": send}
+
+
+def motion_spec(slides: List[Dict[str, Any]], beats_: List[Tuple[int, Dict[str, Any]]], sc: Dict[str, Any],
+                close: Dict[str, Any], team: Optional[str] = None) -> Tuple[Dict[str, Any], List[str]]:
+    """(anchored reel spec, voiced lines) for a v2 script: the hook over the first beat's card as the hero, then each
+    beat's card with its line (the first card again, whole), then the pick-one with close["line"]."""
+    from services import reel_plan
+
+    cards = [beats_[0][1]] + [c for _, c in beats_]
+    lines = [sc["hook"], *sc["lines"], close["line"]]
+    spec = reel_plan.plan(cards, lines, team=team, close=close)
+    return spec, lines
+
+
+def record_motion(spec: Dict[str, Any], audio: Path, out: Path, base: str, tmp: Path) -> Dict[str, Any]:
+    """The motion Reel recorded from the Reel page at `base` (/ig/reel, the spec handed in): 1080x1920, 30 fps, the
+    voice muxed with loudnorm. Returns the recorder's summary."""
+    spec_file = tmp / "reel.json"
+    spec_file.write_text(json.dumps(spec))
+    proc = subprocess.run(["node", str(ROOT / "scripts/record_ig_reel.mjs"), "--spec", str(spec_file), "--base", base,
+                           "--out", str(tmp / "stills"), "--mp4", str(out), "--audio", str(audio)],
+                          capture_output=True, text=True, timeout=900)
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr[-400:])
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+class MotionFailed(RuntimeError):
+    """The motion Reel couldn't be made. `voiced`: the lines already voiced ({lines, lengths, audio bytes}) when the
+    failure came after the voice, so the v2 fallback reuses them instead of paying for the voice again."""
+
+    def __init__(self, message: str, voiced: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.voiced = voiced
+
+
+def make_motion(carousel_id: str, slides: List[Dict[str, Any]], plan: Dict[str, Any], voice: str, base: str,
+                out: Path, tmp: Path, transcribe=None, recorder=None) -> Dict[str, Any]:
+    """The motion Reel for a planned script (plan: script, beats, close {line, question, lit, send, options?}): voice it,
+    time every word, place the scenes on their anchor words, check the spec against the Reel rules (a failing spec
+    raises, and make() falls back to v2), record it. The paid calls are voice_lines and the word timestamps
+    (reel_timing.transcribe_words unless `transcribe` is given)."""
+    from services import reel_timing
+
+    bs = [(n, slide_card(slides[n - 1])) for n in plan["beats"]]
+    sc, close = motion_close(plan["script"], plan.get("close"), plan.get("team"))
+    if close is None:
+        raise MotionFailed("no closing pick-one: the script's question doesn't offer two choices")
+    spec, lines = motion_spec(slides, bs, sc, close, plan.get("team"))
+    problems = reel_timing.budget_problems(lines)
+    if problems:  # before the voice: a script over budget costs nothing
+        raise MotionFailed("motion Reel script: " + "; ".join(problems))
+    voice_file = tmp / "voice.mp3"
+    lengths = voice_lines(lines, voice, voice_file)
+    voiced = {"lines": lines, "lengths": lengths, "audio": voice_file.read_bytes() if voice_file.exists() else b""}
+    try:
+        timing = reel_timing.time_voice(lines, str(voice_file), lengths, audio_seconds=duration(voice_file),
+                                        **({"transcribe": transcribe} if transcribe else {}))
+        placed = reel_timing.place(spec, timing)
+        problems = social_rules.reel_problems(placed)
+        if problems:
+            raise RuntimeError("motion Reel spec: " + "; ".join(problems))
+        got = (recorder or record_motion)(placed, voice_file, out, base, tmp)  # looked up now: tests replace it
+    except Exception as exc:
+        raise MotionFailed(str(exc)[:400], voiced) from exc
+    return {"seconds": placed["duration"], "spec": placed, "recorded": got, "script": sc}
+
+
+def _store(carousel_id: str, mp4: Path, seconds: float) -> None:
+    """The Reel into ig_reels (one a carousel, replaced on a remake), then its Short."""
+    from sqlalchemy import text
+
+    from database import engine
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO ig_reels (carousel_id, mp4, seconds) VALUES (:c, :m, :s)
+            ON CONFLICT (carousel_id) DO UPDATE SET mp4 = EXCLUDED.mp4, seconds = EXCLUDED.seconds, made_at = now()
+        """), {"c": carousel_id, "m": mp4.read_bytes(), "s": seconds})
+    make_short(carousel_id)
 
 
 # ---- the A/B, and the queue ------------------------------------------------------------------------------------------

@@ -1,0 +1,22 @@
+{
+ "_note": "The motion Reel's frame in canvas px (1080 x 1920; MOTION_REEL_PLAN.md decisions 7 and 8). One source for the Reel page (motion.js) and the Reel checks in Python (services/social_rules.reel_problems). keepClear: Instagram's own overlays, which nothing that must be read may enter.",
+ "shift": 120,
+ "stripe": {"x": 0, "w": 14},
+ "chapters": {"x": 64, "y": 370, "w": 876, "h": 6, "gap": 8},
+ "kicker": {"x": 64, "y": 416, "w": 876, "h": 34},
+ "content": {"x": 64, "y": 470, "w": 876, "h": 970},
+ "caption": {"x": 64, "y": 1504, "w": 876, "h": 80},
+ "keepClear": [
+  {"name": "top overlay", "x": 0, "y": 0, "w": 1080, "h": 200},
+  {"name": "bottom overlay", "x": 0, "y": 1600, "w": 1080, "h": 320},
+  {"name": "right rail", "x": 940, "y": 1000, "w": 140, "h": 500}
+ ],
+ "rules": {
+  "lengthMin": 28, "lengthMax": 33,
+  "stillMax": 0.8,
+  "dwellMin": 0.6,
+  "sceneMin": 1.2,
+  "captionWords": 5, "captionChars": 30,
+  "kickerMinPx": 22, "sendMinPx": 48
+ }
+}

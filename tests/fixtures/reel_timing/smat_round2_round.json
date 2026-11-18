@@ -1,0 +1,81 @@
+{
+ "label": "SMAT round 2",
+ "date": "16 Nov",
+ "pool": 324,
+ "franchises": [
+  {
+   "team": "RCB",
+   "name": "Rajat Patidar",
+   "value": 62.4,
+   "line": "135* off 48"
+  },
+  {
+   "team": "MI",
+   "name": "Suryakumar Yadav",
+   "value": 45.0,
+   "line": "82 off 29"
+  },
+  {
+   "team": "CSK",
+   "name": "Sanju Samson",
+   "value": 26.4,
+   "line": "47 off 16"
+  },
+  {
+   "team": "SRH",
+   "name": "Ravichandran Smaran",
+   "value": 19.6,
+   "line": "68 off 39"
+  },
+  {
+   "team": "DC",
+   "name": "Abishek Porel",
+   "value": 18.4,
+   "line": "53 off 26"
+  },
+  {
+   "team": "LSG",
+   "name": "Mayank Yadav",
+   "value": 11.9,
+   "line": "4/12 in 3"
+  },
+  {
+   "team": "PBKS",
+   "name": "Shashank Singh",
+   "value": 9.3,
+   "line": "2/19 in 3"
+  },
+  {
+   "team": "RR",
+   "name": "Ravi Singh",
+   "value": 9.1,
+   "line": "21 off 11"
+  },
+  {
+   "team": "KKR",
+   "name": "Angkrish Raghuvanshi",
+   "value": 4.7,
+   "line": "4 off 3"
+  },
+  {
+   "team": "GT",
+   "name": "Jayant Yadav",
+   "value": 3.4,
+   "line": "2/24 in 4"
+  }
+ ],
+ "hero": {
+  "team": "RCB",
+  "name": "Rajat Patidar",
+  "state": "Madhya Pradesh",
+  "value": 62.4,
+  "line": "135* off 48"
+ },
+ "free": {
+  "name": "Shivalik Sharma",
+  "state": "Baroda",
+  "value": 55.3,
+  "line": "101* off 39",
+  "tag": "Last IPL squad: Mumbai, 2024 · unsold at the 2025 auction"
+ }
+}

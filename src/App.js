@@ -53,6 +53,7 @@ import { apiErrorText } from './utils/apiError';
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
 const IgSlide = React.lazy(() => import('./components/ig/IgSlide'));
 const IgLinks = React.lazy(() => import('./components/ig/IgLinks'));
+const IgReel = React.lazy(() => import('./components/ig/reel/IgReel'));
 const NotesList = React.lazy(() => import('./components/notes/NotesList'));
 const NotePage = React.lazy(() => import('./components/notes/NotePage'));
 const ScorecardsBrowse = React.lazy(() => import('./components/scorecard/ScorecardsBrowse'));
@@ -552,7 +553,12 @@ const AppContent = () => {
   if (location.pathname.startsWith('/ig/')) {
     return (
       <React.Suspense fallback={null}>
-        <Routes><Route path="/ig/:carouselId/:n" element={<IgSlide />} /></Routes>
+        <Routes>
+          {/* Motion Reels (src/components/ig/reel): before /ig/:carouselId/:n so "reel" is not read as a slide number. */}
+          <Route path="/ig/reel" element={<IgReel />} />
+          <Route path="/ig/:carouselId/reel" element={<IgReel />} />
+          <Route path="/ig/:carouselId/:n" element={<IgSlide />} />
+        </Routes>
       </React.Suspense>
     );
   }
