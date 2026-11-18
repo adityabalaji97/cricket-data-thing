@@ -1875,7 +1875,9 @@ const GapFits = ({ payload, motion }) => {
       {payload.rows.map((r, ri) => (
         <Box key={r.label} sx={{ display: 'flex', flexDirection: 'column', gap: 0.45,
           ...(motion ? { ...enterSx(reveal({ ...motion, plan: { stagger: 0.6, ...motion.plan } }, ri)), ...ringOn(motion, r.label) } : {}) }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+          {/* wraps the "now · playoff" figures under the label when the row is narrower than the card (the Reel's paged
+              gap, laid out bigger, cut them at the right edge: "…playo") */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 0.75, rowGap: 0.25 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.label}</Typography>
             <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{r.status}</Typography>
             <Typography sx={{ ...mono, fontSize: 11, color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap' }}>now {r.now} · playoff {r.playoff}</Typography>

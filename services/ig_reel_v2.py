@@ -62,7 +62,17 @@ GAP = 0.12                     # seconds of silence between lines
 LENGTHS = {
     "short": {"words": (45, 76), "say": "55 to 72", "spoken": "about 28 seconds", "seconds": 30, "beats": 3},
     "long": {"words": (75, 175), "say": "90 to 160", "spoken": "35 to 60 seconds", "seconds": 60, "beats": 5},
+    # The motion Reel (REEL_MOTION=1) runs 28-33s (frame.json rules). The voice says 2.65-2.95 spoken words a second
+    # (MI's retention takes: 95 in 33.1s, 89 in 32.4s, 84 in 31.9s; the posted Reels 2.96), so the whole Reel is
+    # MOTION_WORDS (76-86, the top is reel_timing.BUDGET) with its close, whose send line ("Send this to a Mumbai fan.",
+    # SEND_WORDS) motion_close adds: the script itself is 70-80 spoken words (reel_timing.spoken_count: "1.98" is four).
+    # v2's short script (45-76 written words) came out at 25.7s (18 Nov).
+    "motion": {"words": (40, 86), "spoken_words": (70, 80), "say": "70 to 80 spoken", "spoken": "about 30 seconds",
+               "seconds": 31, "beats": 3},
 }
+#: The motion Reel's spoken words with its closing line, and the send line's share of them (see LENGTHS["motion"]).
+MOTION_WORDS = (76, 86)
+SEND_WORDS = 6
 WORDS = LENGTHS["short"]["words"]
 MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)
@@ -182,14 +192,25 @@ def allowed(hook: str, bs: List[Tuple[int, Dict[str, Any]]]) -> set:
     return nums | {_short(n) for n in nums}
 
 
-def guard(script: Dict[str, Any], ok: set, k: int, words_range: Tuple[int, int] = WORDS) -> Optional[str]:
-    """None if the script is usable, else why not."""
+def guard(script: Dict[str, Any], ok: set, k: int, words_range: Tuple[int, int] = WORDS,
+          spoken_range: Optional[Tuple[int, int]] = None) -> Optional[str]:
+    """None if the script is usable, else why not. spoken_range: the motion Reel's length in spoken words
+    (reel_timing.spoken_count, digits said one by one after a point), checked as well as the written words."""
     lines = script.get("lines")
     if not isinstance(script.get("hook"), str) or not isinstance(lines, list) or len(lines) != k:
+        return "shape"
+    if not all(isinstance(x, str) for x in lines):
         return "shape"
     words = len(" ".join([script["hook"], *lines]).split())
     if not words_range[0] <= words <= words_range[1]:
         return f"{words} words"
+    if spoken_range:
+        from services.reel_timing import spoken_count
+
+        n = sum(spoken_count(x) for x in [script["hook"], *lines])
+        if not spoken_range[0] <= n <= spoken_range[1]:
+            return (f"{n} spoken words ({'too short' if n < spoken_range[0] else 'too long'}: "
+                    f"{spoken_range[0]}-{spoken_range[1]} spoken words, counting 1.98 as four)")
     h = script["hook"].strip()
     stats = lambda t: {m.rstrip("%").replace(",", "") for m in re.findall(r"\d[\d,]*(?:\.\d+)?%?", t)
                        if "%" in m or "." in m}  # noqa: E731  percentages and decimals: the stats people notice twice
@@ -287,7 +308,11 @@ def script_llm(hook: str, bs: List[Tuple[int, Dict[str, Any]]], feedback: str = 
     L = LENGTHS[length]
     extra = ("\n- Around the middle, turn the story with a re-hook (e.g. \"But here's what the scorecard doesn't show.\")"
              " so people who drift come back. Give the advanced numbers room: that is why this Reel is longer."
-             if length == "long" else "")
+             if length == "long" else
+             "\n- Count words as they are spoken: a number with a decimal point is its whole part, \"point\" and each "
+             "digit after it (1.98 is four words: one point nine eight; 16.3 is three; 135 is four; 42% is three). The "
+             "Reel must run its full 30 seconds: land in the range, don't stop short."
+             if length == "motion" else "")
     from services.ig_captions import GLOSS
 
     gloss = "; ".join(f'{k}: "{v}"' for k, v in GLOSS.items())
@@ -396,7 +421,7 @@ def script(hook: str, bs: List[Tuple[int, Dict[str, Any]]], notes: str = "", len
         except Exception as exc:  # no key, network: the template
             logger.warning("reel script: %r", exc)
             break
-        why = guard(s, ok, len(bs), LENGTHS[length]["words"]) or ""
+        why = guard(s, ok, len(bs), LENGTHS[length]["words"], LENGTHS[length].get("spoken_words")) or ""
         if not why:
             try:
                 why = check(s, hook, bs, notes) or ""
@@ -826,9 +851,12 @@ def make(carousel_id: str, slides: List[Dict[str, Any]], voice: Optional[str] = 
     if len(bs) < 2:
         return None
     if plan is None or not plan.get("script"):
-        # the motion Reel needs a two-choice closing question: ask for one unless the caller gave the question
-        close = (plan or {}).get("close") or (PICK_ONE if (MOTION if motion is None else motion) else "")
-        sc, source = script(hook, bs, notes_of(slides), length, close if isinstance(close, str) else "")
+        # the motion Reel needs a two-choice closing question: ask for one unless the caller gave the question; and it
+        # runs 28-33s, so its script is written to the motion length (a short v2 script fell short: 25.7s, 18 Nov)
+        on = MOTION if motion is None else motion
+        close = (plan or {}).get("close") or (PICK_ONE if on else "")
+        written = "motion" if on and length == "short" else length
+        sc, source = script(hook, bs, notes_of(slides), written, close if isinstance(close, str) else "")
         plan = {**(plan or {}), "script": sc, "source": source, "beats": [n for n, _ in bs], "length": length}
     sc, voice = plan["script"], voice or VOICE
     voiced = None
@@ -960,13 +988,16 @@ def motion_spec(slides: List[Dict[str, Any]], beats_: List[Tuple[int, Dict[str, 
     return spec, lines
 
 
-def record_motion(spec: Dict[str, Any], audio: Path, out: Path, base: str, tmp: Path) -> Dict[str, Any]:
+def record_motion(spec: Dict[str, Any], audio: Path, out: Path, base: str, tmp: Path,
+                  nodrift: bool = False) -> Dict[str, Any]:
     """The motion Reel recorded from the Reel page at `base` (/ig/reel, the spec handed in): 1080x1920, 30 fps, the
-    voice muxed with loudnorm. Returns the recorder's summary."""
+    voice muxed with loudnorm. nodrift: the visuals' slow bob off (the recording scripts/check_ig_reel.py --video
+    checks for still stretches; the posted Reel keeps the bob). Returns the recorder's summary."""
     spec_file = tmp / "reel.json"
     spec_file.write_text(json.dumps(spec))
     proc = subprocess.run(["node", str(ROOT / "scripts/record_ig_reel.mjs"), "--spec", str(spec_file), "--base", base,
-                           "--out", str(tmp / "stills"), "--mp4", str(out), "--audio", str(audio)],
+                           "--out", str(tmp / "stills"), "--mp4", str(out), "--audio", str(audio),
+                           *(["--nodrift"] if nodrift else [])],
                           capture_output=True, text=True, timeout=900)
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr[-400:])
@@ -986,15 +1017,38 @@ def make_motion(carousel_id: str, slides: List[Dict[str, Any]], plan: Dict[str, 
                 out: Path, tmp: Path, transcribe=None, recorder=None) -> Dict[str, Any]:
     """The motion Reel for a planned script (plan: script, beats, close {line, question, lit, send, options?}): voice it,
     time every word, place the scenes on their anchor words, check the spec against the Reel rules (a failing spec
-    raises, and make() falls back to v2), record it. The paid calls are voice_lines and the word timestamps
-    (reel_timing.transcribe_words unless `transcribe` is given)."""
-    from services import reel_timing
-
+    raises, and make() falls back to v2), record it (voice_and_record)."""
     bs = [(n, slide_card(slides[n - 1])) for n in plan["beats"]]
     sc, close = motion_close(plan["script"], plan.get("close"), plan.get("team"))
     if close is None:
         raise MotionFailed("no closing pick-one: the script's question doesn't offer two choices")
     spec, lines = motion_spec(slides, bs, sc, close, plan.get("team"))
+    made = voice_and_record(spec, lines, voice, base, out, tmp, transcribe=transcribe, recorder=recorder)
+    return {**made, "script": sc}
+
+
+#: The closing pick-one may hold up to this long after the voice (reel_timing.HOLD is 0.6s) to bring a voice that came
+#: out a touch short up to the Reel's 28s: people answering the question, with nothing new on screen to miss.
+HOLD_MAX = 2.5
+
+
+def close_hold(audio_seconds: float) -> float:
+    """The last scene's hold after the voice: reel_timing.HOLD, or more (up to HOLD_MAX) so the Reel reaches 28s."""
+    from services import reel_timing
+
+    least = social_rules.reel_frame()["rules"]["lengthMin"] + 0.1
+    return round(min(HOLD_MAX, max(reel_timing.HOLD, least - audio_seconds)), 3)
+
+
+def voice_and_record(spec: Dict[str, Any], lines: List[str], voice: str, base: str, out: Path, tmp: Path,
+                     transcribe=None, recorder=None, nodrift: bool = False) -> Dict[str, Any]:
+    """An anchored reel spec (one voiced line a scene, reel_plan.plan or a preset) voiced, timed word by word, placed,
+    checked against the Reel rules and recorded: {seconds, spec, recorded, voice: the mp3 in tmp}. The budget is
+    checked before the voice (an over-long script costs nothing); a failure after the voice raises MotionFailed with
+    the voiced lines. The paid calls are voice_lines and the word timestamps (reel_timing.transcribe_words unless
+    `transcribe` is given)."""
+    from services import reel_timing
+
     problems = reel_timing.budget_problems(lines)
     if problems:  # before the voice: a script over budget costs nothing
         raise MotionFailed("motion Reel script: " + "; ".join(problems))
@@ -1002,16 +1056,69 @@ def make_motion(carousel_id: str, slides: List[Dict[str, Any]], plan: Dict[str, 
     lengths = voice_lines(lines, voice, voice_file)
     voiced = {"lines": lines, "lengths": lengths, "audio": voice_file.read_bytes() if voice_file.exists() else b""}
     try:
-        timing = reel_timing.time_voice(lines, str(voice_file), lengths, audio_seconds=duration(voice_file),
+        seconds = duration(voice_file)
+        timing = reel_timing.time_voice(lines, str(voice_file), lengths, audio_seconds=seconds,
                                         **({"transcribe": transcribe} if transcribe else {}))
-        placed = reel_timing.place(spec, timing)
+        voiced["timing"] = timing  # paid for too (the word timestamps): kept with the voice if a later step fails
+        placed = reel_timing.place(spec, timing, hold=close_hold(timing["audio"]))
+        voiced["placed"] = placed
         problems = social_rules.reel_problems(placed)
         if problems:
             raise RuntimeError("motion Reel spec: " + "; ".join(problems))
-        got = (recorder or record_motion)(placed, voice_file, out, base, tmp)  # looked up now: tests replace it
+        rec = recorder or record_motion  # looked up now: tests replace it
+        got = rec(placed, voice_file, out, base, tmp, **({"nodrift": True} if nodrift else {}))
     except Exception as exc:
         raise MotionFailed(str(exc)[:400], voiced) from exc
-    return {"seconds": placed["duration"], "spec": placed, "recorded": got, "script": sc}
+    return {"seconds": placed["duration"], "spec": placed, "recorded": got, "voice": voice_file}
+
+
+def overseas_of(team: str, path: Optional[Path] = None) -> List[str]:
+    """The team's overseas retained players (data/auction_raw/ipl/2027/retained_official.csv, its overseas column), by
+    their 2026 names too, so the retention hook can prefer an Indian player (reel_plan.retention's `overseas`)."""
+    import csv
+
+    path = path or ROOT / "data/auction_raw/ipl/2027/retained_official.csv"
+    with open(path, newline="") as f:
+        rows = [r for r in csv.DictReader(f) if r["team"].upper() == team.upper() and str(r["overseas"]).strip() == "1"]
+    return sorted({n for r in rows for n in (r["player"], r.get("name_2026") or "") if n})
+
+
+def make_retention(slides: Dict[str, Any], team: str, voice: Optional[str] = None, base: str = SITE,
+                   out: Optional[Path] = None, overseas: Optional[List[str]] = None, nodrift: bool = False,
+                   keep: Optional[Path] = None, transcribe=None, recorder=None) -> Dict[str, Any]:
+    """The IPL retention preset's motion Reel (reel_plan.retention: the script written from the cards, no model): voiced,
+    timed (reel_timing), placed and recorded via the motion path. slides: {"slides": [...]} (the pack's carousel, or
+    articles/ipl-retention/<team>/slides.json). keep: a folder for the placed spec (reel.json) and the voice
+    (voice.mp3), so the same Reel can be re-recorded or checked with no new paid call. No store: preview only."""
+    from services import reel_plan
+    from services.squad_view import TEAMS
+
+    code = team.upper()
+    planned = reel_plan.retention(slides, code, TEAMS[code]["short"], overseas=overseas)
+    with tempfile.TemporaryDirectory() as d:
+        tmp = Path(d)
+        mp4 = out or (tmp / "reel.mp4")
+        try:
+            made = voice_and_record(planned["spec"], planned["lines"], voice or VOICE, base, mp4, tmp,
+                                    transcribe=transcribe, recorder=recorder, nodrift=nodrift)
+        except MotionFailed as exc:  # keep what was paid for (the voice and its line lengths) before giving up
+            if keep is not None and exc.voiced and exc.voiced.get("audio"):
+                keep.mkdir(parents=True, exist_ok=True)
+                (keep / "voice.mp3").write_bytes(exc.voiced["audio"])
+                (keep / "voiced.json").write_text(json.dumps({k: exc.voiced[k] for k in ("lines", "lengths", "timing")
+                                                              if k in exc.voiced}, indent=1))
+                if exc.voiced.get("placed"):  # re-record or check it with no new paid call
+                    (keep / "reel.json").write_text(json.dumps(exc.voiced["placed"], indent=1, ensure_ascii=False))
+            if out is not None and Path(out).exists():
+                Path(out).unlink()  # never a partial recording
+            raise
+        if keep is not None:
+            keep.mkdir(parents=True, exist_ok=True)
+            (keep / "reel.json").write_text(json.dumps(made["spec"], indent=1, ensure_ascii=False))
+            if made["voice"].exists():
+                shutil.copy(made["voice"], keep / "voice.mp3")
+    return {"seconds": made["seconds"], "spec": made["spec"], "lines": planned["lines"], "recorded": made["recorded"],
+            "mp4": str(out) if out else None}
 
 
 def _store(carousel_id: str, mp4: Path, seconds: float) -> None:
