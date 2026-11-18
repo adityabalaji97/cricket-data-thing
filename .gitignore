@@ -84,6 +84,10 @@ data_exports/
 !services/preview_cards/baselines.json
 # ...and the team colour palette shared by the app and Python
 !src/utils/teamPalette.json
+# ...and the motion Reel's frame (read by the page and by services/social_rules), its test payloads and voice timings
+!src/components/ig/reel/frame.json
+!src/components/ig/reel/__fixtures__/*.json
+!tests/fixtures/reel_timing/*.json
 
 .vercel
 .env

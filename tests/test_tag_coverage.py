@@ -16,6 +16,13 @@ from services.coverage import rank_with_coverage
 from services.shot_families import FAMILIES, families_for_shots, family_case_sql, shots_for
 
 FULL_DATA = os.getenv("HINDSIGHT_FULL_DATA") == "1"
+_URL = os.getenv("DATABASE_URL", "")
+# The data checks open SessionLocal() directly; without an exported local URL, database.py would load the
+# production URL from .env. Run them only against a local database (or a full copy with HINDSIGHT_FULL_DATA=1).
+local_db = pytest.mark.skipif(
+    not (FULL_DATA or any(h in _URL for h in ("@localhost", "//localhost", "127.0.0.1"))),
+    reason="reads the database; export DATABASE_URL to a local copy",
+)
 
 
 # --- shot families ----------------------------------------------------------------------------
@@ -95,6 +102,7 @@ def _q(**kw):
         db.close()
 
 
+@local_db
 @pytest.mark.parametrize("player,expected", [("Shubman Gill", 87.98), ("Virat Kohli", 86.90)])
 def test_control_percentage_matches_group_by_control(player, expected):
     rows = _q(batters=[player], group_by=["batter"])["data"]
@@ -110,6 +118,7 @@ def test_control_percentage_matches_group_by_control(player, expected):
         assert round(rows[0]["control_percentage"], 2) == expected
 
 
+@local_db
 def test_odi_pull_hook_sixes_count_both_schemes():
     rows = _q(shot_family=["PULL_HOOK"], group_by=["batter"])["data"]
     if not rows:
@@ -122,6 +131,7 @@ def test_odi_pull_hook_sixes_count_both_schemes():
         assert (sixes["Rohit Sharma"], sixes["AB de Villiers"], sixes["Eoin Morgan"], sixes["Chris Gayle"]) == (170, 69, 57, 70)  # Gayle 57 before 2000-04 ODIs were read
 
 
+@local_db
 def test_partnership_with_a_batters_filter_counts_both_batters():
     from database import SessionLocal
     from sqlalchemy import text
@@ -141,6 +151,7 @@ def test_partnership_with_a_batters_filter_counts_both_batters():
     assert "runs" in explicit["metadata"]["definitions"]
 
 
+@local_db
 def test_a_stand_owns_its_wicket_ball_whatever_the_feed_says():
     """The feed often names the wrong non-striker on a wicket ball (migration 016); the stand's pair,
     from the striker sequence, gets the ball and the wicket."""

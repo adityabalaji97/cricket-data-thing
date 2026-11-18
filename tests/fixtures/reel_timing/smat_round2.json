@@ -1,0 +1,230 @@
+{
+ "voice": "marin",
+ "model": "gpt-realtime-2.1-mini",
+ "lines": [
+  "Rajat Patidar: 135 not out, off 48 balls.",
+  "That is 62 runs more than an average batter makes from the same spots: the most by any IPL player in round two of the Mushtaq Ali Trophy.",
+  "Suryakumar Yadav, 82 off 29.",
+  "Sanju Samson, 47 off 16.",
+  "Mayank Yadav, four for 12.",
+  "But the best of the rest has no IPL team. Shivalik Sharma, 101 not out off 39.",
+  "Bid or pass on 16 December? Send this to your team's fans."
+ ],
+ "lengths": [
+  4.286,
+  8.17,
+  2.545,
+  2.634,
+  2.321,
+  5.759,
+  4.286
+ ],
+ "starts": [
+  0.0,
+  4.406,
+  12.695,
+  15.36,
+  18.114,
+  20.555,
+  26.434
+ ],
+ "words": [
+  [
+   0.0,
+   0.42,
+   1.34,
+   2.08,
+   2.4,
+   2.9,
+   3.12,
+   3.56
+  ],
+  [
+   4.406,
+   4.666,
+   4.786,
+   5.206,
+   5.546,
+   5.906,
+   6.086,
+   6.286,
+   6.486,
+   6.746,
+   6.986,
+   7.146,
+   7.266,
+   7.486,
+   8.386,
+   8.486,
+   8.726,
+   8.926,
+   9.366,
+   9.826,
+   10.126,
+   10.426,
+   10.666,
+   10.906,
+   11.126,
+   11.266,
+   11.666,
+   11.886
+  ],
+  [
+   12.695,
+   13.315,
+   13.935,
+   14.215,
+   14.495
+  ],
+  [
+   15.36,
+   15.98,
+   16.6,
+   17.06,
+   17.4
+  ],
+  [
+   18.114,
+   18.614,
+   19.114,
+   19.614,
+   19.774
+  ],
+  [
+   20.555,
+   20.795,
+   21.075,
+   21.395,
+   21.515,
+   21.635,
+   21.895,
+   22.155,
+   22.355,
+   22.735,
+   23.535,
+   23.775,
+   24.395,
+   24.895,
+   25.195,
+   25.375,
+   25.595
+  ],
+  [
+   26.434,
+   26.794,
+   27.014,
+   27.334,
+   27.574,
+   28.034,
+   29.154,
+   29.174,
+   29.414,
+   29.514,
+   29.754,
+   30.154
+  ]
+ ],
+ "captions": [
+  [
+   0.0,
+   1.34,
+   "Rajat Patidar:"
+  ],
+  [
+   1.34,
+   2.9,
+   "135 not out,"
+  ],
+  [
+   2.9,
+   4.286,
+   "off 48 balls."
+  ],
+  [
+   4.406,
+   6.486,
+   "That is 62 runs more than an average"
+  ],
+  [
+   6.486,
+   8.386,
+   "batter makes from the same spots:"
+  ],
+  [
+   8.386,
+   10.126,
+   "the most by any IPL player"
+  ],
+  [
+   10.126,
+   11.666,
+   "in round two of the Mushtaq"
+  ],
+  [
+   11.666,
+   12.576,
+   "Ali Trophy."
+  ],
+  [
+   12.695,
+   13.935,
+   "Suryakumar Yadav,"
+  ],
+  [
+   13.935,
+   15.24,
+   "82 off 29."
+  ],
+  [
+   15.36,
+   16.6,
+   "Sanju Samson,"
+  ],
+  [
+   16.6,
+   17.994,
+   "47 off 16."
+  ],
+  [
+   18.114,
+   19.114,
+   "Mayank Yadav,"
+  ],
+  [
+   19.114,
+   20.435,
+   "four for 12."
+  ],
+  [
+   20.555,
+   21.895,
+   "But the best of the rest"
+  ],
+  [
+   21.895,
+   23.535,
+   "has no IPL team."
+  ],
+  [
+   23.535,
+   24.395,
+   "Shivalik Sharma,"
+  ],
+  [
+   24.395,
+   26.314,
+   "101 not out off 39."
+  ],
+  [
+   26.434,
+   29.154,
+   "Bid or pass on 16 December?"
+  ],
+  [
+   29.154,
+   30.72,
+   "Send this to your team's fans."
+  ]
+ ],
+ "audio": 30.792
+}

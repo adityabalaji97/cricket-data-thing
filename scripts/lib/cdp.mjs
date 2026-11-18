@@ -53,8 +53,9 @@ export async function openBrowser({ port = 9335 } = {}) {
         return false;
       },
       evaluate,
-      async screenshot(clip) {
-        const r = await s('Page.captureScreenshot', { format: 'png', clip: { ...clip, scale: 1 }, captureBeyondViewport: false });
+      // format: 'png' (default) or 'jpeg' (quality 0-100, default 92): the motion-Reel recorder's faster path.
+      async screenshot(clip, { format = 'png', quality = 92 } = {}) {
+        const r = await s('Page.captureScreenshot', { format, ...(format === 'jpeg' ? { quality } : {}), clip: { ...clip, scale: 1 }, captureBeyondViewport: false });
         return Buffer.from(r.result.data, 'base64');
       },
       close: () => send('Target.closeTarget', { targetId }),

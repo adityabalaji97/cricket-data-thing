@@ -38,6 +38,31 @@ TEAMS = {
     "GT": {"name": "Gujarat Titans", "short": "Gujarat", "tag": "#GT", "big": "Shubman Gill"},
 }
 COMMON_SURNAMES = {"Ahmed", "Ahmad", "Khan", "Singh", "Sharma", "Kumar", "Yadav", "Patel", "Pandya", "Iyer"}
+ATTACK = 5  # the bowling grid's rows (MOTION_REEL_PLAN.md, owner's decision 5; carousel too, 18 Nov 2026)
+
+
+def regular_attack(players, n=ATTACK, min_balls=MIN_BOWL):
+    """The regular attack for the bowling grid, carousel and Reel alike (owner's decision 5, 16 Nov 2026; the carousel
+    switched on 18 Nov): the n bowlers who bowl the most overs per match he played, every one of them shown with his
+    numbers, best first. No-blame is applied by choosing the regular attack, not by leaving anyone out.
+
+    Per match, not per bowling innings: a player's matches are the most of his batting and bowling innings (and
+    `games` when the caller knows it), so a part-timer isn't flattered by the games he didn't bowl in. And a regular
+    bowls in at least a third of the side's matches (the most matches any squad member played): three 4-over games
+    don't make a regular. Ties go to the one with more balls. Before 18 Nov the carousel showed the six busiest by
+    total balls.
+    players: [{name, bowl_balls, bowl_raa, bowl: {innings_count}, bat: {innings_count}, games?}]."""
+    def inns(p, side):
+        return (p.get(side) or {}).get("innings_count") or 0
+
+    def played(p):
+        return max(p.get("games") or 0, inns(p, "bat"), inns(p, "bowl"))
+
+    side_games = max([played(p) for p in players] or [0])
+    floor = max(1, -(-side_games // 3))  # a third of the side's matches, rounded up
+    pool = [p for p in players if (p.get("bowl_balls") or 0) >= min_balls and inns(p, "bowl") >= floor]
+    busiest = sorted(pool, key=lambda p: (-(p["bowl_balls"] / max(1, played(p))), -p["bowl_balls"], p["name"]))[:n]
+    return sorted(busiest, key=lambda p: (-(p.get("bowl_raa") or 0), p["name"]))
 
 
 def called(name):
@@ -251,20 +276,23 @@ def build(db, code, reported=True):
               f"IPL 2025-26, any side · {MIN_BAT}+ balls · role: his most common batting position", kicker="Batting by role")
 
     # 4. Bowling by phase: runs saved against par per 24 balls (four overs).
-    bowlers = sorted(sorted([p for p in players if p["bowl_balls"] >= MIN_BOWL], key=lambda p: -p["bowl_balls"])[:6],
-                     key=lambda p: -(p["bowl_raa"] or 0))  # the six busiest, best first
-    rows4, cells_all = [], []
-    for p in bowlers:
-        cells = []
-        for ph in ("powerplay", "middle", "death"):
-            r = phase.get((p["name"], ph))
-            if not r or r["balls"] < MIN_CELL:
-                cells.append(None)
-                continue
-            v = 24 * (r.get("raa") or 0) / r["balls"]
-            cells.append({"value": round(v, 1), "text": sg(v, 1), "sub": f"{r['wickets']}w · {r['balls']}b"})
-            cells_all.append((p["name"], ph, v, r["balls"]))
-        rows4.append({"name": short(p["name"]), "sub": f"{sg(p['bowl_raa'] or 0, 0)} runs saved", "cells": cells})
+    def grid_rows(bowlers):
+        rows, found = [], []
+        for p in bowlers:
+            cells = []
+            for ph in ("powerplay", "middle", "death"):
+                r = phase.get((p["name"], ph))
+                if not r or r["balls"] < MIN_CELL:
+                    cells.append(None)
+                    continue
+                v = 24 * (r.get("raa") or 0) / r["balls"]
+                cells.append({"value": round(v, 1), "text": sg(v, 1), "sub": f"{r['wickets']}w · {r['balls']}b"})
+                found.append((p["name"], ph, v, r["balls"]))
+            rows.append({"name": short(p["name"]), "sub": f"{sg(p['bowl_raa'] or 0, 0)} runs saved", "cells": cells})
+        return rows, found
+
+    bowlers = regular_attack(players)  # the five who bowl most per game, all shown, best first (owner's decision 5)
+    rows4, cells_all = grid_rows(bowlers)
     best_c = max((c for c in cells_all if c[3] >= 48), key=lambda c: c[2], default=None)
     PH = {"powerplay": "powerplay", "middle": "middle overs", "death": "death"}
     # One bowler above par and the rest below (CSK, 13 Nov 2026: Noor +41, five others under) is the sturdier line: a
