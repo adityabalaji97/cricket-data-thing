@@ -42,6 +42,13 @@ def lit_keys(card: Dict[str, Any]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     if v == "case_board":
         return [{"key": c["name"], "value": None} for c in p.get("cases", [])]
+    if v == "grid_heat" and any(isinstance(c, dict) and c.get("status") for r in p.get("rows") or [] for c in r.get("cells") or []):
+        # a graded grid mixes units (an average, a strike rate, wickets), so its biggest number means nothing: the
+        # rows light instead, each only while the voice names its team ("Chennai's", "RCB")
+        from services.squad_view import TEAMS
+
+        return [{"key": r["name"], "value": None, "named_only": True,
+                 "say": [r["name"], (TEAMS.get(r["name"]) or {}).get("short") or r["name"]]} for r in p["rows"]]
     if v == "grid_heat" and p.get("rows") and p.get("cols"):
         best = None
         for r in p["rows"]:
@@ -55,10 +62,17 @@ def lit_keys(card: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
-def _word_index(line: str, key: str) -> Optional[int]:
+def _word_index(line: str, key: str, say: Optional[Sequence[str]] = None) -> Optional[int]:
     """Where in the line the voice says the item: a surname in any part of its key (last part first), else its first
-    word, else None."""
+    word, else None. say: the names the voice uses instead (a team's code or city, possessive too: "Chennai's")."""
     ws = [_norm(w) for w in line.split()]
+    if say:
+        for cand in say:
+            n = _norm(cand)
+            for j, (w, x) in enumerate(zip(ws, line.split())):
+                if n and (w == n or (x.lower().endswith("'s") and w[:-1] == n)):
+                    return j
+        return None
     parts = [x for x in key.split(" · ") if x.strip()]  # "Opener · R Rickelton", "J Bumrah · Death"
     for cand in [p.split()[-1] for p in reversed(parts)] + [key.split()[0]]:
         n = _norm(cand)
@@ -83,15 +97,19 @@ def card_scene(card: Dict[str, Any], line_no: int, line: str, kicker: Optional[s
     for item in lit_keys(card):
         if v not in BOTH_SIDES and isinstance(item["value"], (int, float)) and item["value"] < 0:
             continue
-        j = _word_index(line, item["key"])
+        j = _word_index(line, item["key"], item.get("say"))
         if j is not None:
             beats.append({"key": item["key"], "anchor": {"line": line_no, "word": j}})
+        elif item.get("named_only"):
+            continue
         elif v in BOTH_SIDES or not beats:
             beats.append({"key": item["key"], "anchor": {"line": line_no}})
     if beats:
         s["beats"] = beats
     if v in PAGES:
         s["pages"] = dict(PAGES[v])
+    if v == "grid_heat" and (card.get("payload") or {}).get("dense"):
+        s["zoom"] = 1.1  # a league of squads: laid out narrower and scaled up, so the numbers read on a phone
     return s
 
 
@@ -149,7 +167,14 @@ def plan(cards: Sequence[Dict[str, Any]], lines: Sequence[str], team: Optional[s
     scenes: List[Dict[str, Any]] = [hero_scene(cards[0], lines[0], team)]
     mid = 1 if len(cards) > 1 else 0
     for i, card in enumerate(cards[1:], start=1):
-        scenes.append(card_scene(card, i, lines[i], chapter=mid))
+        sc = card_scene(card, i, lines[i], chapter=mid)
+        # a hook card with no hero row opens as the card itself: its own line plays on over that scene instead of
+        # drawing the same chart again (the grid drew twice and was cut half-built, retention scorecard, 18 Nov)
+        if i == 1 and card is cards[0] and scenes[0].get("kind") == card.get("visual"):
+            if sc.get("beats"):
+                scenes[0]["beats"] = (scenes[0].get("beats") or []) + sc["beats"]
+            continue
+        scenes.append(sc)
     labels = list(chapters or ["The hook", "The numbers", "Your call"])
     if close:
         last = len(lines) - 1

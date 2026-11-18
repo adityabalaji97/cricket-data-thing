@@ -297,14 +297,13 @@ def thread(b, link):
 def reel_script(b):
     g, p, w = b["g"], b["p"], b["w"]
     return {"hook": copy(b)[0],
-            # the motion Reel's budget: 86 spoken words with the close (reel_timing); the close is a pick-one
-            # the hook and line 1 share the first beat's scene (the grid), line 2 the method slide
-            "lines": ["We graded every squad on seven roles.",
-                      f"Roles where playoff sides beat the rest, like middle-overs spin: "
-                      f"{b['spin_ahead']} seasons of {b['n_seasons']}.",
-                      "Samson and Gaikwad now open at playoff level.",
-                      f"Delhi are {g['DC']['at_level']} of 7, with {p['DC']['purse']:.1f} crore to spend.",
-                      f"And {b['behind']} of 10 squads are behind at five to seven."]}
+            # the motion Reel's budget: 86 spoken words with the close (reel_timing); the close is a pick-one.
+            # Three scenes, each up long enough to read once drawn (the five-scene cut, 18 Nov, was cut mid-draw):
+            # the hook and line 1 over the grid, line 2 Chennai's board, line 3 the league's 5-7 bars
+            "lines": ["We graded all ten squads, role by role, against what playoff sides look like. "
+                      "Green is playoff level, amber is close, red is behind.",
+                      "Chennai's openers, Samson and Gaikwad, are playoff level. Their finishers, five to seven, are behind.",
+                      f"And it's not just Chennai: {b['behind']} of 10 squads are behind at five to seven."]}
 
 
 #: the motion Reel's closing pick-one (two short choices): the league's two commonest holes
@@ -380,7 +379,7 @@ def main() -> int:
     r = ig_slides.render(carousel["id"], n, args.base)
     print(f"rendered {len(r['ok'])}/{n}" + (f", failed {r['failed']}" if r["failed"] else "") + f"; layout {r.get('layout') or 'clean'}")
     env = {**os.environ, "REEL_V2": "1", "REEL_AB": "0"}
-    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,7",  # hook + line 1 on beat 1, then line n on beat n
+    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,3,7",  # the hook and line 1 on the grid, then the CSK board, then the 5-7 bars
                            "--script", str(HERE / "reel.json"), "--close", CLOSE,
                            "--base", args.base, "--store"], env=env, capture_output=True, text=True)
     ok = "stored as the post's Reel" in done.stdout
