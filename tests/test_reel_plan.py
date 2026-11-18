@@ -150,3 +150,9 @@ def test_smat_round_one_team_per_beat_in_its_colour():
     assert P._line_parts("4/12 in 3") == {"value": 4, "done": "/12", "detail": "in 3 overs"}
     placed = T.place(r["spec"], T.estimate(lines))
     assert T.budget_problems(lines) == [] and reel_problems(placed) == []
+
+
+def test_the_hero_number_carries_its_unit():
+    s = P.hero_scene(BARS, LINES[0])
+    assert s["data"]["unit"] == "wins" and s["data"]["second"]["unit"] == "wins"   # "+1.98 WINS", not a bare "+1.98"
+    assert P.metric_unit({"label": "Strike rate"}) is None and P.metric_unit({"unit": "runs"}) == "runs"

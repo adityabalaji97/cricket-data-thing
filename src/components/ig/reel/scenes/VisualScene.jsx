@@ -23,7 +23,10 @@ export const VISUAL_ZOOM = 0.92;
 export const KIND_ZOOM = Object.fromEntries(['win_prob_line', 'race_lines', 'score_race', 'metric_lines', 'game_timeline', 'bid_trail',
   'worm', 'elo_lines', 'scatter_plus', 'totals_scatter', 'suits_scatter', 'last_meeting', 'par'].map((k) => [k, 1])
   // radial charts drawn small inside their SVG margins (twin_cloud caps its height): laid out narrower, scaled up
-  .concat([['twin_cloud', 1.3], ['distance_star', 1.3], ['over_strips', 1.3]]));
+  .concat([['twin_cloud', 1.3], ['distance_star', 1.3], ['over_strips', 1.3],
+    // the squad board at slide size filled the top half of the box (chips small, the rest empty) before the push:
+    // laid out narrower its chips wrap into more rows, and scaled up it fills the box (first live MI Reel, 18 Nov)
+    ['squad_board', 1.15]]));
 /** A board with this many keyed marks or more is pushed in on (spec section 3 says about 21; at slide size 16+ chips are already too small on a phone). */
 export const PUSH_MARKS = 16;
 

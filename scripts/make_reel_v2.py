@@ -13,14 +13,16 @@ replaces the post's in ig_reels, facts.reel records the script, and the caption 
 carries the hook and its line, so make it the slide the hook is about, usually the cover, 1); needs --beats or
 --cards. --close is appended to a hand script's last line.
 Voice and style: REEL_VOICE / REEL_TONE. With REEL_MOTION=1 the script is written to the motion Reel's length (28-33s,
-85-95 spoken words with the close) and ends on a two-choice question (--close, or one the writer picks).
+76-86 spoken words with the close: ig_reel_v2.MOTION_WORDS, the top is reel_timing.BUDGET) and ends on a two-choice question (--close, or one the writer picks).
 
 A preset motion Reel (MOTION_REEL_PLAN.md M5; preview only, no --store): the script is written from the cards, no model.
 
     REEL_MOTION=1 python scripts/make_reel_v2.py --preset retention --team MI --out /tmp/mi.mp4 [--nodrift] [--keep dir]
 
---preset retention: services/reel_plan.retention on the pack's carousel (ig:retention-<team>-2027; --slides FILE or,
-with no pack, articles/ipl-retention/<team>/slides.json), the overseas players from
+--preset retention: services/reel_plan.retention on the post's slides: --slides FILE, else the local
+articles/ipl-retention/<team>/slides.json when it exists, else the queued pack's carousel (ig:retention-<team>-2027).
+That last one is a database SELECT: with DATABASE_URL unset, .env's PRODUCTION database (read only; export the local
+URL to read the local one). The overseas players come from
 data/auction_raw/ipl/2027/retained_official.csv; voiced, timed, placed and recorded against --base (/ig/reel).
 --nodrift: record with the visuals' bob off (for scripts/check_ig_reel.py --video). --keep: save the placed spec
 (reel.json) and voice (voice.mp3) there, to check the spec or re-record with no new paid call.
@@ -107,10 +109,15 @@ def main() -> int:
 
 
 def preset_slides(team: str, slides_file: str = "") -> dict:
-    """The retention post's slides ({"slides": [...]}): a given file, else the queued pack's carousel
-    (ig:retention-<team>-2027, read only), else articles/ipl-retention/<team>/slides.json."""
+    """The retention post's slides ({"slides": [...]}): a given file, else the local
+    articles/ipl-retention/<team>/slides.json, else the queued pack's carousel (ig:retention-<team>-2027; a read-only
+    SELECT, against production when DATABASE_URL is unset)."""
     if slides_file:
         return json.loads(Path(slides_file).read_text())
+    local = Path(__file__).resolve().parents[1] / "articles" / "ipl-retention" / team.lower() / "slides.json"
+    if local.exists():
+        print(f"slides: {local}", file=sys.stderr)
+        return json.loads(local.read_text())
     from sqlalchemy import text
 
     from database import get_session
@@ -122,12 +129,10 @@ def preset_slides(team: str, slides_file: str = "") -> dict:
         data = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar() if cid else None
     finally:
         db.close()
-    if data and data.get("slides"):
-        print(f"slides: the pack's carousel {cid}", file=sys.stderr)
-        return data
-    local = Path(__file__).resolve().parents[1] / "articles" / "ipl-retention" / team.lower() / "slides.json"
-    print(f"slides: {local} (no queued pack)", file=sys.stderr)
-    return json.loads(local.read_text())
+    if not (data and data.get("slides")):
+        raise SystemExit(f"no slides for {team}: no {local} and no queued pack ig:retention-{team.lower()}-2027")
+    print(f"slides: the pack's carousel {cid}", file=sys.stderr)
+    return data
 
 
 def preset(args) -> int:

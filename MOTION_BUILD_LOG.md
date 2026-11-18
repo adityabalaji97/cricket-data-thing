@@ -446,6 +446,29 @@ Running log for MOTION_REEL_PLAN.md (the plan and spec live untracked in the mai
   overseas csv, preset voiced/placed/recorded, keeps voice on failure, the command is preview only), full Python suite
   723 pass; reel JS tests 74 pass; build passes.
 
+### Round 12b (18 Nov 2026, review of PR #331; no paid calls)
+
+- **Estimate at the voice's rate:** `reel_timing.RATE` 2.8 (was 3.0), `BUDGET` 86 (was 95): 86 words at 2.8 with 7
+  lines' gaps and the hold is 31.8s. Word ranges agree everywhere: the motion Reel is `ig_reel_v2.MOTION_WORDS`
+  76-86 spoken words with its close (top = BUDGET), the script 70-80 plus the 6-word send line; the help text says so.
+  The posted round-2 Reel (91 words, voiced at 2.96/s) is now over the budget, which the timing test states.
+- **SMAT round-up shorter:** "That is 62 runs above par: the most by an IPL player." (was "...runs more than an
+  average player from the same spots: ..."): 83 spoken words, was 92.
+- **Hero unit:** `reel_plan.metric_unit` puts the metric's unit after the hero numbers ("+1.98 WINS"), from
+  `metric.unit` or the label's first word (wins, runs, wickets, impact).
+- **gap_fits:** the header row wraps ("now · playoff" under the label) when narrower than the card; it was cut at the
+  right edge in the Reel ("...playo"). On the carousel card nothing changes unless the row doesn't fit.
+- **Squad board:** `KIND_ZOOM.squad_board` 1.15: laid out narrower, it fills the box before the push (1.3 ran past
+  the box's bottom for MI). While pushed, chips on other rows can still run off the right edge (as before).
+- **Data in git:** `.gitignore` excepts `data/auction_raw/ipl/2027/retained_official.csv` and `released_derived.csv`;
+  both committed, so the preset works on a clean checkout.
+- **Preset slides:** `--slides`, else the local `articles/ipl-retention/<team>/slides.json`, else the queued pack
+  (a SELECT that reads PRODUCTION when DATABASE_URL is unset; the help says so).
+- **MI re-recorded free:** re-planned with this code on run 3's saved word timing and voice (same lines), on a local
+  :3100 page: `motion_live/mi_retention_v2.mp4` and `mi_retention_v2_nodrift.mp4` (32.5s); `check_output_v2.txt`:
+  no problems. Stills: `motion_live/stills_v2/contact.png` (hero "+1.98 WINS", gap line whole, board filling the box).
+- Tests: Python 724 pass; JS reel, story and charts 84 pass; build passes.
+
 ## Merge checklist
 
 1. **Commit everything listed by `git status`**, including the new JSON files `.gitignore` now lets through

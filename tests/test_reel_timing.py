@@ -21,10 +21,13 @@ def test_spoken_count_counts_digits_and_point():
     assert T.spoken_count("54%") == 3
 
 
-def test_the_two_finished_reels_fit_the_budget():
-    # Both voiced Reels ran about 30s: their scripts are inside 95 spoken words.
-    for t in (R2, DHONI):
-        assert T.budget_problems(t["lines"]) == []
+def test_the_budget_matches_the_voices_measured_rate():
+    # The budget is what fits 33s at the live voice's rate (2.8 spoken words a second; MI's retention takes 18 Nov ran
+    # 2.65-2.9). The Dhoni Reel (79 words) fits; the round-2 Reel's 91 words fit only because that older voice ran
+    # 2.96 a second: today it would be flagged, as MI's 95- and 89-word takes (33.7s, 33.0s) should have been.
+    assert T.budget_problems(DHONI["lines"]) == []
+    assert T.budget_problems(R2["lines"])
+    assert T.BUDGET / T.RATE + T.GAP * 6 + 0.6 <= 33.0   # the budget, voiced at RATE with 7 lines and the hold
     assert T.budget_problems(R2["lines"] * 2)  # twice as long: over budget
 
 

@@ -3,7 +3,7 @@ Voice timing for motion Reels (MOTION_REEL_PLAN.md M4): a script's spoken length
 and scenes and beats placed on the words that anchor them.
 
     spoken_count(line)               -> spoken words, counting each digit and "point" ("1.98" is four)
-    budget_problems(lines)           -> what breaks the budget: 95 spoken words, about 3 a second, about 31s
+    budget_problems(lines)           -> what breaks the budget: 86 spoken words, about 2.8 a second, about 31s
     estimate(lines)                  -> a timing file (lines, starts, lengths, words) at 3 spoken words a second, no voice
     time_voice(lines, audio, lengths, transcribe=...)
                                      -> the timing file for a voiced script: line starts from the line lengths (as
@@ -19,8 +19,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-RATE = 3.0            # spoken words a second (the mockup's measured rate)
-BUDGET = 95           # spoken words in a 30-second Reel (docs/motion_reel_spec.md section 5)
+RATE = 2.8            # spoken words a second: the live voice (marin, TEMPO 1.12) measured 2.65-2.95 on 18 Nov
+BUDGET = 86           # spoken words that fit 33s at RATE with the gaps and hold (spec section 5 said 95 at 3.0)
 HOLD = 0.6            # seconds the last frame holds after the voice ends
 DWELL = 0.6           # a lit item holds this long before the next lights (frame.json rules.dwellMin)
 LEAD = 0.0            # a scene starts on its anchor word (the Reel page's lift already brings it in 0.1s before)

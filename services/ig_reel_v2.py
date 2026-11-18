@@ -63,12 +63,16 @@ LENGTHS = {
     "short": {"words": (45, 76), "say": "55 to 72", "spoken": "about 28 seconds", "seconds": 30, "beats": 3},
     "long": {"words": (75, 175), "say": "90 to 160", "spoken": "35 to 60 seconds", "seconds": 60, "beats": 5},
     # The motion Reel (REEL_MOTION=1) runs 28-33s (frame.json rules). The voice says 2.65-2.95 spoken words a second
-    # (MI's retention takes: 95 in 33.1s, 89 in 32.4s, 84 in 31.9s; the posted Reels 2.96), so 76-84 with its close,
-    # whose send line ("Send this to a Mumbai fan.", 6 words) motion_close adds: the script itself is 70-78 spoken words
-    # (reel_timing.spoken_count: "1.98" is four). v2's short script (45-76 written words) came out at 25.7s (18 Nov).
-    "motion": {"words": (40, 86), "spoken_words": (70, 78), "say": "70 to 78 spoken", "spoken": "about 30 seconds",
+    # (MI's retention takes: 95 in 33.1s, 89 in 32.4s, 84 in 31.9s; the posted Reels 2.96), so the whole Reel is
+    # MOTION_WORDS (76-86, the top is reel_timing.BUDGET) with its close, whose send line ("Send this to a Mumbai fan.",
+    # SEND_WORDS) motion_close adds: the script itself is 70-80 spoken words (reel_timing.spoken_count: "1.98" is four).
+    # v2's short script (45-76 written words) came out at 25.7s (18 Nov).
+    "motion": {"words": (40, 86), "spoken_words": (70, 80), "say": "70 to 80 spoken", "spoken": "about 30 seconds",
                "seconds": 31, "beats": 3},
 }
+#: The motion Reel's spoken words with its closing line, and the send line's share of them (see LENGTHS["motion"]).
+MOTION_WORDS = (76, 86)
+SEND_WORDS = 6
 WORDS = LENGTHS["short"]["words"]
 MAX_SECONDS = 60
 TEMPO = float(os.getenv("REEL_TEMPO", "1.12"))   # the voice sped up, pitch kept (ffmpeg atempo)

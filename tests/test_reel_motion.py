@@ -252,10 +252,10 @@ def test_motion_on_the_writer_aims_for_the_motion_length_and_the_close(monkeypat
     made = R.make("cid", SLIDES, plan={"beats": [2, 3, 4], "close": "Rohit Sharma: keep or release?"}, store=False,
                   out=tmp_path / "r.mp4", motion=True)
     assert made["motion"] is True and 28 <= made["seconds"] <= 33
-    assert "70 to 78 spoken words" in sent["script"][0] and "about 30 seconds" in sent["script"][0]
+    assert "70 to 80 spoken words" in sent["script"][0] and "about 30 seconds" in sent["script"][0]
     assert "1.98 is four words" in sent["script"][0]
     assert "spoken words (too short" in sent["script"][1]                     # the retry says why
-    assert 76 <= sum(spoken_count(x) for x in got["lines"]) <= 84             # with the close's send line
+    assert R.MOTION_WORDS[0] <= sum(spoken_count(x) for x in got["lines"]) <= R.MOTION_WORDS[1]            # with the close's send line
     close = recorded["spec"]["scenes"][-1]
     assert close["kind"] == "pick_one" and close["data"]["options"] == ["Keep", "Release"]
     assert got["lines"][-1].startswith("Rohit Sharma: keep or release? Send this")

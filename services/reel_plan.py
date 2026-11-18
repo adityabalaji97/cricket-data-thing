@@ -95,6 +95,19 @@ def card_scene(card: Dict[str, Any], line_no: int, line: str, kicker: Optional[s
     return s
 
 
+#: The unit a hero number carries, from its metric's label ("Wins added since the 2025 auction" -> "wins"): a bare
+#: "+1.98" on frame 0 says nothing (review of the first live MI Reel, 18 Nov).
+UNITS = (("wins", "wins"), ("runs", "runs"), ("wickets", "wkts"), ("impact", "impact"))
+
+
+def metric_unit(metric: Dict[str, Any]) -> Optional[str]:
+    """The hero number's unit: the metric's own `unit`, else the first word of its label when that word is a unit."""
+    if metric.get("unit"):
+        return str(metric["unit"])
+    first = (str(metric.get("label") or "").lower().split() or [""])[0]
+    return next((say for word, say in UNITS if first == word), None)
+
+
 def hero_scene(card: Dict[str, Any], line: str, team: Optional[str] = None) -> Dict[str, Any]:
     """The opening scene: the hook card's highlighted row as the hero (name and number at full size on frame 0, the
     number counting), the next row entering as the second player; or the card itself when it has no such row."""
@@ -104,12 +117,13 @@ def hero_scene(card: Dict[str, Any], line: str, team: Optional[str] = None) -> D
     if not lead or lead["value"] < 0:
         return {**card_scene(card, 0, line), "chapter": 0}
     fmt = (p.get("metric") or {}).get("format", "signed1")
+    unit = metric_unit(p.get("metric") or {})
     second = next((r for r in rows if r is not lead and r.get("value", 0) > 0), None)
     data: Dict[str, Any] = {"name": lead["name"], "value": lead["value"], "format": fmt, "from": round(lead["value"] * 0.2, 2),
-                            "gloss": lead.get("detail"), "scope": card.get("sample")}
+                            "gloss": lead.get("detail"), "scope": card.get("sample"), **({"unit": unit} if unit else {})}
     if second:
         j = _word_index(line, second["name"])
-        data["second"] = {"name": second["name"], "value": second["value"],
+        data["second"] = {"name": second["name"], "value": second["value"], **({"unit": unit} if unit else {}),
                           "anchor": {"line": 0, "word": j} if j is not None else {"line": 0, "word": min(4, len(line.split()) - 1)}}
     return {"kind": "hero", "chapter": 0, "kicker": (p.get("metric") or {}).get("label") or card.get("kicker") or "",
             "team": team, "data": data}
@@ -232,7 +246,7 @@ def retention(slides: Dict[str, Any], team: str, place: str, overseas: Optional[
         said = [n["said"] for n in named]
         listed = (said[0] if len(said) == 1 else ", ".join(said[:-1]) + " and " + said[-1]) if said else ""
         # lean on purpose: the voice says about 2.9 spoken words a second, slower on numbers (MI's first voiced take,
-        # 95 spoken words, ran 33.7s against the 33s limit; 18 Nov)
+        # 95 spoken words, ran 33.7s against the 33s limit; 18 Nov; reel_timing.BUDGET is now 86)
         lines.append("Nobody else passed a quarter of a win." if not others else
                      f"Only one other passed a quarter of a win: {listed}." if len(others) == 1 else
                      f"Only {len(others)} others passed a quarter of a win"
@@ -320,7 +334,7 @@ def smat_round(rnd: Dict[str, Any], teams: int = 4) -> Dict[str, Any]:
     others = [f for f in rnd["franchises"] if f["team"] != hero["team"]][: teams - 1]
     h = _line_parts(hero["line"])
     lines = [f"{hero['name']}: {_spoken_line(hero['line'])}.",
-             f"That is {round(hero['value'])} runs more than an average player from the same spots: the most by an IPL player."]
+             f"That is {round(hero['value'])} runs above par: the most by an IPL player."]
     scenes: List[Dict[str, Any]] = [{
         "kind": "hero_card", "chapter": 0, "team": hero["team"], "kicker": f"{rnd['label']} · {rnd['date']} · the IPL's Indians",
         "data": {"name": hero["name"], "team": hero["team"], "corner": f"{hero['team']} · {hero['state']}", "rank": 1,
