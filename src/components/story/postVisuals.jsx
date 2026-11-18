@@ -1764,10 +1764,13 @@ const CaseBoard = ({ payload, motion }) => (
 /**
  * A squad against the winners' template (TEAM_TEMPLATE_PLAN.md): one row per role, its holders, and where their number
  * would place among IPL sides (0-100) against the tick where playoff sides average. The dot's colour is the verdict:
- * lime at playoff level, amber short of it, red a gap.
+ * lime at playoff level, amber close (between the rest and playoff sides), red behind (below the rest).
  * payload: {colour, rows:[{label, holders, place, playoff_place, status, value_text}], scale_label}
  */
 const STATUS_COLOUR = { short: '#e0a43a' };
+// The grade's statuses as cards say them (owner, 18 Nov 2026): 'gap' read as nearer playoff level than 'short'.
+const STATUS_LABEL = { 'playoff level': 'playoff level', short: 'close', gap: 'behind' };
+const statusLabel = (s) => STATUS_LABEL[s] || s;
 const TemplateBoard = ({ payload, motion }) => {
   // Verdict colours are semantic, not the team's: lime at playoff level (CSK's yellow would read as amber).
   const statusColour = (s) => (s === 'playoff level' ? colors.accent : s === 'short' ? STATUS_COLOUR.short : colors.red);
@@ -1778,7 +1781,7 @@ const TemplateBoard = ({ payload, motion }) => {
           {/* On the page the value takes its own line: at 11px, label + status + value don't fit 390px (13 Nov 2026 audit). */}
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, lineHeight: 1.15, flexWrap: payload.page ? 'wrap' : 'nowrap' }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.label}</Typography>
-            <Typography sx={{ ...mono, fontSize: pfs(payload, 9.5), color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: pfs(payload, 9.5), color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{statusLabel(r.status)}</Typography>
             <Typography sx={{ ...mono, fontSize: pfs(payload, 10), color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.value_text}</Typography>
           </Box>
           <Box sx={{ position: 'relative', height: 11, mt: '2px' }}>
@@ -1879,7 +1882,7 @@ const GapFits = ({ payload, motion }) => {
               gap, laid out bigger, cut them at the right edge: "…playo") */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 0.75, rowGap: 0.25 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.label}</Typography>
-            <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{statusLabel(r.status)}</Typography>
             <Typography sx={{ ...mono, fontSize: 11, color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap' }}>now {r.now} · playoff {r.playoff}</Typography>
           </Box>
           <Typography noWrap sx={{ fontSize: 11.5, color: colors.textLo }}>

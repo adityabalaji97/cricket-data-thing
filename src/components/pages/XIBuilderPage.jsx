@@ -16,8 +16,8 @@ import XITab from './XITab';
 // but Save stays off (the agreed rule). Description, not prediction: "roles at playoff level".
 
 const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums' };
-const STATUS = { 'playoff level': { label: 'Playoff level', c: colors.accent }, short: { label: 'Short', c: '#f0b429' },
-  gap: { label: 'Gap', c: colors.red } };
+const STATUS = { 'playoff level': { label: 'Playoff level', c: colors.accent }, short: { label: 'Close', c: '#f0b429' },
+  gap: { label: 'Behind', c: colors.red } };
 const FMT = { average: (v) => v.toFixed(1), strike_rate: (v) => v.toFixed(0), wickets_per_24: (v) => v.toFixed(2),
   economy: (v) => v.toFixed(2), regular_bowlers: (v) => v.toFixed(0) };
 const UNIT = { average: 'avg', strike_rate: 'SR', wickets_per_24: 'wkts / 4 ov', economy: 'an over', regular_bowlers: 'bowlers' };
