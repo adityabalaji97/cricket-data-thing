@@ -231,9 +231,11 @@ def retention(slides: Dict[str, Any], team: str, place: str, overseas: Optional[
         named = [{"key": p["name"], "said": _say(p["name"], fulls)} for p in others[:3]]
         said = [n["said"] for n in named]
         listed = (said[0] if len(said) == 1 else ", ".join(said[:-1]) + " and " + said[-1]) if said else ""
-        lines.append("Nobody else added more than a quarter of a win." if not others else
-                     f"Only one other added more than a quarter of a win: {listed}." if len(others) == 1 else
-                     f"Only {len(others)} others added more than a quarter of a win"
+        # lean on purpose: the voice says about 2.9 spoken words a second, slower on numbers (MI's first voiced take,
+        # 95 spoken words, ran 33.7s against the 33s limit; 18 Nov)
+        lines.append("Nobody else passed a quarter of a win." if not others else
+                     f"Only one other passed a quarter of a win: {listed}." if len(others) == 1 else
+                     f"Only {len(others)} others passed a quarter of a win"
                      + (f", led by {listed}." if len(others) > 3 else f": {listed}."))
         said_beats[len(cards) - 1] = named
     lead = next((r for r in (batting or {}).get("payload", {}).get("rows", [])
@@ -254,12 +256,18 @@ def retention(slides: Dict[str, Any], team: str, place: str, overseas: Optional[
     calls = cases["payload"]["cases"]
     cards.append(cases)
     call_said = [{"key": c["name"], "said": _say(c["name"], fulls)} for c in calls[:3]]
-    lines.append("Three calls: " + ", ".join(f"{n['said']} at {_price(c['price'])} crore" for n, c in zip(call_said, calls)) + ".")
+    # the big price said, the others named (each page of the board shows its price): a list of three prices took the
+    # voice 7.1s, the longest line of the Reel (18 Nov)
+    count = {1: "One call", 2: "Two calls", 3: "Three calls"}[len(call_said)]
+    rest = [n["said"] for n in call_said[1:]]
+    lines.append(f"{count}: {call_said[0]['said']} at {_price(calls[0]['price'])} crore"
+                 + (", then " + (rest[0] if len(rest) == 1 else ", ".join(rest[:-1]) + " and " + rest[-1]) if rest else "")
+                 + ".")
     said_beats[len(cards) - 1] = call_said
     gap = next((r for r in (fits or {}).get("payload", {}).get("rows", []) if r.get("status") == "gap" and r.get("options")), None)
     if gap:
         cards.append(fits)
-        lines.append(f"The biggest gap is {gap['label'].lower()}. {gap['options'][0]['name']} is available.")
+        lines.append(f"Biggest gap: {gap['label'].lower()}. {gap['options'][0]['name']} is available.")
     big = calls[0]
     close = {"question": f"{big['name']}, {big['price']}:", "lit": "keep or release?", "options": ["Keep", "Release"],
              "send": f"Send this to a {place} fan", "credit": [cases.get("sample") or ""]}

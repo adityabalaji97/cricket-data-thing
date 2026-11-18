@@ -94,9 +94,9 @@ def test_retention_preset_writes_the_script_from_the_cards():
     r = P.retention(_retention_slides(), "MI", "Mumbai")
     lines = r["lines"]
     assert lines[0] == "Bumrah added 1.98 wins since the 2025 auction. Arshdeep, 1.89."  # Arshdeep, not Singh
-    assert lines[1] == "Only one other added more than a quarter of a win: Boult."      # named, so the ring lands on him
-    assert r["spec"]["scenes"][1]["beats"] == [{"key": "T Boult", "anchor": {"line": 1, "word": 11}}]
-    assert "Rohit at 16.3 crore" in lines[4] and lines[-1].endswith("Send this to a Mumbai fan.")
+    assert lines[1] == "Only one other passed a quarter of a win: Boult."                # named, so the ring lands on him
+    assert r["spec"]["scenes"][1]["beats"] == [{"key": "T Boult", "anchor": {"line": 1, "word": 9}}]
+    assert lines[4] == "Three calls: Rohit at 16.3 crore, then Chahar and Rickelton." and lines[-1].endswith("Send this to a Mumbai fan.")
     assert [s["kind"] for s in r["spec"]["scenes"]] == ["hero", "squad_board", "metric_bars", "grid_heat",
                                                          "case_board", "gap_fits", "pick_one"]
     assert T.budget_problems(lines) == []

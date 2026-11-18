@@ -408,6 +408,44 @@ Running log for MOTION_REEL_PLAN.md (the plan and spec live untracked in the mai
   loaded `.env`'s production URL; the tests mock the database, but next time export the local URL first, as
   CLAUDE.md says). JS: 144 pass; `App.test.js` and `FantasyPlanner.test.jsx` fail on HEAD too. Build passes.
 
+### Round 12 (18 Nov 2026, after PR #330): motion length, the retention command, the first live motion Reel
+
+- **The problem:** a live `REEL_MOTION=1 scripts/make_reel_v2.py --key ig:retention-mi-2027 --close "Keep or release?"`
+  fell back to v2: the script, written to v2's short length, voiced at 25.7s (motion needs 28-33s).
+- **Motion length (`services/ig_reel_v2.py`):** with motion on and length "short", `make` asks the writer for
+  `LENGTHS["motion"]`: 70-78 spoken words of script (`reel_timing.spoken_count`, "1.98" is four), so 76-84 with the
+  close's send line. The prompt explains spoken counting; `guard(..., spoken_range=)` rejects a script outside it
+  ("N spoken words (too short ...)"), which the retry feeds back. Motion off: v2's lengths and prompt unchanged.
+  The close: `--close` or the writer's two-choice question, as before (motion_close).
+- **The voice's real rate is 2.65-2.95 spoken words a second**, slower than the 3.0 the estimate uses (numbers and
+  lists are slow): MI's takes ran 95 words in 33.1s of voice, 89 in 32.4s, 84 in 31.9s. `reel_timing.BUDGET` (95) and
+  `RATE` (3.0) are unchanged (the M8 SMAT estimate tests rely on them), but a 95-word script will usually run past
+  33s: **the budget should be about 86** (open).
+- **`close_hold`:** the pick-one holds up to 2.5s (not 0.6s) when the voice is a touch short, so the Reel reaches 28s.
+- **`voice_and_record(spec, lines, ...)`:** make_motion's voice -> time -> place -> check -> record, shared by presets;
+  `record_motion(..., nodrift=)`. A late failure keeps the voice, timing and placed spec on `MotionFailed.voiced`.
+- **Retention command:** `REEL_MOTION=1 scripts/make_reel_v2.py --preset retention --team MI --out mi.mp4
+  [--nodrift] [--keep dir] [--slides f] [--retained csv] [--base URL]`: slides from the pack's carousel
+  (ig:retention-<team>-2027, read only), else `articles/ipl-retention/<team>/slides.json`; `overseas` from
+  `data/auction_raw/ipl/2027/retained_official.csv` (`ig_reel_v2.overseas_of`); `make_retention` plans
+  (reel_plan.retention), voices, times, places and records. Preview only: `--store` is refused. `--keep` saves
+  reel.json + voice.mp3 (also on failure) to re-record or check with no new paid call.
+- **Preset script leaner:** "Only 3 others passed a quarter of a win: ...", "Three calls: Rohit at 16.3 crore, then
+  Chahar and Rickelton." (the three prices took the voice 7.1s), "Biggest gap: middle-overs spin. ...". MI: 84 spoken
+  words (was 95).
+- **Live run (owner-approved paid calls, 3 runs, base https://hindsightcricket.com, no store, no DB writes):**
+  run 1 (95 words) 33.7s, run 2 (89 words) 33.0s (the hold tipped it over): both refused by the length check
+  before recording. Run 3 (84 words): **32.5s**, 977 frames, recorded `--nodrift`; `scripts/check_ig_reel.py
+  reel.json --video` -> no problems (exit 0). The posting version (with the bob) re-recorded from the kept spec
+  and voice. Scratchpad `motion_live/`: `mi_retention_nodrift.mp4`, `mi_retention.mp4`, `check_output.txt`,
+  `run3/reel.json`, `run3/voice.mp3`, `stills/contact.png`.
+- **Seen in the stills (owner to look at):** the posted MI carousel (wdAzQNlIm) predates change B, so its bowling grid
+  is the old six (Bumrah, Arshdeep, Santner, Boult, Chahar, Thakur); the squad board is shown small with empty space
+  below before the push; 32.5s is near the 33s cap.
+- Tests: `tests/test_reel_motion.py` (+8: writer length with a faked model, motion off unchanged, close hold,
+  overseas csv, preset voiced/placed/recorded, keeps voice on failure, the command is preview only), full Python suite
+  723 pass; reel JS tests 74 pass; build passes.
+
 ## Merge checklist
 
 1. **Commit everything listed by `git status`**, including the new JSON files `.gitignore` now lets through

@@ -12,7 +12,18 @@ replaces the post's in ig_reels, facts.reel records the script, and the caption 
 --script: a JSON file {"hook": "...", "lines": ["...", ...]} spoken word for word, one line per beat (the first beat
 carries the hook and its line, so make it the slide the hook is about, usually the cover, 1); needs --beats or
 --cards. --close is appended to a hand script's last line.
-Voice and style: REEL_VOICE / REEL_TONE.
+Voice and style: REEL_VOICE / REEL_TONE. With REEL_MOTION=1 the script is written to the motion Reel's length (28-33s,
+85-95 spoken words with the close) and ends on a two-choice question (--close, or one the writer picks).
+
+A preset motion Reel (MOTION_REEL_PLAN.md M5; preview only, no --store): the script is written from the cards, no model.
+
+    REEL_MOTION=1 python scripts/make_reel_v2.py --preset retention --team MI --out /tmp/mi.mp4 [--nodrift] [--keep dir]
+
+--preset retention: services/reel_plan.retention on the pack's carousel (ig:retention-<team>-2027; --slides FILE or,
+with no pack, articles/ipl-retention/<team>/slides.json), the overseas players from
+data/auction_raw/ipl/2027/retained_official.csv; voiced, timed, placed and recorded against --base (/ig/reel).
+--nodrift: record with the visuals' bob off (for scripts/check_ig_reel.py --video). --keep: save the placed spec
+(reel.json) and voice (voice.mp3) there, to check the spec or re-record with no new paid call.
 """
 from __future__ import annotations
 
@@ -27,7 +38,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--key", required=True)
+    parser.add_argument("--key", help="the post (content_packs.angle_key); --preset finds its own")
+    parser.add_argument("--preset", choices=["retention"], help="a preset motion Reel (preview only)")
+    parser.add_argument("--team", help="--preset retention: the team code, e.g. MI")
+    parser.add_argument("--slides", help="--preset: a slides.json to use instead of the pack's carousel")
+    parser.add_argument("--retained", help="--preset retention: the retained-players csv (overseas column)")
+    parser.add_argument("--nodrift", action="store_true", help="--preset: record with the bob off (for the still check)")
+    parser.add_argument("--keep", help="--preset: a folder for the placed spec (reel.json) and the voice (voice.mp3)")
     parser.add_argument("--beats")
     parser.add_argument("--cards", help="card ids instead of slide numbers, e.g. totals,form-strips,milestones")
     parser.add_argument("--out")
@@ -37,6 +54,10 @@ def main() -> int:
     parser.add_argument("--base", default=None)
     parser.add_argument("--script", help="a hand-written script: JSON file {hook, lines}, one line per beat")
     args = parser.parse_args()
+    if args.preset:
+        return preset(args)
+    if not args.key:
+        parser.error("--key is required (or --preset)")
 
     from sqlalchemy import text
 
@@ -82,6 +103,53 @@ def main() -> int:
                               "'{reel}', CAST(:r AS jsonb)) WHERE id = :i"),
                          {"c": with_ai_voice(row["caption"] or ""), "r": json.dumps(info), "i": row["id"]})
         print("stored as the post's Reel")
+    return 0
+
+
+def preset_slides(team: str, slides_file: str = "") -> dict:
+    """The retention post's slides ({"slides": [...]}): a given file, else the queued pack's carousel
+    (ig:retention-<team>-2027, read only), else articles/ipl-retention/<team>/slides.json."""
+    if slides_file:
+        return json.loads(Path(slides_file).read_text())
+    from sqlalchemy import text
+
+    from database import get_session
+
+    db = next(get_session())
+    try:
+        cid = db.execute(text("SELECT facts->>'carousel_id' FROM content_packs WHERE angle_key = :k"),
+                         {"k": f"ig:retention-{team.lower()}-2027"}).scalar()
+        data = db.execute(text("SELECT data FROM chart_snapshots WHERE id = :c"), {"c": cid}).scalar() if cid else None
+    finally:
+        db.close()
+    if data and data.get("slides"):
+        print(f"slides: the pack's carousel {cid}", file=sys.stderr)
+        return data
+    local = Path(__file__).resolve().parents[1] / "articles" / "ipl-retention" / team.lower() / "slides.json"
+    print(f"slides: {local} (no queued pack)", file=sys.stderr)
+    return json.loads(local.read_text())
+
+
+def preset(args) -> int:
+    from services import ig_reel_v2 as R
+
+    if args.store:
+        print("--preset is preview only: no --store")
+        return 1
+    if not args.team:
+        print("--preset retention needs --team")
+        return 1
+    team = args.team.upper()
+    slides = preset_slides(team, args.slides or "")
+    overseas = R.overseas_of(team, Path(args.retained) if args.retained else None)
+    out = Path(args.out) if args.out else None
+    made = R.make_retention(slides, team, base=args.base or R.SITE, out=out, overseas=overseas, nodrift=args.nodrift,
+                            keep=Path(args.keep) if args.keep else None)
+    from services.reel_timing import spoken_count
+
+    print(json.dumps({"seconds": made["seconds"], "spoken_words": sum(spoken_count(x) for x in made["lines"]),
+                      "words": len(" ".join(made["lines"]).split()), "lines": made["lines"], "mp4": made["mp4"],
+                      "recorded": made["recorded"]}, indent=2, ensure_ascii=False))
     return 0
 
 
