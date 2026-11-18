@@ -394,7 +394,7 @@ def build(db, code, reported=True):
     gaps = sorted([r for r in g["roles"] if r["status"] != "playoff level"], key=lambda r: (r["status"] != "gap", -r["weight"]))
     top_gap = gaps[0] if gaps else None
     c7 = card("template", "template_board",
-              f"{g['at_level']} of {g['of']} roles at playoff-side level" + (f". The biggest gap: {SAY[top_gap['key']]}" if top_gap else ""),
+              f"{g['at_level']} of {g['of']} roles at playoff-side level" + (f". Furthest behind: {SAY[top_gap['key']]}" if top_gap else ""),
               {"colour": colour, "rows": rows7, "scale_label": "Place among IPL sides, 2023-26"},
               "IPL 2024-26 at any side · recent seasons first · v playoff sides 2023-26",
               kicker="Against the winners' template")

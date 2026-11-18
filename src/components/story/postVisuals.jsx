@@ -184,14 +184,16 @@ const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax], avoid = []) => {
  * region that beats the subject on both is shaded. The labelled leaders are numbered on the chart and named in a key
  * below, so names never pile up in the busy corner.
  * payload: {x:{label,format,higher_better}, y:{...}, z?:{label}, points:[{name, short, x, y, zp?, highlight?, label?}], box}
- * Several highlighted points are all named in lime; the box is drawn only for a single subject.
+ * Several highlighted points are all named in lime; the box is drawn only for a single subject. A point with `tag` gets
+ * its name beside a small dot, smaller and dimmer than a highlight's (the rest of a league of ten, all named).
  */
 const ScatterPlus = ({ payload, motion }) => {
   const { points, x: X, y: Y, z: Z } = payload;
   const W = 300; const H = 214; const L = 8; const R = 8; const T = 18; const B = 184;
   // Robust to the field's outliers, but always wide enough for the named and numbered players (never pinned to an edge).
   const subjects = points.filter((p) => p.highlight);
-  const named = points.filter((p) => p.highlight || p.label);
+  const named = points.filter((p) => p.highlight || p.label || p.tag);
+  const tagged = points.filter((p) => p.tag && !p.highlight);
   const reach = ([a, b], vals, all) => {
     const d = (b - a) * 0.06;
     const lo = Math.min(a, ...vals.map((v) => v - d));
@@ -239,7 +241,7 @@ const ScatterPlus = ({ payload, motion }) => {
         {/* Zero lines for signed measures (runs above average and the like), so the quadrants mean something. */}
         {x0 < 0 && x1 > 0 && <line x1={sx(0)} y1={T} x2={sx(0)} y2={B} stroke={colors.borderStrong} strokeDasharray="3 3" />}
         {y0 < 0 && y1 > 0 && <line x1={L} y1={sy(0)} x2={W - R} y2={sy(0)} stroke={colors.borderStrong} strokeDasharray="3 3" />}
-        {points.filter((p) => !p.highlight && !p.label).map((p) => {
+        {points.filter((p) => !p.highlight && !p.label && !p.tag).map((p) => {
           const op = Z && p.zp != null ? 0.18 + 0.8 * (p.zp / 100) : 0.55;
           const inBox = subject && better(p, 'x', subject) && better(p, 'y', subject);
           return <circle key={p.name} cx={sx(p.x)} cy={sy(p.y)} r="3.5" fill={Z ? colors.accent : '#7c8aa5'} fillOpacity={cloudP >= 1 ? op : op * cloudP}
@@ -257,6 +259,13 @@ const ScatterPlus = ({ payload, motion }) => {
             <circle cx={m.mx} cy={m.my} r="7.5" fill={colors.textHi} stroke={colors.bg} strokeWidth="1.5" />
             {ring(motion, m.name) > 0 && <circle cx={m.mx} cy={m.my} r={11 + 3 * ringPulse(motion)} fill="none" stroke={colors.textHi} strokeWidth="1.5" strokeOpacity={ring(motion, m.name)} />}
             <text x={m.mx} y={m.my + 3.5} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 10, fontWeight: 700, fill: colors.bg }}>{i + 1}</text>
+          </g>
+        ))}
+        {tagged.map((p) => (
+          <g key={p.name} style={gStyle(cloudP)}>
+            <circle cx={sx(p.x)} cy={sy(p.y)} r="4" fill="#9aa6bd" />
+            <text x={tag(p).x - (tag(p).left ? -3 : 3)} y={tag(p).y + 1} textAnchor={tag(p).left ? 'end' : 'start'}
+              style={{ fontFamily: fonts.body, fontSize: 10, fontWeight: 600, fill: colors.textMed }}>{tag(p).text}</text>
           </g>
         ))}
         {subjects.map((s) => (
@@ -1671,47 +1680,64 @@ const SquadBoard = ({ payload, motion }) => {
 /**
  * Rows by columns, each cell a value shaded by how good it is (lime good, red bad, around `mid`), with an optional
  * small line under it; empty cells stay blank. Bowlers by phase, a side's phase ranks.
- * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?}|null]}], format, higher_better, mid, legend?:[good, bad]}
+ * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?, status?}|null]}], format, higher_better, mid,
+ *           legend?:[good, bad] | [playoff, close, behind]}
+ * col_subs: a unit under each column's label (avg, SR, ...).
+ * dense: tighter rows for many of them (ten squads under a cover); name_fr: the name column's width.
+ * A cell with `status` (the template grade's 'playoff level' / 'short' / 'gap') is filled by verdict: lime, amber, red.
  */
 const GridHeat = ({ payload, motion }) => {
   const vals = payload.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c.value));
   const mid = payload.mid ?? 0;
   const spread = Math.max(...vals.map((v) => Math.abs(v - mid)), 0.01);
-  const tone = (v) => {
+  // status cells (the template grade, a league of squads): traffic-light fill by verdict, not by value
+  const STATUS_FILL = { 'playoff level': colors.accent, short: '#e0a43a', gap: colors.red };
+  const tone = (v, c) => {
+    if (c && c.status) return { col: STATUS_FILL[c.status] || colors.textLo, a: c.status === 'playoff level' ? 0.55 : c.status === 'short' ? 0.5 : 0.6 };
     const d = ((v - mid) / spread) * (payload.higher_better === false ? -1 : 1);
     return { col: d >= 0 ? colors.accent : colors.red, a: 0.15 + Math.min(1, Math.abs(d)) * 0.6 };
   };
   const cols = payload.cols.length;
+  // dense: many rows (a league of ten squads) on one card, under a cover's hook
+  const dense = !!payload.dense;
+  const nameFr = payload.name_fr || 1.3;
   return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.5 }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'end' }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: dense ? 0.3 : 0.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'end' }}>
         <span />
-        {payload.cols.map((c) => <Typography key={c} sx={{ ...mono, fontSize: 10.5, color: colors.textLo, textAlign: 'center' }}>{c}</Typography>)}
+        {payload.cols.map((c, i) => (
+          <Box key={c} sx={{ textAlign: 'center', lineHeight: 1.1 }}>
+            <Typography sx={{ ...mono, fontSize: 10.5, color: colors.textLo, lineHeight: 1.15 }}>{c}</Typography>
+            {payload.col_subs && <Typography sx={{ ...mono, fontSize: 8.5, color: colors.textFaint, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{payload.col_subs[i]}</Typography>}
+          </Box>
+        ))}
       </Box>
       {payload.rows.map((r, ri) => (
-        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'stretch' }}>
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'stretch' }}>
           <Box sx={{ minWidth: 0, alignSelf: 'center', ...(motion ? enterSx(reveal(motion, ri), { dx: -14, dy: 0 }) : {}) }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</Typography>
-            {r.sub && <Typography sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{r.sub}</Typography>}
+            <Typography sx={{ fontSize: dense ? 12 : 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: dense ? 1.1 : undefined }}>{r.name}</Typography>
+            {r.sub && <Typography sx={{ fontSize: dense ? 9.5 : 10.5, color: colors.textLo, whiteSpace: 'nowrap', lineHeight: dense ? 1.1 : undefined }}>{r.sub}</Typography>}
           </Box>
           {r.cells.map((c, i) => {
             // motion: column i fills 0.7s after column i-1, each cell 0.1s after the one above
             const g = motion ? grow({ ...motion, plan: { stagger: 0.1, delay: 0.4 + i * 0.7, grow: 0.4, ...motion.plan } }, ri) : 1;
             if (!c) return <Box key={i} sx={{ borderRadius: '6px', bgcolor: 'rgba(255,255,255,0.03)', ...(g >= 1 ? {} : { opacity: g }) }} />;
-            const t = tone(c.value);
+            const t = tone(c.value, c);
             const a = g >= 1 ? t.a : t.a * g;
             const key = `${r.name} · ${payload.cols[i]}`;
             return (
-              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: 0.5,
+              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: dense ? 0.15 : 0.5,
                 ...(motion ? { ...(g >= 1 ? {} : { opacity: Math.min(1, g * 3) }), ...ringOn(motion, key) } : {}) }}>
-                <Typography sx={{ ...mono, fontSize: 13, fontWeight: 700, color: colors.textHi }}>{g >= 1 ? (c.text ?? fmt(c.value, payload.format)) : fmt(c.value * g, payload.format || 'signed1')}</Typography>
+                <Typography sx={{ ...mono, fontSize: dense ? 12 : 13, fontWeight: 700, color: colors.textHi }}>{g >= 1 ? (c.text ?? fmt(c.value, payload.format)) : fmt(c.value * g, payload.format || 'signed1')}</Typography>
                 {c.sub && <Typography sx={{ ...mono, fontSize: 9.5, color: colors.textMed }}>{c.sub}</Typography>}
               </Box>
             );
           })}
         </Box>
       ))}
-      {payload.legend && <Legend items={[[payload.legend[0], colors.accent], [payload.legend[1], colors.red]]} />}
+      {payload.legend && <Legend items={payload.legend.length === 3
+        ? [[payload.legend[0], colors.accent], [payload.legend[1], STATUS_FILL.short], [payload.legend[2], colors.red]]
+        : [[payload.legend[0], colors.accent], [payload.legend[1], colors.red]]} />}
     </Box>
   );
 };
@@ -1764,10 +1790,13 @@ const CaseBoard = ({ payload, motion }) => (
 /**
  * A squad against the winners' template (TEAM_TEMPLATE_PLAN.md): one row per role, its holders, and where their number
  * would place among IPL sides (0-100) against the tick where playoff sides average. The dot's colour is the verdict:
- * lime at playoff level, amber short of it, red a gap.
+ * lime at playoff level, amber close (between the rest and playoff sides), red behind (below the rest).
  * payload: {colour, rows:[{label, holders, place, playoff_place, status, value_text}], scale_label}
  */
 const STATUS_COLOUR = { short: '#e0a43a' };
+// The grade's statuses as cards say them (owner, 18 Nov 2026): 'gap' read as nearer playoff level than 'short'.
+const STATUS_LABEL = { 'playoff level': 'playoff level', short: 'close', gap: 'behind' };
+const statusLabel = (s) => STATUS_LABEL[s] || s;
 const TemplateBoard = ({ payload, motion }) => {
   // Verdict colours are semantic, not the team's: lime at playoff level (CSK's yellow would read as amber).
   const statusColour = (s) => (s === 'playoff level' ? colors.accent : s === 'short' ? STATUS_COLOUR.short : colors.red);
@@ -1778,7 +1807,7 @@ const TemplateBoard = ({ payload, motion }) => {
           {/* On the page the value takes its own line: at 11px, label + status + value don't fit 390px (13 Nov 2026 audit). */}
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, lineHeight: 1.15, flexWrap: payload.page ? 'wrap' : 'nowrap' }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.label}</Typography>
-            <Typography sx={{ ...mono, fontSize: pfs(payload, 9.5), color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: pfs(payload, 9.5), color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{statusLabel(r.status)}</Typography>
             <Typography sx={{ ...mono, fontSize: pfs(payload, 10), color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{r.value_text}</Typography>
           </Box>
           <Box sx={{ position: 'relative', height: 11, mt: '2px' }}>
@@ -1879,7 +1908,7 @@ const GapFits = ({ payload, motion }) => {
               gap, laid out bigger, cut them at the right edge: "…playo") */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 0.75, rowGap: 0.25 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{r.label}</Typography>
-            <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{r.status}</Typography>
+            <Typography sx={{ ...mono, fontSize: 10, color: statusColour(r.status), textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{statusLabel(r.status)}</Typography>
             <Typography sx={{ ...mono, fontSize: 11, color: colors.textMed, ml: 'auto', whiteSpace: 'nowrap' }}>now {r.now} · playoff {r.playoff}</Typography>
           </Box>
           <Typography noWrap sx={{ fontSize: 11.5, color: colors.textLo }}>
