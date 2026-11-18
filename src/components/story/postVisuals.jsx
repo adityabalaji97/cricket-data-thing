@@ -1671,47 +1671,58 @@ const SquadBoard = ({ payload, motion }) => {
 /**
  * Rows by columns, each cell a value shaded by how good it is (lime good, red bad, around `mid`), with an optional
  * small line under it; empty cells stay blank. Bowlers by phase, a side's phase ranks.
- * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?}|null]}], format, higher_better, mid, legend?:[good, bad]}
+ * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?, status?}|null]}], format, higher_better, mid,
+ *           legend?:[good, bad] | [playoff, close, behind]}
+ * dense: tighter rows for many of them (ten squads under a cover); name_fr: the name column's width.
+ * A cell with `status` (the template grade's 'playoff level' / 'short' / 'gap') is filled by verdict: lime, amber, red.
  */
 const GridHeat = ({ payload, motion }) => {
   const vals = payload.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c.value));
   const mid = payload.mid ?? 0;
   const spread = Math.max(...vals.map((v) => Math.abs(v - mid)), 0.01);
-  const tone = (v) => {
+  // status cells (the template grade, a league of squads): traffic-light fill by verdict, not by value
+  const STATUS_FILL = { 'playoff level': colors.accent, short: '#e0a43a', gap: colors.red };
+  const tone = (v, c) => {
+    if (c && c.status) return { col: STATUS_FILL[c.status] || colors.textLo, a: c.status === 'playoff level' ? 0.55 : c.status === 'short' ? 0.5 : 0.6 };
     const d = ((v - mid) / spread) * (payload.higher_better === false ? -1 : 1);
     return { col: d >= 0 ? colors.accent : colors.red, a: 0.15 + Math.min(1, Math.abs(d)) * 0.6 };
   };
   const cols = payload.cols.length;
+  // dense: many rows (a league of ten squads) on one card, under a cover's hook
+  const dense = !!payload.dense;
+  const nameFr = payload.name_fr || 1.3;
   return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.5 }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'end' }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: dense ? 0.3 : 0.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'end' }}>
         <span />
         {payload.cols.map((c) => <Typography key={c} sx={{ ...mono, fontSize: 10.5, color: colors.textLo, textAlign: 'center' }}>{c}</Typography>)}
       </Box>
       {payload.rows.map((r, ri) => (
-        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, 1.3fr) repeat(${cols}, minmax(0, 1fr))`, gap: '4px', alignItems: 'stretch' }}>
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'stretch' }}>
           <Box sx={{ minWidth: 0, alignSelf: 'center', ...(motion ? enterSx(reveal(motion, ri), { dx: -14, dy: 0 }) : {}) }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</Typography>
-            {r.sub && <Typography sx={{ fontSize: 10.5, color: colors.textLo, whiteSpace: 'nowrap' }}>{r.sub}</Typography>}
+            <Typography sx={{ fontSize: dense ? 12 : 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: dense ? 1.1 : undefined }}>{r.name}</Typography>
+            {r.sub && <Typography sx={{ fontSize: dense ? 9.5 : 10.5, color: colors.textLo, whiteSpace: 'nowrap', lineHeight: dense ? 1.1 : undefined }}>{r.sub}</Typography>}
           </Box>
           {r.cells.map((c, i) => {
             // motion: column i fills 0.7s after column i-1, each cell 0.1s after the one above
             const g = motion ? grow({ ...motion, plan: { stagger: 0.1, delay: 0.4 + i * 0.7, grow: 0.4, ...motion.plan } }, ri) : 1;
             if (!c) return <Box key={i} sx={{ borderRadius: '6px', bgcolor: 'rgba(255,255,255,0.03)', ...(g >= 1 ? {} : { opacity: g }) }} />;
-            const t = tone(c.value);
+            const t = tone(c.value, c);
             const a = g >= 1 ? t.a : t.a * g;
             const key = `${r.name} · ${payload.cols[i]}`;
             return (
-              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: 0.5,
+              <Box key={i} sx={{ borderRadius: '6px', bgcolor: `${t.col}${Math.round(a * 255).toString(16).padStart(2, '0')}`, textAlign: 'center', py: dense ? 0.15 : 0.5,
                 ...(motion ? { ...(g >= 1 ? {} : { opacity: Math.min(1, g * 3) }), ...ringOn(motion, key) } : {}) }}>
-                <Typography sx={{ ...mono, fontSize: 13, fontWeight: 700, color: colors.textHi }}>{g >= 1 ? (c.text ?? fmt(c.value, payload.format)) : fmt(c.value * g, payload.format || 'signed1')}</Typography>
+                <Typography sx={{ ...mono, fontSize: dense ? 12 : 13, fontWeight: 700, color: colors.textHi }}>{g >= 1 ? (c.text ?? fmt(c.value, payload.format)) : fmt(c.value * g, payload.format || 'signed1')}</Typography>
                 {c.sub && <Typography sx={{ ...mono, fontSize: 9.5, color: colors.textMed }}>{c.sub}</Typography>}
               </Box>
             );
           })}
         </Box>
       ))}
-      {payload.legend && <Legend items={[[payload.legend[0], colors.accent], [payload.legend[1], colors.red]]} />}
+      {payload.legend && <Legend items={payload.legend.length === 3
+        ? [[payload.legend[0], colors.accent], [payload.legend[1], STATUS_FILL.short], [payload.legend[2], colors.red]]
+        : [[payload.legend[0], colors.accent], [payload.legend[1], colors.red]]} />}
     </Box>
   );
 };
