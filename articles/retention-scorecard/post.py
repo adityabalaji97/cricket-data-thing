@@ -154,9 +154,10 @@ def method_card():
     n = len(t["seasons"])
     rows = [{"name": role, "detail": measure, "value": round(t["seasons_ahead"][f] * n)} for f, role, measure in METHOD]
     rows.sort(key=lambda r: -r["value"])
-    return card("method", "metric_bars", f"Seven roles where playoff sides beat the rest, season after season",
-                {"metric": {"label": f"IPL seasons playoff sides were ahead (of {n})", "format": "int"}, "rows": rows},
-                f"IPL 2008-26 · playoff sides v the rest, each season · the grade's roles", kicker="How we graded"), n
+    return card("method", "metric_bars", "Seven roles where playoff sides, on average, beat the rest in most seasons",
+                {"metric": {"label": f"Seasons the playoff four's average beat the rest's (of {n})", "format": "int"},
+                 "rows": rows},
+                f"IPL 2008-26 · each season: the playoff four's average v the other sides'", kicker="How we graded"), n
 
 
 def league_grid(g, p):
@@ -220,9 +221,8 @@ def build(db):
                              if r["status"] != "playoff level"), None)
     mc, n_seasons = method_card()
     cards = [
-        money_card(g, p),  # the cover: the grid needs its units, which don't fit under a hook
+        league_grid(g, p),  # the cover, with a unit under each column
         mc,
-        league_grid(g, p),
         board("CSK", csk, colour("CSK"),
               f"Chennai won {w.get('CSK', 0)} games last season. Now: {csk['at_level']} of 7 roles at playoff level",
               "Dhoni's gone. The rebuild isn't"),
@@ -232,6 +232,7 @@ def build(db):
         board("RCB", rcb, colour("RCB"),
               f"The champions, {rcb['at_level']} of 7: {worst(rcb)['label'].lower()} is behind",
               f"{crore(p['RCB']['purse'])} to fix it"),
+        money_card(g, p),
     ]
     fc, behind = finishers_card(g, po_fin)
     cards.append(fc)
@@ -294,8 +295,8 @@ def thread(b, link):
 def reel_script(b):
     g, p, w = b["g"], b["p"], b["w"]
     return {"hook": copy(b)[0],
-            "lines": [f"First, the seven roles where playoff sides beat the rest, like middle-overs spin: ahead in "
-                      f"{b['spin_ahead']} of {b['n_seasons']} seasons.",
+            "lines": [f"First, the seven roles where playoff sides beat the rest most often. Middle-overs spin: "
+                      f"{b['spin_ahead']} seasons of {b['n_seasons']}.",
                       "Then we graded every retained squad on each player's IPL record since 2024.",
                       f"Chennai won {w.get('CSK', 0)} games last season. Samson and Gaikwad now open at playoff level.",
                       f"Delhi are {g['DC']['at_level']} of 7, with {p['DC']['purse']:.1f} crore to spend.",
@@ -371,7 +372,7 @@ def main() -> int:
     r = ig_slides.render(carousel["id"], n, args.base)
     print(f"rendered {len(r['ok'])}/{n}" + (f", failed {r['failed']}" if r["failed"] else "") + f"; layout {r.get('layout') or 'clean'}")
     env = {**os.environ, "REEL_V2": "1", "REEL_AB": "0"}
-    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,5,7",
+    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,7",
                            "--script", str(HERE / "reel.json"), "--close", "Which role does your team buy first?",
                            "--base", args.base, "--store"], env=env, capture_output=True, text=True)
     ok = "stored as the post's Reel" in done.stdout
