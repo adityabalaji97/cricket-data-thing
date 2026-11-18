@@ -1713,14 +1713,19 @@ const GridHeat = ({ payload, motion }) => {
         ))}
       </Box>
       {payload.rows.map((r, ri) => (
-        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'stretch' }}>
+        <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'stretch',
+          // a graded grid's row is lit while the voice names its team (the cells' own ring is for one number)
+          ...(motion && ring(motion, r.name) > 0 ? { borderRadius: '6px', ...ringOn(motion, r.name) } : {}) }}>
           <Box sx={{ minWidth: 0, alignSelf: 'center', ...(motion ? enterSx(reveal(motion, ri), { dx: -14, dy: 0 }) : {}) }}>
             <Typography sx={{ fontSize: dense ? 12 : 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: dense ? 1.1 : undefined }}>{r.name}</Typography>
             {r.sub && <Typography sx={{ fontSize: dense ? 9.5 : 10.5, color: colors.textLo, whiteSpace: 'nowrap', lineHeight: dense ? 1.1 : undefined }}>{r.sub}</Typography>}
           </Box>
           {r.cells.map((c, i) => {
-            // motion: column i fills 0.7s after column i-1, each cell 0.1s after the one above
-            const g = motion ? grow({ ...motion, plan: { stagger: 0.1, delay: 0.4 + i * 0.7, grow: 0.4, ...motion.plan } }, ri) : 1;
+            // motion: column i fills after column i-1, each cell after the one above, the whole grid drawn in about
+            // 3s however big it is (a 7 x 10 league grid took 6s and was cut before it finished, 18 Nov)
+            const colStep = Math.min(0.7, 1.8 / Math.max(1, cols - 1));
+            const rowStep = Math.min(0.1, 0.6 / Math.max(1, payload.rows.length - 1));
+            const g = motion ? grow({ ...motion, plan: { stagger: rowStep, delay: 0.4 + i * colStep, grow: 0.4, ...motion.plan } }, ri) : 1;
             if (!c) return <Box key={i} sx={{ borderRadius: '6px', bgcolor: 'rgba(255,255,255,0.03)', ...(g >= 1 ? {} : { opacity: g }) }} />;
             const t = tone(c.value, c);
             const a = g >= 1 ? t.a : t.a * g;

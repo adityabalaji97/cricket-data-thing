@@ -170,7 +170,8 @@ export const PickOneScene = ({ scene, t }) => {
               boxSizing: 'border-box', bgcolor: colors.surface2, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center',
               gap: `${u(14)}px`, px: `${u(24)}px`, opacity: clamp(progress(t, s0 + 0.4, 0.2)),
               transform: `scale(${(0.7 + 0.3 * back(p)) * breathe(k)})`, transformOrigin: k ? 'right center' : 'left center' }}>
-              <Box sx={type.display(lined ? 96 : 110)}>{o.label}</Box>
+              {/* shrunk to the tile's inside (410 less its border and padding): FINISHER at 110px ran out of its box */}
+              <Box sx={{ ...type.display(fitSize(o.label, 410 - 2 * 24 - 2 * 5 - 8, lined ? 96 : 110, 'display')), whiteSpace: 'nowrap' }}>{o.label}</Box>
               {o.line && <Box sx={{ ...type.mono(32, 500), color: colors.textMed }}>{o.line}</Box>}
             </Box>
           );

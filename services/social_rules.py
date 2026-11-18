@@ -343,6 +343,12 @@ def reel_problems(spec: Dict[str, Any]) -> List[str]:
             out.append(f"{name} starts before the scene before it")
         if b - a < R["sceneMin"]:
             out.append(f"{name} is on screen {b - a:.1f}s: a must-read number needs {R['sceneMin']}s")
+        elif s.get("kind") not in ("hero", "pick_one") and R.get("drawn"):
+            # a chart must finish drawing and then stay up long enough to read (charts cut off mid-draw, 18 Nov)
+            draw = R["drawn"].get(s.get("kind"), R["drawn"]["default"])
+            if b - a < draw + R["drawn"]["hold"]:
+                out.append(f"{name} is on screen {b - a:.1f}s: its chart draws for {draw}s and must then hold "
+                           f"{R['drawn']['hold']}s (give it {draw + R['drawn']['hold']:.1f}s, or fewer scenes)")
         beats = sorted((x for x in (s.get("beats") or []) if x.get("key") is not None), key=lambda x: x["at"])
         for x, y in zip(beats, beats[1:]):
             if y["at"] - x["at"] < R["dwellMin"] - 1e-3:

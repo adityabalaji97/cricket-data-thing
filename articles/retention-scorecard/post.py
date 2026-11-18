@@ -165,7 +165,9 @@ def league_grid(g, p):
     for t in order(g):
         by = {r["key"]: r for r in g[t]["roles"]}
         rows.append({"name": t, "sub": f"{g[t]['at_level']}/7 · {crore(p[t]['purse'])}",
-                     "cells": [{"value": 0, "text": value_text(by[k]), "status": by[k]["status"]} for k, _ in COLS]})
+                     # the real number as value: a motion Reel counts each cell up to it (0 read as "0" mid-count)
+                     "cells": [{"value": by[k]["value"] or 0, "text": value_text(by[k]), "status": by[k]["status"]}
+                               for k, _ in COLS]})
     return card("league", "grid_heat", "All ten squads against playoff sides, role by role",
                 {"cols": [c for _, c in COLS], "col_subs": ["avg", "SR", "SR", "wkts/4ov", "wkts/4ov", "econ", "bowlers"], "rows": rows, "format": "int", "legend": ["playoff level", "close", "behind"],
                  "dense": True, "name_fr": 1.7},
@@ -295,12 +297,17 @@ def thread(b, link):
 def reel_script(b):
     g, p, w = b["g"], b["p"], b["w"]
     return {"hook": copy(b)[0],
-            "lines": [f"First, the seven roles where playoff sides beat the rest most often. Middle-overs spin: "
-                      f"{b['spin_ahead']} seasons of {b['n_seasons']}.",
-                      "Then we graded every retained squad on each player's IPL record since 2024.",
-                      f"Chennai won {w.get('CSK', 0)} games last season. Samson and Gaikwad now open at playoff level.",
-                      f"Delhi are {g['DC']['at_level']} of 7, with {p['DC']['purse']:.1f} crore to spend.",
-                      f"And {b['behind']} of 10 squads are behind at five to seven."]}
+            # the motion Reel's budget: 86 spoken words with the close (reel_timing); the close is a pick-one.
+            # Three scenes, each up long enough to read once drawn (the five-scene cut, 18 Nov, was cut mid-draw):
+            # the hook and line 1 over the grid, line 2 Chennai's board, line 3 the league's 5-7 bars
+            "lines": ["We graded all ten squads, role by role, against what playoff sides look like. "
+                      "Green is playoff level, amber is close, red is behind.",
+                      "Chennai's openers, Samson and Gaikwad, are playoff level. Their finishers, five to seven, are behind.",
+                      f"And it's not just Chennai: {b['behind']} of 10 squads are behind at five to seven."]}
+
+
+#: the motion Reel's closing pick-one (two short choices): the league's two commonest holes
+CLOSE = "Your first buy: finisher or spinner?"
 
 
 def slides_of(b, hook):
@@ -372,8 +379,8 @@ def main() -> int:
     r = ig_slides.render(carousel["id"], n, args.base)
     print(f"rendered {len(r['ok'])}/{n}" + (f", failed {r['failed']}" if r["failed"] else "") + f"; layout {r.get('layout') or 'clean'}")
     env = {**os.environ, "REEL_V2": "1", "REEL_AB": "0"}
-    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,7",
-                           "--script", str(HERE / "reel.json"), "--close", "Which role does your team buy first?",
+    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,3,7",  # the hook and line 1 on the grid, then the CSK board, then the 5-7 bars
+                           "--script", str(HERE / "reel.json"), "--close", CLOSE,
                            "--base", args.base, "--store"], env=env, capture_output=True, text=True)
     ok = "stored as the post's Reel" in done.stdout
     print("voiced Reel:", "stored" if ok else f"FAILED\n{done.stdout[-1500:]}\n{done.stderr[-1500:]}")
