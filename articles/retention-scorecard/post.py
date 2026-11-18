@@ -66,8 +66,9 @@ def known_names(db):
 
 
 def matcher(names):
-    """The ball-by-ball name for a list's name: exact, then surname + first name (or an initial), then a suffix
-    ('Ravisrinivasan Sai Kishore' -> 'Sai Kishore'). None when it's ambiguous or he has no IPL record in the window."""
+    """The ball-by-ball name for a list's name: exact, the feed's '(Team)' disambiguation, swapped first and last names,
+    surname + first name (or an initial), then a suffix ('Ravisrinivasan Sai Kishore' -> 'Sai Kishore'). None when it's
+    ambiguous or he has no IPL record in the window (Brydon Carse: T20Is, the Blast and the Hundred only)."""
     def match(*cands):
         for c in cands:
             if c in names:
@@ -75,6 +76,10 @@ def matcher(names):
         for c in cands:
             p = c.replace(".", " ").split()
             tests = [
+                # the feed's disambiguated names: 'Abdul Samad (Lucknow Super Giants)'
+                lambda x: x.endswith(")") and x[: x.rfind(" (")].lower() == c.lower(),
+                # first and last name swapped: 'Ravichandran Smaran' for 'Smaran Ravichandran'
+                lambda x: x.lower() == " ".join(reversed(p)).lower(),
                 lambda x: x.split()[-1].lower() == p[-1].lower() and x[0].lower() == c[0].lower()
                 and (len(x.split()[0]) <= 2 or len(p[0]) <= 2 or x.split()[0].lower() == p[0].lower()),
                 lambda x: x.split()[0].lower() == p[0].lower() and x.split()[-1][:4].lower() == p[-1][:4].lower(),
@@ -130,6 +135,30 @@ def order(g):
     return sorted(g, key=lambda t: (-g[t]["at_level"], -g[t]["fit"]))
 
 
+# Each graded role as the method slide says it: (template feature, role, measure in words)
+METHOD = [("structure:regular_bowlers", "Bowling depth", "regular bowlers"),
+          ("bowl:middle|spin:wickets_per_24", "Middle-overs spin", "wickets per 4 overs"),
+          ("bat:openers:average", "Openers", "average"),
+          ("bat:middle:strike_rate", "Batting 5-7", "strike rate"),
+          ("bowl:death|pace:economy", "Death pace", "economy"),
+          ("bowl:powerplay|pace:wickets_per_24", "Powerplay pace", "wickets per 4 overs"),
+          ("bat:top:strike_rate", "Batting 3-4", "strike rate")]
+
+
+def method_card():
+    """Why these seven: the share of IPL seasons (2008-26) in which playoff sides beat the rest at each
+    (services/pinned/team_template_IPL.json, seasons_ahead)."""
+    from services.squad_grade import load_template
+
+    t = load_template("IPL")
+    n = len(t["seasons"])
+    rows = [{"name": role, "detail": measure, "value": round(t["seasons_ahead"][f] * n)} for f, role, measure in METHOD]
+    rows.sort(key=lambda r: -r["value"])
+    return card("method", "metric_bars", f"Seven roles where playoff sides beat the rest, season after season",
+                {"metric": {"label": f"IPL seasons playoff sides were ahead (of {n})", "format": "int"}, "rows": rows},
+                f"IPL 2008-26 · playoff sides v the rest, each season · the grade's roles", kicker="How we graded"), n
+
+
 def league_grid(g, p):
     rows = []
     for t in order(g):
@@ -137,9 +166,9 @@ def league_grid(g, p):
         rows.append({"name": t, "sub": f"{g[t]['at_level']}/7 · {crore(p[t]['purse'])}",
                      "cells": [{"value": 0, "text": value_text(by[k]), "status": by[k]["status"]} for k, _ in COLS]})
     return card("league", "grid_heat", "All ten squads against playoff sides, role by role",
-                {"cols": [c for _, c in COLS], "rows": rows, "format": "int", "legend": ["playoff level", "close", "behind"],
+                {"cols": [c for _, c in COLS], "col_subs": ["avg", "SR", "SR", "wkts/4ov", "wkts/4ov", "econ", "bowlers"], "rows": rows, "format": "int", "legend": ["playoff level", "close", "behind"],
                  "dense": True, "name_fr": 1.7},
-                SAMPLE + " · cell: the role's number", kicker="Built like a playoff side?")
+                "IPL 2024-26 at any side · v playoff sides 2023-26", kicker="Built like a playoff side?")
 
 
 def board(team, g, colour, title, kicker):
@@ -154,8 +183,8 @@ def board(team, g, colour, title, kicker):
 
 
 def money_card(g, p):
-    pts = [{"name": t, "short": t, "x": p[t]["purse"], "y": g[t]["at_level"], "label": t,
-            "highlight": t in ("DC", "KKR", "LSG")} for t in g]
+    pts = [{"name": t, "short": t, "x": p[t]["purse"], "y": g[t]["at_level"],
+            "highlight": t in ("CSK", "DC", "KKR", "LSG"), "tag": t not in ("CSK", "DC", "KKR", "LSG")} for t in g]
     return card("money", "scatter_plus", "Most money, fewest roles at playoff level: Delhi, Kolkata, Lucknow",
                 {"x": {"label": "Purse left (₹ cr)", "format": "dec1", "higher_better": True},
                  "y": {"label": "Roles at playoff level", "format": "int", "higher_better": True},
@@ -189,7 +218,10 @@ def build(db):
     csk, dc, rcb = g["CSK"], g["DC"], g["RCB"]
     worst = lambda gg: next((r for r in sorted(gg["roles"], key=lambda r: (r["status"] != "gap", -r["weight"]))  # noqa: E731
                              if r["status"] != "playoff level"), None)
+    mc, n_seasons = method_card()
     cards = [
+        money_card(g, p),  # the cover: the grid needs its units, which don't fit under a hook
+        mc,
         league_grid(g, p),
         board("CSK", csk, colour("CSK"),
               f"Chennai won {w.get('CSK', 0)} games last season. Now: {csk['at_level']} of 7 roles at playoff level",
@@ -200,12 +232,12 @@ def build(db):
         board("RCB", rcb, colour("RCB"),
               f"The champions, {rcb['at_level']} of 7: {worst(rcb)['label'].lower()} is behind",
               f"{crore(p['RCB']['purse'])} to fix it"),
-        money_card(g, p),
     ]
     fc, behind = finishers_card(g, po_fin)
     cards.append(fc)
     return {"g": g, "p": p, "w": w, "rank": rank, "cards": cards, "missing": missing, "behind": behind, "po_fin": po_fin,
-            "csk_place": rank.index("CSK") + 1, "worst_rcb": worst(rcb)}
+            "csk_place": rank.index("CSK") + 1, "n_seasons": n_seasons,
+            "spin_ahead": next(r["value"] for r in mc["payload"]["rows"] if r["name"].startswith("Middle-overs spin")), "worst_rcb": worst(rcb)}
 
 
 def holders(g, key):
@@ -243,7 +275,6 @@ def thread(b, link):
     from services.ig_x import hand_thread
 
     g, p = b["g"], b["p"]
-    grid = b["cards"][0]["payload"]["rows"]
     texts = [
         copy(b)[0] + " All ten squads, role by role 🧵",
         "Green: playoff level. Amber: close (a good season gets them there). Red: behind. "
@@ -263,10 +294,12 @@ def thread(b, link):
 def reel_script(b):
     g, p, w = b["g"], b["p"], b["w"]
     return {"hook": copy(b)[0],
-            "lines": [f"They won {w.get('CSK', 0)} games last season. Samson and Gaikwad now open at playoff level.",
-                      f"Delhi are {g['DC']['at_level']} of 7, with {p['DC']['purse']:.1f} crore for {p['DC']['slots']} players.",
-                      f"The champions RCB are {g['RCB']['at_level']} of 7, but {b['worst_rcb']['label'].lower()} is behind.",
-                      f"And {b['behind']} of 10 squads are behind at five to seven. Finishers are the shortage."]}
+            "lines": [f"First, the seven roles where playoff sides beat the rest, like middle-overs spin: ahead in "
+                      f"{b['spin_ahead']} of {b['n_seasons']} seasons.",
+                      "Then we graded every retained squad on each player's IPL record since 2024.",
+                      f"Chennai won {w.get('CSK', 0)} games last season. Samson and Gaikwad now open at playoff level.",
+                      f"Delhi are {g['DC']['at_level']} of 7, with {p['DC']['purse']:.1f} crore to spend.",
+                      f"And {b['behind']} of 10 squads are behind at five to seven."]}
 
 
 def slides_of(b, hook):
@@ -338,7 +371,7 @@ def main() -> int:
     r = ig_slides.render(carousel["id"], n, args.base)
     print(f"rendered {len(r['ok'])}/{n}" + (f", failed {r['failed']}" if r["failed"] else "") + f"; layout {r.get('layout') or 'clean'}")
     env = {**os.environ, "REEL_V2": "1", "REEL_AB": "0"}
-    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,6",
+    done = subprocess.run([sys.executable, str(ROOT / "scripts/make_reel_v2.py"), "--key", f"ig:{KEY}", "--beats", "1,2,3,4,5,7",
                            "--script", str(HERE / "reel.json"), "--close", "Which role does your team buy first?",
                            "--base", args.base, "--store"], env=env, capture_output=True, text=True)
     ok = "stored as the post's Reel" in done.stdout

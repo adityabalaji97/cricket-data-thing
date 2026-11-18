@@ -184,14 +184,16 @@ const spreadMarkers = (pts, sx, sy, [xmin, xmax, ymin, ymax], avoid = []) => {
  * region that beats the subject on both is shaded. The labelled leaders are numbered on the chart and named in a key
  * below, so names never pile up in the busy corner.
  * payload: {x:{label,format,higher_better}, y:{...}, z?:{label}, points:[{name, short, x, y, zp?, highlight?, label?}], box}
- * Several highlighted points are all named in lime; the box is drawn only for a single subject.
+ * Several highlighted points are all named in lime; the box is drawn only for a single subject. A point with `tag` gets
+ * its name beside a small dot, smaller and dimmer than a highlight's (the rest of a league of ten, all named).
  */
 const ScatterPlus = ({ payload, motion }) => {
   const { points, x: X, y: Y, z: Z } = payload;
   const W = 300; const H = 214; const L = 8; const R = 8; const T = 18; const B = 184;
   // Robust to the field's outliers, but always wide enough for the named and numbered players (never pinned to an edge).
   const subjects = points.filter((p) => p.highlight);
-  const named = points.filter((p) => p.highlight || p.label);
+  const named = points.filter((p) => p.highlight || p.label || p.tag);
+  const tagged = points.filter((p) => p.tag && !p.highlight);
   const reach = ([a, b], vals, all) => {
     const d = (b - a) * 0.06;
     const lo = Math.min(a, ...vals.map((v) => v - d));
@@ -239,7 +241,7 @@ const ScatterPlus = ({ payload, motion }) => {
         {/* Zero lines for signed measures (runs above average and the like), so the quadrants mean something. */}
         {x0 < 0 && x1 > 0 && <line x1={sx(0)} y1={T} x2={sx(0)} y2={B} stroke={colors.borderStrong} strokeDasharray="3 3" />}
         {y0 < 0 && y1 > 0 && <line x1={L} y1={sy(0)} x2={W - R} y2={sy(0)} stroke={colors.borderStrong} strokeDasharray="3 3" />}
-        {points.filter((p) => !p.highlight && !p.label).map((p) => {
+        {points.filter((p) => !p.highlight && !p.label && !p.tag).map((p) => {
           const op = Z && p.zp != null ? 0.18 + 0.8 * (p.zp / 100) : 0.55;
           const inBox = subject && better(p, 'x', subject) && better(p, 'y', subject);
           return <circle key={p.name} cx={sx(p.x)} cy={sy(p.y)} r="3.5" fill={Z ? colors.accent : '#7c8aa5'} fillOpacity={cloudP >= 1 ? op : op * cloudP}
@@ -257,6 +259,13 @@ const ScatterPlus = ({ payload, motion }) => {
             <circle cx={m.mx} cy={m.my} r="7.5" fill={colors.textHi} stroke={colors.bg} strokeWidth="1.5" />
             {ring(motion, m.name) > 0 && <circle cx={m.mx} cy={m.my} r={11 + 3 * ringPulse(motion)} fill="none" stroke={colors.textHi} strokeWidth="1.5" strokeOpacity={ring(motion, m.name)} />}
             <text x={m.mx} y={m.my + 3.5} textAnchor="middle" style={{ fontFamily: fonts.body, fontSize: 10, fontWeight: 700, fill: colors.bg }}>{i + 1}</text>
+          </g>
+        ))}
+        {tagged.map((p) => (
+          <g key={p.name} style={gStyle(cloudP)}>
+            <circle cx={sx(p.x)} cy={sy(p.y)} r="4" fill="#9aa6bd" />
+            <text x={tag(p).x - (tag(p).left ? -3 : 3)} y={tag(p).y + 1} textAnchor={tag(p).left ? 'end' : 'start'}
+              style={{ fontFamily: fonts.body, fontSize: 10, fontWeight: 600, fill: colors.textMed }}>{tag(p).text}</text>
           </g>
         ))}
         {subjects.map((s) => (
@@ -1673,6 +1682,7 @@ const SquadBoard = ({ payload, motion }) => {
  * small line under it; empty cells stay blank. Bowlers by phase, a side's phase ranks.
  * payload: {cols:[label], rows:[{name, sub?, cells:[{value, text?, sub?, status?}|null]}], format, higher_better, mid,
  *           legend?:[good, bad] | [playoff, close, behind]}
+ * col_subs: a unit under each column's label (avg, SR, ...).
  * dense: tighter rows for many of them (ten squads under a cover); name_fr: the name column's width.
  * A cell with `status` (the template grade's 'playoff level' / 'short' / 'gap') is filled by verdict: lime, amber, red.
  */
@@ -1695,7 +1705,12 @@ const GridHeat = ({ payload, motion }) => {
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: dense ? 0.3 : 0.5 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'end' }}>
         <span />
-        {payload.cols.map((c) => <Typography key={c} sx={{ ...mono, fontSize: 10.5, color: colors.textLo, textAlign: 'center' }}>{c}</Typography>)}
+        {payload.cols.map((c, i) => (
+          <Box key={c} sx={{ textAlign: 'center', lineHeight: 1.1 }}>
+            <Typography sx={{ ...mono, fontSize: 10.5, color: colors.textLo, lineHeight: 1.15 }}>{c}</Typography>
+            {payload.col_subs && <Typography sx={{ ...mono, fontSize: 8.5, color: colors.textFaint, lineHeight: 1.15, whiteSpace: 'nowrap' }}>{payload.col_subs[i]}</Typography>}
+          </Box>
+        ))}
       </Box>
       {payload.rows.map((r, ri) => (
         <Box key={r.name} sx={{ display: 'grid', gridTemplateColumns: `minmax(0, ${nameFr}fr) repeat(${cols}, minmax(0, 1fr))`, gap: dense ? '3px' : '4px', alignItems: 'stretch' }}>
