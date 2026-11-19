@@ -97,3 +97,41 @@ def test_reference_decks_may_run_long():
     deck = [{"type": "image"} for _ in range(12)]
     assert any(f["rule"] == "slide_count" for f in findings(deck, "spotlight"))
     assert not any(f["rule"] == "slide_count" for f in findings(deck, "reference"))
+
+
+def test_a_thread_must_group_its_slides():
+    """One tweet per slide is the carousel retyped (18 Nov scorecard thread): up to four slides a tweet."""
+    from services.social_rules import thread_problems
+
+    per_slide = [{"n": i, "text": f"Tweet {i}", "slides": [i]} for i in range(1, 9)]
+    assert any("group the slides" in p for p in thread_problems(per_slide))
+    grouped = [{"n": 1, "text": "Hook #IPL2027", "slides": [1]}, {"n": 2, "text": "Four", "slides": [2, 3, 4, 5]},
+               {"n": 3, "text": "Three and the link", "slides": [6, 7, 8]}]
+    assert thread_problems(grouped) == []
+    assert any("tweet 1: 2 images" in p for p in thread_problems([{"n": 1, "text": "Hook", "slides": [1, 2]}]))
+
+
+def test_a_short_title_is_never_cut_mid_thought():
+    from services.ig_notes import yt_title
+    from services.social_rules import youtube_problems
+
+    hook = "Dhoni's gone. Chennai's squad has 4 of 7 roles at playoff level. Only RCB has more."
+    assert yt_title(hook) == ""  # no whole clause fits: no title, not "...4 of 7 roles at playoff"
+    assert youtube_problems({"title": ""})[0].startswith("The Short has no title")
+    assert youtube_problems({"title": "IPL 2027 retentions: every squad graded like a playoff side"}) == []
+    assert youtube_problems({"title": "x" * 61})
+
+
+def test_a_hand_post_breaking_the_copy_rules_is_not_queued():
+    import pytest
+    from services import ig_backlog
+
+    post = {"key": "t", "pillar": "reactive", "snapshot_id": None, "warnings": [], "caption": "c",
+            "fact": {"title": "t", "x": [{"n": i, "text": "x", "slides": [i]} for i in range(1, 9)]}}
+
+    class Conn:
+        def execute(self, *a, **k):
+            raise AssertionError("queued")
+
+    with pytest.raises(ig_backlog.RuleBroken):
+        ig_backlog.upsert_pack(Conn(), post, None, source="hand")

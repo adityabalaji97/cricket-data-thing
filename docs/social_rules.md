@@ -78,6 +78,9 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 - Hashtags: 3-5 on Instagram, specific first (series, team, player); no #King, #CricketTwitter or #cricket filler.
 - A Short's title is a search phrase of 60 characters or fewer, never cut with "…" (a post can set `yt_title`). The
   description opens with the claim and the link; three specific tags, then #shorts. Pin the question as a comment.
+  Enforced since 18 Nov (a title cut to "...4 of 7 roles at playoff" went out): when no whole clause of the hook fits,
+  yt_title() returns no title instead of the words that fit, social_rules.youtube_problems flags it, and a hand-built
+  post isn't queued until it sets its own `yt_title`.
 - Every slide has alt text (stored as `facts.alt` when the post is queued).
 
 ## Reels
@@ -98,6 +101,7 @@ One term per idea, the same everywhere: cards, captions, threads, Reels.
 - One or two hashtags, on tweet 1 only (the fixture or series: #INDvNZ, #IPL2027); none after. Players are named in plain text, not as hashtags (replaces the 7 Nov rule of a hashtag per player and #CricketTwitter on every tweet: tags add little reach on X now and read as spam). Credit @himganj153 and @TechRadar9; the last tweet links the post's page.
 - A tweet takes up to four images: group slides rather than run one tweet per slide (a reference deck of 12 is 4 tweets). With two or more, X crops each tile to its middle until tapped, so the tweet's text names who and what is in each image; tweet 1 keeps a single image, which shows tall.
 - Hand-written threads go through services/ig_x.hand_thread (tags on tweet 1, up to four slides a tweet), and social_rules.thread_problems checks them before a post is queued.
+- Enforced since 18 Nov (after an 8-tweet, one-slide-a-tweet thread went out): thread_problems flags tweet 1 with more than one image and a thread longer than tweet 1 plus the rest four slides at a time plus one (8 slides: 4 tweets at most). ig_backlog.upsert_pack won't queue a hand-built post that breaks it (RuleBroken); an automatic one is queued with the warning. A hand post also sets `link` to the page the thread is about (a squads post: the team page), not the first player's page.
 
 ## Appeal
 

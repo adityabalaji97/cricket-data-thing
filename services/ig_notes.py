@@ -127,7 +127,9 @@ YT_TITLE = 60  # characters a Short's title shows in search and the feed without
 
 def yt_title(text: str, limit: int = YT_TITLE) -> str:
     """A Short's title, never cut mid-thought with "…" (SOCIAL_COPY_PLAN.md S4): the whole text when it fits, else the
-    longest run of whole clauses that fits and says something (four words or more), else the words that fit."""
+    longest run of whole clauses that fits and says something (four words or more), else "" (no title: the post
+    sets its own yt_title, and social_rules.youtube_problems says so). Never the words that happen to fit: "Dhoni's
+    gone. Chennai's squad has 4 of 7 roles at playoff" (18 Nov)."""
     text = re.sub(r"\s+", " ", text or "").strip()
     if len(text) <= limit:
         return text
@@ -135,7 +137,7 @@ def yt_title(text: str, limit: int = YT_TITLE) -> str:
     fits = [e for e in ends if e <= limit and len(text[:e].split()) >= 4]
     if fits:
         return text[:max(fits)].rstrip(" ,;:—–-")
-    return text[:limit + 1].rsplit(" ", 1)[0].rstrip(" ,;:·—-")
+    return ""
 
 
 def youtube_copy(fact: Dict[str, Any], caption: str, search_title: Optional[str]) -> Dict[str, str]:

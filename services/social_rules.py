@@ -179,7 +179,16 @@ def thread_problems(tweets: List[Dict[str, Any]], players: Optional[List[str]] =
     from services.ig_x import LIMIT, MAX_IMAGES, MAX_TAGS, weight
 
     out = []
-    for t in tweets or []:
+    tweets = list(tweets or [])
+    if tweets and len(tweets[0].get("slides") or []) > 1:
+        out.append(f"tweet 1: {len(tweets[0]['slides'])} images (one: tweet 1's image shows tall)")
+    # group the slides, up to four a tweet: one tweet per slide is the carousel retyped (18 Nov scorecard thread)
+    images = sum(len(t.get("slides") or []) for t in tweets)
+    most = 2 + -(-max(0, images - 1) // MAX_IMAGES)  # tweet 1, the rest four at a time, one spare (text or link)
+    if len(tweets) > most:
+        out.append(f"{len(tweets)} tweets for {images} images: group the slides, up to {MAX_IMAGES} a tweet "
+                   f"({most} tweets at most)")
+    for t in tweets:
         text, n = t.get("text") or "", t.get("n")
         tags = re.findall(r"(?<![\w&])#\w+", text)
         if n == 1 and len(tags) > MAX_TAGS:
@@ -190,6 +199,25 @@ def thread_problems(tweets: List[Dict[str, Any]], players: Optional[List[str]] =
             out.append(f"tweet {n}: {len(t['slides'])} images ({MAX_IMAGES} at most)")
         if weight(text) > LIMIT:
             out.append(f"tweet {n}: {weight(text)} characters")
+    return out
+
+
+def youtube_problems(yt: Optional[Dict[str, Any]]) -> List[str]:
+    """What a Short's copy breaks (docs/social_rules.md, Captions and YouTube): a title that's missing, over 60
+    characters, cut with "…", or cut mid-thought (it doesn't end on a whole word run that says something: the hook
+    shortened to "...4 of 7 roles at playoff", 18 Nov). Set the post's own `yt_title`, a search phrase."""
+    from services.ig_notes import YT_TITLE
+
+    if not yt:
+        return []
+    title = (yt.get("title") or "").strip()
+    if not title:
+        return ["The Short has no title: set the post's yt_title (a search phrase, 60 characters at most)"]
+    out = []
+    if len(title) > YT_TITLE:
+        out.append(f"The Short's title is {len(title)} characters ({YT_TITLE} at most)")
+    if title.endswith(("…", "...")):
+        out.append("The Short's title is cut with an ellipsis: set the post's yt_title")
     return out
 
 
