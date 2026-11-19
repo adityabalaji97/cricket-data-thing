@@ -588,11 +588,15 @@ def alt_texts(slides: List[Dict[str, Any]]) -> List[str]:
     return out
 
 
+class RuleBroken(ValueError):
+    """A hand-built post whose X thread or Short copy breaks docs/social_rules.md: upsert_pack won't queue it."""
+
+
 def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "ig-backlog",
                 post_by: Optional[Any] = None) -> None:
     """One Instagram pack: {key, pillar, fact, snapshot_id, warnings} planned for `day` (None = bench). The carousel's
     slides are checked against docs/social_rules.md on the way in; what they break joins the pack's warnings (the
-    admin shows them), and never stops the pack."""
+    admin shows them). The X thread and the Short's copy are checked too, and stop a hand-built post (RuleBroken)."""
     fact = post["fact"]
     caption = caption_of(post)
     warnings = list(post.get("warnings") or [])
@@ -618,6 +622,15 @@ def upsert_pack(conn, post: Dict[str, Any], day: Optional[date], source: str = "
         warnings += [w for w in caption_problems(caption) if w not in warnings]
     except Exception:  # pragma: no cover
         logger.exception("caption check failed for %s", post.get("key"))
+    # The X thread and the Short's copy (docs/social_rules.md): a hand-built post that breaks them isn't queued (the
+    # builder fixes its copy and runs again); an automatic one is queued with the warnings, for the admin page.
+    from services.social_rules import thread_problems, youtube_problems
+
+    copy_problems = ([f"X: {w}" for w in thread_problems(fact.get("x") or [])]
+                     + [f"YouTube: {w}" for w in youtube_problems(fact.get("youtube"))])
+    if copy_problems and source == "hand":
+        raise RuleBroken(f"ig:{post['key']} not queued: " + "; ".join(copy_problems))
+    warnings += [w for w in copy_problems if w not in warnings]
     conn.execute(text("""
         INSERT INTO content_packs (match_id, snapshot_id, angle_key, title, first_comment, subreddit, flair, facts,
                                    rule_warnings, status, source, channel, planned_for, pillar, caption, post_by)

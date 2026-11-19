@@ -34,6 +34,7 @@ COLS = [("openers", "Open"), ("top", "3-4"), ("finishers", "5-7"), ("pp_pace", "
 WORD = {"playoff level": "playoff level", "short": "close", "gap": "behind"}
 FMT = {"average": "{:.0f}", "strike_rate": "{:.0f}", "wickets_per_24": "{:.2f}", "economy": "{:.1f}", "regular_bowlers": "{:.0f}"}
 UNIT = {"average": "avg", "strike_rate": "SR", "wickets_per_24": "wkts/4 ov", "economy": "an over", "regular_bowlers": "bowlers"}
+YT_TITLE = "IPL 2027 retentions: every squad graded like a playoff side"
 THREAD_PLAYERS = ["Sanju Samson", "Ruturaj Gaikwad", "Rishabh Pant"]
 
 
@@ -278,18 +279,16 @@ def thread(b, link):
     from services.ig_x import hand_thread
 
     g, p = b["g"], b["p"]
+    # docs/social_rules.md, X: tweet 1 one image (it shows tall), then up to four slides a tweet, each tweet naming
+    # what is in each of its images (X crops them until tapped); the link only in the last
     texts = [
-        copy(b)[0] + " All ten squads, role by role 🧵",
-        "Green: playoff level. Amber: close (a good season gets them there). Red: behind. "
-        "Each player's IPL record since 2024, wherever he played.",
-        f"Chennai: Samson and Gaikwad open at playoff level, Noor and Hosein spin at it. The hole is 5-7.",
-        f"Delhi: {g['DC']['at_level']} of 7 at playoff level, {crore(p['DC']['purse'])} for {p['DC']['slots']} slots. "
-        "The biggest job on 16 Dec.",
-        f"RCB, the champions: {g['RCB']['at_level']} of 7. {b['worst_rcb']['label']} is behind, {crore(p['RCB']['purse'])} to fix it.",
-        f"Most money, most holes: Lucknow {crore(p['LSG']['purse'])}, Kolkata {crore(p['KKR']['purse'])}, Delhi "
-        f"{crore(p['DC']['purse'])}.",
-        f"{b['behind']} of 10 squads are behind playoff sides at 5-7. Finishers are the auction's shortage.",
-        f"Which role does your team buy first?\n\nEvery squad, free: {link}\nData: @himganj153 & @TechRadar9",
+        ([1], copy(b)[0] + " All ten squads, role by role 🧵"),
+        ([2, 3, 4, 5], "How we graded: seven roles where playoff sides beat the rest. Then three squads: "
+                       f"Chennai {g['CSK']['at_level']}/7, the hole at 5-7. Delhi {g['DC']['at_level']}/7 with "
+                       f"{crore(p['DC']['purse'])}. Champions RCB {g['RCB']['at_level']}/7, "
+                       f"{b['worst_rcb']['label'].lower()} behind."),
+        ([6, 7, 8], f"Most money, most holes: Lucknow, Kolkata, Delhi. And {b['behind']} of 10 squads are behind at 5-7.\n\n"
+                    f"Which role does your team buy first? Every squad's grade: {link}\nData: @himganj153 & @TechRadar9"),
     ]
     return hand_thread(texts, copy(b)[1], THREAD_PLAYERS)
 
@@ -366,7 +365,9 @@ def main() -> int:
     carousel = ig_carousel.save(db, slides, hook, {"spotlight": KEY}, "ig-spotlight")
     n = len(slides)
     fact = {"kind": "spotlight", "title": hook, "hook": hook, "subject": "Sanju Samson", "subject_role": "batter",
-            "carousel_id": carousel["id"], "slides": n, "render": True, "post_time": "8 pm"}
+            "carousel_id": carousel["id"], "slides": n, "render": True, "post_time": "8 pm",
+            # the Short's own search title (never the hook cut to fit) and the page the thread sends people to
+            "yt_title": YT_TITLE, "link": "/team?team=CSK"}
     fact["x"] = thread(b, post_link(fact))
     fact["youtube"] = youtube_copy(fact, caption, hook)
     ist = timezone(timedelta(hours=5, minutes=30))
