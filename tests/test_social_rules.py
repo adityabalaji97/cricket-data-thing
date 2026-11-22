@@ -176,7 +176,20 @@ def test_captions_off_gate_number_word_and_length():
     spec = _gate_spec("smat_r3_placed.json")
     assert "number word" in captions_off_problems(_with_last_line(spec, "Three or four?"))[0]
     long_q = "So after all of that, who exactly would you really bid for now?"
-    assert "words (at most 10)" in captions_off_problems(_with_last_line(spec, long_q))[0]
+    assert "words (at most 10" in captions_off_problems(_with_last_line(spec, long_q))[0]
+
+
+def test_captions_off_gate_lets_the_send_line_and_shown_numbers_through():
+    """The retention close voices its send line ("Send this to a Mumbai fan"), which is on screen; round 2's asks
+    "Bid or pass on 16 December?" with the date on the card. Neither is a hidden fact (PR #335 review)."""
+    from services.social_rules import captions_off_problems
+    spec = _gate_spec("smat_r3_placed.json")
+    close = spec["scenes"][-1]
+    close.setdefault("data", {})["send"] = {"text": "Send this to a Mumbai fan", "anchor": "Send"}
+    assert captions_off_problems(_with_last_line(spec, "Rohit Sharma, keep or release? Send this to a Mumbai fan.")) == []
+    close["data"]["question"] = "Bid or pass on 16 December?"
+    assert captions_off_problems(_with_last_line(spec, "Bid or pass on 16 December? Send this to a Mumbai fan.")) == []
+    assert "doesn't show" in captions_off_problems(_with_last_line(spec, "Bid or pass on 17 December?"))[0]
 
 
 def test_captions_off_gate_passes_rana_and_untimed():

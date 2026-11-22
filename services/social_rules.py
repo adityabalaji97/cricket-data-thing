@@ -353,33 +353,57 @@ _NUMBER_WORDS = re.compile(
     re.I)
 
 
+def _scene_strings(o: Any) -> List[str]:
+    """Every string a scene puts on screen (its kicker, data, payload): what a captions-off line may repeat."""
+    if isinstance(o, str):
+        return [o]
+    if isinstance(o, dict):
+        return [x for v in o.values() for x in _scene_strings(v)]
+    if isinstance(o, list):
+        return [x for v in o for x in _scene_strings(v)]
+    return []
+
+
+_TOKEN = re.compile(r"[\w%*'-]+")
+_NUM = re.compile(r"\d[\d,.]*\d|\d")
+
+
 def captions_off_problems(spec: Dict[str, Any]) -> List[str]:
-    """A scene with captions off shows none of what it voices, so it may voice only the question: no digits, no number
-    words and at most rules.captionsOffWords words (SMAT round 3, 19 Nov 2026: "Yash Dhull, 125 off 59" was voiced over
-    the captions-off close and never appeared on screen). Words are assigned to scenes by their voiced time; with no
-    timing there is nothing to check (reel_timing.place gives estimated timing, so a dry run catches it unpaid)."""
+    """A scene with captions off shows none of what it voices, so it may voice only the question: no number or number
+    word it doesn't show itself, and at most rules.captionsOffWords words besides its own send line (SMAT round 3,
+    19 Nov 2026: "Yash Dhull, 125 off 59" was voiced over the captions-off close and never appeared on screen). The
+    close's send line ("Send this to a Mumbai fan") is on screen, so voicing it is fine and it isn't counted. Words
+    are assigned to scenes by their voiced time; with no timing, or a scene not yet placed, there is nothing to check
+    (reel_timing.place gives estimated timing, so a dry run catches it unpaid)."""
     timing = spec.get("timing")
     if not timing:
         return []
     cap = reel_frame()["rules"].get("captionsOffWords", 10)
     out: List[str] = []
     voiced = [(at, w) for li, line in enumerate(timing["lines"]) for w, at in zip(line.split(" "), timing["words"][li])]
+    norm = lambda w: re.sub(r"[^\w%*'-]", "", w.lower())  # noqa: E731
     for i, s in enumerate(spec.get("scenes") or []):
-        if s.get("captions") is not False:
+        if s.get("captions") is not False or "start" not in s:
             continue
-        a, b = s.get("start", 0), s.get("end", float("inf"))
+        a, b = s["start"], s.get("end", float("inf"))
         words = [w for at, w in voiced if a - 1e-3 <= at < b]
         if not words:
             continue
+        shown = " ".join(_scene_strings({k: s.get(k) for k in ("kicker", "data", "payload", "scope")}))
+        send = {norm(w) for w in _TOKEN.findall(str(((s.get("data") or {}).get("send") or {}).get("text") or ""))}
         said = " ".join(words)
+        counted = [w for w in words if norm(w) not in send]
+        on_screen_nums = set(_NUM.findall(shown))
+        missing = [n for n in _NUM.findall(said) if n not in on_screen_nums]
+        word = next((m.group(0) for m in _NUMBER_WORDS.finditer(said) if m.group(0).lower() not in shown.lower()), None)
         name = f"Scene {i + 1} ({s.get('kind')})"
         why = []
-        if re.search(r"\d", said):
-            why.append("a number")
-        elif _NUMBER_WORDS.search(said):
-            why.append(f"a number word ('{_NUMBER_WORDS.search(said).group(0)}')")
-        if len(words) > cap:
-            why.append(f"{len(words)} words (at most {cap})")
+        if missing:
+            why.append(f"a number it doesn't show ('{missing[0]}')")
+        elif word:
+            why.append(f"a number word ('{word}')")
+        if len(counted) > cap:
+            why.append(f"{len(counted)} words (at most {cap}, besides its send line)")
         if why:
             short = said if len(said) <= 60 else said[:57] + "..."
             out.append(f"{name} has captions off but voices {' and '.join(why)}: '{short}'. Nothing it says is on "
