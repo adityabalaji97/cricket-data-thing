@@ -6,7 +6,7 @@ import { getTeamColor, readableOnDark } from '../../utils/teamColors';
 import { InningsClue } from '../games/GuessInningsGame';
 import PlayerLink from '../common/PlayerLink';
 import OverseasMark from '../common/OverseasMark';
-import { deal, draw, enterSx, grow, reveal, ring, ringOn, ringPulse } from '../ig/reel/motion';
+import { alpha, deal, draw, easeOut, enterSx, grow, progress, reveal, ring, ringOn, ringPulse, snap } from '../ig/reel/motion';
 
 /**
  * Visuals for Instagram post cards (services/ig_posts): one question answered from several angles. Same contract as
@@ -334,6 +334,104 @@ const MetricBars = ({ payload, motion }) => {
         );
       })}
       {payload.legend && <Legend items={payload.legend.map((t) => [t, teamColour(t, '#5b6b85')])} />}
+    </Box>
+  );
+};
+
+/**
+ * Form so far, round by round (SMAT watch, from round 4): one signed stacked bar a player, a segment a round. Above-par
+ * rounds stack right of the par line in stepped neutral shades (never the accent: lime is the subject's alone),
+ * below-par rounds stack left of it in red, so a total is never hidden by a bad game (share_bars drops segments <= 0).
+ * A round with no data (a washed-out game) is a dashed slot. The total is written at the end; the round labels sit on
+ * the first row's segments where they fit, so there is no legend.
+ * payload: {metric:{label, format}, rounds:[{key, label}], rows:[{name, detail?, highlight?, total?,
+ *           segments:[{key, value|null, note?}]}], label_width?}
+ * Motion: round k grows across every row in its own window (plan.round, 0.55s; rows stagger plan.stagger), then the
+ * totals count up.
+ */
+export const ROUND_SHADES = ['#3b4658', '#56637a', '#7a879e', '#a3aec2', '#c3cbd8'];
+export const roundStackGeometry = (rows, rounds) => {
+  const sums = rows.map((r) => r.segments.reduce((a, g) => {
+    if (g.value == null) return a;
+    return g.value >= 0 ? { pos: a.pos + g.value, neg: a.neg } : { pos: a.pos, neg: a.neg - g.value };
+  }, { pos: 0, neg: 0 }));
+  const maxPos = Math.max(0, ...sums.map((x) => x.pos)); const maxNeg = Math.max(0, ...sums.map((x) => x.neg));
+  const span = maxPos + maxNeg || 1;
+  const zero = (100 * maxNeg) / span;
+  const order = rounds.map((r) => r.key);
+  // the round labels go on the row whose narrowest segment is widest (every round readable), not always the first
+  const minW = (r) => (r.segments.length === rounds.length && r.segments.every((g) => g.value != null && g.value > 0)
+    ? Math.min(...r.segments.map((g) => g.value)) : -1);
+  const labelRow = rows.reduce((best, r, i) => (minW(r) > minW(rows[best]) ? i : best), 0);
+  return {
+    zero,
+    labelRow,
+    rows: rows.map((r, i) => {
+      let right = zero; let left = zero;
+      const segs = [...r.segments].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)).map((g) => {
+        const k = order.indexOf(g.key);
+        if (g.value == null) return { ...g, k, missing: true };
+        const w = (100 * Math.abs(g.value)) / span;
+        if (g.value >= 0) { const x = right; right += w; return { ...g, k, x, w }; }
+        left -= w; return { ...g, k, x: left, w };
+      });
+      return { ...r, segs, end: right, total: r.total != null ? r.total : sums[i].pos - sums[i].neg };
+    }),
+  };
+};
+const RoundStack = ({ payload, motion }) => {
+  const { rounds, rows, metric = {} } = payload;
+  const geo = roundStackGeometry(rows, rounds);
+  const nameCol = nameColumn(rows.map((r) => r.name), payload.label_width || 110);
+  const win = motion ? (motion.plan?.round ?? 0.55) : 0;
+  // segment k of row i: grows in round k's window; 1 on a card
+  const segGrow = (k, i) => (motion ? snap(easeOut(progress(motion.t,
+    motion.start + (motion.plan?.delay ?? 0.05) + k * win + i * (motion.plan?.stagger ?? 0.06), win))) : 1);
+  const totalGrow = (i) => (motion ? snap(easeOut(progress(motion.t,
+    motion.start + (motion.plan?.delay ?? 0.05) + rounds.length * win + i * (motion.plan?.stagger ?? 0.06), 0.5))) : 1);
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.7 }}>
+      {geo.rows.map((r, i) => {
+        const tg = totalGrow(i);
+        return (
+          <Box key={r.name}
+            sx={{ display: 'grid', gridTemplateColumns: `${nameCol}px 1fr 58px`, gap: 1, alignItems: 'center', ...rowMotion(motion, i, r.name) }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography noWrap sx={{ fontSize: 13, color: r.highlight ? colors.accent : colors.textHi, fontWeight: r.highlight ? 600 : 400 }}>{r.name}</Typography>
+              {r.detail && <Typography noWrap sx={{ fontSize: 11, color: colors.textLo, lineHeight: 1.25 }}>{r.detail}</Typography>}
+            </Box>
+            <Box data-round-bar sx={{ position: 'relative', height: 22 }}>
+              <Box sx={{ position: 'absolute', left: `${geo.zero}%`, top: -3, bottom: -3, width: '1px', bgcolor: colors.borderStrong }} />
+              {r.segs.map((g) => {
+                if (g.missing) {
+                  return (
+                    <Box key={g.key} data-missing title={g.note || 'no data'} sx={{ position: 'absolute', top: 3, height: 16,
+                      left: `calc(${r.end}% + 3px)`, width: 18, borderRadius: '3px', border: `1px dashed ${colors.textLo}`,
+                      opacity: segGrow(g.k, i), boxSizing: 'border-box' }} />
+                  );
+                }
+                const p = segGrow(g.k, i);
+                const below = belowPar(g.value);
+                // a positive segment grows rightwards from its left edge, a negative one leftwards from its right edge
+                const w = g.w * p;
+                const x = below ? g.x + g.w - w : g.x;
+                const label = i === geo.labelRow && g.w >= 7 && p >= 1 ? (rounds[g.k] || {}).label : null;
+                return (
+                  <Box key={g.key} data-seg={g.key} sx={{ position: 'absolute', top: 3, height: 16, left: `${x}%`, width: `${w}%`,
+                    bgcolor: below ? colors.red : ROUND_SHADES[g.k % ROUND_SHADES.length], borderRadius: '3px',
+                    boxShadow: `inset -1px 0 0 ${colors.bg}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                    ...(r.highlight ? { outline: `1px solid ${alpha(colors.accent, 0.9)}` } : {}) }}>
+                    {label && <Typography sx={{ ...mono, fontSize: 10, fontWeight: 700, color: g.k >= 2 && !below ? colors.bg : colors.textHi }}>{label}</Typography>}
+                  </Box>
+                );
+              })}
+            </Box>
+            <Typography sx={{ ...mono, fontSize: 13, color: r.highlight ? colors.accent : colors.textMed, textAlign: 'right', opacity: motion ? Math.min(1, tg * 2) : 1 }}>
+              {fmt(part(r.total, tg), metric.format || 'signed1')}
+            </Typography>
+          </Box>
+        );
+      })}
     </Box>
   );
 };
@@ -791,21 +889,31 @@ export const WinProbLine = ({ payload, motion }) => {
   const { points } = payload;
   const W = 300; const H = 200; const L = 30; const R = 10; const T = 16; const B = 176;
   const n = points.length;
-  const drawn = motion ? Math.max(1, Math.ceil(n * draw(motion, 0.15, motion.plan?.draw ?? 3))) : n;
+  // Motion: the line runs continuously, the last segment drawn part way to the next ball (whole points only made it
+  // jump a segment at a time: with ~20 points on a Reel it read as stop motion, owner 22 Nov 2026)
+  const prog = motion ? Math.min(n, payload.upto || n, n * draw(motion, 0.15, motion.plan?.draw ?? 3)) : n;
+  const drawn = motion ? Math.max(1, Math.ceil(prog)) : n;
   const shown = Math.min(n, payload.upto || n, drawn);
-  const bands = (payload.bands || []).filter((b) => b.i1 < shown);
+  const bands = (payload.bands || []).filter((b) => b.i1 < (motion ? Math.floor(prog) : shown));
   const sx = (i) => L + ((i + 1) / n) * (W - L - R); // x 0 is the start of the innings (payload.start)
   const sy = (v) => B - (v / 100) * (B - T);
-  const line = `M${L},${sy(payload.start)} ` + points.slice(0, shown).map((p, i) => `L${sx(i).toFixed(1)},${sy(p.wp).toFixed(1)}`).join(' ');
+  const full = motion ? Math.max(0, Math.floor(prog)) : shown;
+  const frac = motion ? prog - full : 0;
+  const wpAt = (i) => (i < 0 ? payload.start : points[i].wp);
+  const tip = motion && full < shown
+    ? { x: sx(full - 1) + frac * (sx(full) - sx(full - 1)), wp: wpAt(full - 1) + frac * (wpAt(full) - wpAt(full - 1)) }
+    : { x: sx(shown - 1), wp: points[shown - 1].wp };
+  const line = `M${L},${sy(payload.start)} ` + points.slice(0, full).map((p, i) => `L${sx(i).toFixed(1)},${sy(p.wp).toFixed(1)}`).join(' ')
+    + (motion && full < shown ? ` L${tip.x.toFixed(1)},${sy(tip.wp).toFixed(1)}` : '');
   const colour = teamColour(payload.team, colors.accent);
   const overTicks = [];
   points.forEach((p, i) => {
     if (i && p.over !== points[i - 1].over && (p.over % 5 === 0)) overTicks.push([i, p.over]);
   });
-  const last = points[shown - 1];
+  const last = { ...points[shown - 1], wp: tip.wp };
   // The replay's chance label: right of the dot (left of it near the end), on the side the line didn't come from.
-  const nowRight = sx(shown - 1) < W - 60;
-  const falling = points[Math.max(0, shown - 6)].wp >= last.wp;
+  const nowRight = tip.x < W - 60;
+  const falling = wpAt(Math.max(0, shown - 6)) >= last.wp;
   const nowY = falling ? sy(last.wp) + 18 : sy(last.wp) - 8;
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.75 }}>
@@ -825,9 +933,9 @@ export const WinProbLine = ({ payload, motion }) => {
           </g>
         ))}
         <path d={line} fill="none" stroke={colour} strokeWidth="2" strokeLinejoin="round" />
-        <circle cx={sx(shown - 1)} cy={sy(last.wp)} r="4" fill={colour} stroke={colors.bg} strokeWidth="2" />
-        {shown < n && (
-          <text x={sx(shown - 1) + (nowRight ? 8 : -8)} y={Math.min(B + 14, nowY)} textAnchor={nowRight ? 'start' : 'end'}
+        <circle cx={tip.x} cy={sy(last.wp)} r="4" fill={colour} stroke={colors.bg} strokeWidth="2" />
+        {(shown < n || (motion && full < n)) && (
+          <text x={tip.x + (nowRight ? 8 : -8)} y={Math.min(B + 14, nowY)} textAnchor={nowRight ? 'start' : 'end'}
             style={{ ...mono, fontSize: 14, fontWeight: 700, fill: colors.textHi }}>{`${Math.round(last.wp)}%`}</text>
         )}
         {points.slice(0, shown).map((p, i) => (
@@ -1524,7 +1632,9 @@ const BidTrail = ({ payload, motion }) => {
   const sx = (i) => L + ((i - 1) / Math.max(1, n - 1)) * (W - L - R);
   const sy = (v) => B - (v / top) * (B - T);
   const colourOf = Object.fromEntries(teams.map((t) => [t.key, t.colour || teamColour(t.key, colors.textMed)]));
-  const ticks = [0, ...Array.from({ length: Math.floor(top / 10) }, (_, k) => (k + 1) * 10).filter((v) => v < top), top];
+  // ticks every 10 (every 20 past 50, e.g. 95 lakh); none within half a step of the top, whose label would overlap
+  const step = top > 50 ? 20 : 10;
+  const ticks = [0, ...Array.from({ length: Math.floor(top / step) }, (_, k) => (k + 1) * step).filter((v) => v < top - step / 2), top];
   const counts = Object.fromEntries(teams.map((t) => [t.key, bids.filter((b) => b.team === t.key).length]));
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1945,7 +2055,7 @@ const GapFits = ({ payload, motion }) => {
  * themselves in a motion Reel. Without the prop they draw exactly as on their card. Other kinds play the Reel fallback.
  */
 export const MOTION_KINDS = new Set([
-  'metric_bars', 'share_bars', 'scorecard', 'bucket_bars', 'pair_dumbbell', 'deep_compare', 'innings_scorecard', 'recap_text',
+  'metric_bars', 'share_bars', 'round_stack', 'scorecard', 'bucket_bars', 'pair_dumbbell', 'deep_compare', 'innings_scorecard', 'recap_text',
   'percentile_strip',
   // visuals.jsx kinds (the match-preview visuals) that read it too
   'zone_pair',
@@ -1971,6 +2081,7 @@ export const POST_VISUALS = {
   scorecard: Scorecard,
   scatter_plus: ScatterPlus,
   metric_bars: MetricBars,
+  round_stack: RoundStack,
   share_bars: ShareBars,
   race_lines: RaceLines,
   win_prob_line: WinProbLine,

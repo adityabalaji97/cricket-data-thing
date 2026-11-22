@@ -16,8 +16,8 @@
   "stillMax": 0.8,
   "dwellMin": 0.6,
   "sceneMin": 1.2,
-  "drawn": {"_note": "seconds a card scene's chart takes to draw (its motion), then the least it stays up drawn", "default": 1.5, "grid_heat": 3.2, "hold": 2.5},
-  "captionWords": 5, "captionChars": 30,
+  "drawn": {"_note": "seconds a card scene's chart takes to draw (its motion), then the least it stays up drawn", "default": 1.5, "grid_heat": 3.2, "bid_trail": 2.6, "metric_lines": 2.6, "round_stack": 3.2, "hold": 2.5},
+  "captionWords": 5, "captionChars": 30, "captionsOffWords": 10,
   "kickerMinPx": 22, "sendMinPx": 48
  }
 }

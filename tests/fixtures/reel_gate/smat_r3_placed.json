@@ -1,0 +1,311 @@
+{
+ "duration": 28.752,
+ "timing": {
+  "lines": [
+   "Shivang Kumar: 64 not out off 34 balls, then four overs of left-arm wrist spin for 25.",
+   "The other sides' best: Chennai's Urvil Patel, 56 off 28, and Vicky Ostwal: two wickets, then the winning four off the last ball.",
+   "Released by Delhi Capitals on Tuesday, Karun Nair made 61 not out on Wednesday.",
+   "The best of the round has no IPL side: Yash Dhull, 125 off 59. Karun or Dhull: who would you bid for?"
+  ],
+  "starts": [
+   0.0,
+   6.772,
+   15.463,
+   20.405
+  ],
+  "lengths": [
+   6.652,
+   8.571,
+   4.821,
+   7.679
+  ],
+  "words": [
+   [
+    0.0,
+    0.42,
+    1.32,
+    1.72,
+    2.02,
+    2.28,
+    2.52,
+    2.9,
+    3.82,
+    4.01,
+    4.2,
+    4.48,
+    4.79,
+    5.1,
+    5.38,
+    5.66,
+    5.86
+   ],
+   [
+    6.772,
+    6.992,
+    7.192,
+    7.572,
+    8.192,
+    8.492,
+    8.792,
+    9.752,
+    10.232,
+    10.432,
+    11.312,
+    11.592,
+    11.712,
+    12.572,
+    12.772,
+    13.592,
+    13.752,
+    13.892,
+    14.032,
+    14.392,
+    14.592,
+    14.712,
+    14.952
+   ],
+   [
+    15.463,
+    15.823,
+    16.063,
+    16.283,
+    16.663,
+    16.863,
+    17.353,
+    17.843,
+    18.083,
+    18.343,
+    18.823,
+    19.083,
+    19.263,
+    19.483
+   ],
+   [
+    20.405,
+    20.605,
+    20.945,
+    21.085,
+    21.305,
+    21.445,
+    21.705,
+    21.985,
+    22.425,
+    23.245,
+    23.645,
+    24.045,
+    24.605,
+    24.885,
+    26.165,
+    26.225,
+    26.695,
+    27.165,
+    27.265,
+    27.405,
+    27.505,
+    27.605
+   ]
+  ]
+ },
+ "scenes": [
+  {
+   "kind": "hero_card",
+   "start": 0.0,
+   "end": 6.772,
+   "kicker": "SMAT round 3 \u00b7 18 Nov \u00b7 the IPL's Indians",
+   "data": {
+    "name": "Shivang Kumar",
+    "team": "SRH",
+    "corner": "SRH \u00b7 Madhya Pradesh",
+    "rank": 1,
+    "from": 20,
+    "value": 64,
+    "done": "*",
+    "detail": "off 34 balls \u00b7 0-25 in 4",
+    "sub": {
+     "value": 32.5,
+     "format": "signed1",
+     "label": "runs above par",
+     "anchor": "balls",
+     "at": 2.9
+    },
+    "badge": {
+     "text": "Left-arm wrist spin",
+     "anchor": "left-arm",
+     "at": 4.79
+    }
+   }
+  },
+  {
+   "kind": "metric_bars",
+   "start": 6.772,
+   "end": 15.463,
+   "kicker": "The other sides' best \u00b7 runs above par",
+   "payload": {
+    "metric": {
+     "label": "Runs above par, bat + ball",
+     "format": "signed1"
+    },
+    "label_width": 150,
+    "rows": [
+     {
+      "name": "Urvil Patel",
+      "value": 21.9,
+      "team": "CSK",
+      "detail": "CSK \u00b7 56 off 28"
+     },
+     {
+      "name": "Ravi Bishnoi",
+      "value": 17.5,
+      "team": "RR",
+      "detail": "RR \u00b7 1-21 in 4 \u00b7 10* off 5"
+     },
+     {
+      "name": "Rahul Tewatia",
+      "value": 16.9,
+      "team": "GT",
+      "detail": "GT \u00b7 1-11 in 4"
+     },
+     {
+      "name": "Vicky Ostwal",
+      "value": 15.6,
+      "team": "RCB",
+      "detail": "RCB \u00b7 2-15 in 4 \u00b7 25* off 18"
+     },
+     {
+      "name": "Musheer Khan",
+      "value": 14.5,
+      "team": "PBKS",
+      "detail": "PBKS \u00b7 44 off 27"
+     },
+     {
+      "name": "Sameer Rizvi",
+      "value": 12.2,
+      "team": "DC",
+      "detail": "DC \u00b7 41 off 37"
+     },
+     {
+      "name": "Suryakumar Yadav",
+      "value": 10.0,
+      "team": "MI",
+      "detail": "MI \u00b7 25 off 12"
+     },
+     {
+      "name": "Saurabh Dubey",
+      "value": 8.6,
+      "team": "KKR",
+      "detail": "KKR \u00b7 2-30 in 4"
+     },
+     {
+      "name": "Abdul Samad",
+      "value": 4.6,
+      "team": "LSG",
+      "detail": "LSG \u00b7 74 off 44 \u00b7 1-12 in 1"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "metric_bars",
+   "start": 15.463,
+   "end": 20.405,
+   "kicker": "Released, in the auction pool",
+   "payload": {
+    "metric": {
+     "label": "Runs above par, bat + ball",
+     "format": "signed1"
+    },
+    "label_width": 150,
+    "rows": [
+     {
+      "name": "Karun Nair",
+      "value": 20.1,
+      "team": "DC",
+      "highlight": true,
+      "detail": "ex-DC \u00b7 61* off 35"
+     },
+     {
+      "name": "Ravi Singh",
+      "value": 20.0,
+      "team": "RR",
+      "highlight": false,
+      "detail": "ex-RR \u00b7 44 off 18"
+     },
+     {
+      "name": "Tejasvi Dahiya",
+      "value": 17.0,
+      "team": "KKR",
+      "highlight": false,
+      "detail": "ex-KKR \u00b7 51 off 25"
+     },
+     {
+      "name": "Jaydev Unadkat",
+      "value": 13.3,
+      "team": "SRH",
+      "highlight": false,
+      "detail": "ex-SRH \u00b7 2-22 in 4"
+     },
+     {
+      "name": "Deepak Chahar",
+      "value": 11.9,
+      "team": "MI",
+      "highlight": false,
+      "detail": "ex-MI \u00b7 1-25 in 4"
+     },
+     {
+      "name": "Sahil Parakh",
+      "value": 8.9,
+      "team": "DC",
+      "highlight": false,
+      "detail": "ex-DC \u00b7 35 off 25"
+     },
+     {
+      "name": "Avesh Khan",
+      "value": 8.7,
+      "team": "LSG",
+      "highlight": false,
+      "detail": "ex-LSG \u00b7 1-24 in 4"
+     },
+     {
+      "name": "Abishek Porel",
+      "value": 8.0,
+      "team": "DC",
+      "highlight": false,
+      "detail": "ex-DC \u00b7 49 off 34"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "pick_one",
+   "start": 20.405,
+   "end": 28.752,
+   "captions": false,
+   "data": {
+    "question": "Who would you",
+    "lit": "bid for?",
+    "options": [
+     {
+      "label": "Karun",
+      "line": "61* \u00b7 ex-DC"
+     },
+     {
+      "label": "Dhull",
+      "line": "125 \u00b7 no IPL side"
+     }
+    ],
+    "send": {
+     "text": "Send this to your team's fans",
+     "anchor": {
+      "line": 3,
+      "word": 14
+     },
+     "at": 26.165
+    },
+    "credit": [
+     "Runs above par, bat + ball \u00b7 one game \u00b7 SMAT round 3, 18 Nov",
+     "hindsightcricket.com \u00b7 Data: Himanish Ganjoo & TechRadar, Cricsheet"
+    ]
+   }
+  }
+ ]
+}
