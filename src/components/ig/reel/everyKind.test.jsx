@@ -55,6 +55,11 @@ const EXTRA = {
   xis: { payload: { sides: [
     { team: 'Mumbai Indians', opponent: 'Chennai Super Kings', date: '2026-04-12', players: ['R Sharma', 'R Rickelton', 'SA Yadav'], earlier: {} },
     { team: 'Chennai Super Kings', opponent: 'Mumbai Indians', date: '2026-04-12', players: ['RD Gaikwad', 'D Conway', 'S Dube'], earlier: { 'D Conway': '2026-03-30' } }] } },
+  round_stack: { payload: { metric: { label: 'Runs above par', format: 'signed1' },
+    rounds: [{ key: '1', label: 'R1' }, { key: '2', label: 'R2' }, { key: '3', label: 'R3' }, { key: '4', label: 'R4' }],
+    rows: [{ name: 'Yash Dhull', detail: '267 off 141', highlight: true, segments: [{ key: '1', value: 7 }, { key: '2', value: 10.4 }, { key: '3', value: 44.6 }, { key: '4', value: 3.3 }] },
+      { name: 'Vikalp Tiwari', detail: '3 games', segments: [{ key: '1', value: 33.2 }, { key: '2', value: -0.8 }, { key: '3', value: 30.4 }, { key: '4', value: null, note: 'washed out' }] },
+      { name: 'Shivalik Sharma', segments: [{ key: '1', value: -8.3 }, { key: '2', value: 55.3 }, { key: '3', value: 7 }, { key: '4', value: -0.7 }] }] } },
   recap_text: { payload: { headline: 'Won in the middle overs', bullets: ['Spin went for 5.1 an over', 'Two wickets in the 14th'] } },
 };
 
@@ -110,4 +115,27 @@ describe('every visual kind with and without motion', () => {
   });
 
   Object.keys(ALL).filter((k) => !CASES[k]).sort().forEach((k) => test.todo(`${k}: no payload yet (plays the fallback)`));
+});
+
+describe('round_stack geometry (form so far)', () => {
+  // eslint-disable-next-line global-require
+  const { roundStackGeometry } = require('../../story/postVisuals');
+  const { rounds, rows } = EXTRA.round_stack.payload;
+  const g = roundStackGeometry(rows, rounds);
+  test('below-par rounds sit left of par, above-par right, and the total is the signed sum', () => {
+    const shiv = g.rows[2];
+    shiv.segs.filter((x) => x.value < 0).forEach((x) => expect(x.x + x.w).toBeLessThanOrEqual(g.zero + 1e-9));
+    shiv.segs.filter((x) => x.value > 0).forEach((x) => expect(x.x).toBeGreaterThanOrEqual(g.zero - 1e-9));
+    expect(shiv.total).toBeCloseTo(-8.3 + 55.3 + 7 - 0.7, 6);
+  });
+  test('a round with no data is a missing slot, not a zero', () => {
+    const vik = g.rows[1];
+    expect(vik.segs.find((x) => x.key === '4').missing).toBe(true);
+    expect(vik.total).toBeCloseTo(33.2 - 0.8 + 30.4, 6);
+  });
+  test('no segment passes either edge', () => {
+    g.rows.forEach((r) => r.segs.filter((x) => !x.missing).forEach((x) => {
+      expect(x.x).toBeGreaterThanOrEqual(-1e-9); expect(x.x + x.w).toBeLessThanOrEqual(100 + 1e-9);
+    }));
+  });
 });

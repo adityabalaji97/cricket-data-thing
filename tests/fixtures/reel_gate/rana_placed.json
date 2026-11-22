@@ -1,0 +1,668 @@
+{
+ "duration": 28.1,
+ "timing": {
+  "lines": [
+   "Nitish Rana sweeps or reverse-sweeps 26% of the balls he faces from spin. No regular IPL batter does it more.",
+   "Of 69 regulars since 2022, only Dinesh Karthik comes close.",
+   "The sweep: 127 runs off 61 balls. The reverse sweep: out every five balls.",
+   "A Raina-style left-hander, but not Raina's method: Raina drove spin. Rana sweeps it. And Delhi just let him go.",
+   "Would you bid for him?"
+  ],
+  "starts": [
+   0.0,
+   7.441,
+   11.892,
+   17.815,
+   25.569
+  ],
+  "lengths": [
+   7.321,
+   4.33,
+   5.804,
+   7.634,
+   0.938
+  ],
+  "words": [
+   [
+    0.0,
+    0.32,
+    0.64,
+    1.08,
+    1.55,
+    2.02,
+    3.18,
+    3.32,
+    3.44,
+    3.62,
+    3.82,
+    4.14,
+    4.38,
+    5.22,
+    5.42,
+    5.78,
+    6.18,
+    6.38,
+    6.6,
+    6.78
+   ],
+   [
+    7.441,
+    7.661,
+    8.161,
+    8.701,
+    8.921,
+    10.141,
+    10.321,
+    10.701,
+    11.041,
+    11.261
+   ],
+   [
+    11.892,
+    11.892,
+    12.732,
+    13.452,
+    13.772,
+    13.992,
+    14.352,
+    15.072,
+    15.512,
+    15.512,
+    16.232,
+    16.332,
+    16.692,
+    16.992
+   ],
+   [
+    17.815,
+    18.515,
+    19.215,
+    19.915,
+    19.915,
+    20.175,
+    20.595,
+    21.575,
+    21.825,
+    22.075,
+    22.615,
+    23.155,
+    23.535,
+    24.155,
+    24.295,
+    24.475,
+    24.775,
+    24.955,
+    25.095
+   ],
+   [
+    25.569,
+    25.729,
+    25.849,
+    26.009,
+    26.149
+   ]
+  ]
+ },
+ "scenes": [
+  {
+   "kind": "hero_card",
+   "start": 0.0,
+   "end": 7.441,
+   "kicker": "Against spin \u00b7 IPL 2022-26",
+   "data": {
+    "name": "Nitish Rana",
+    "team": "DC",
+    "corner": "Left-handed \u00b7 ex-DC",
+    "rank": 1,
+    "from": 26,
+    "value": 26,
+    "format": "pct0",
+    "detail": "of balls v spin: sweeps + reverse sweeps",
+    "badge": {
+     "text": "No. 1 of 69 IPL regulars",
+     "anchor": "No",
+     "at": 5.22
+    }
+   }
+  },
+  {
+   "kind": "scatter_plus",
+   "start": 7.441,
+   "end": 11.892,
+   "kicker": "69 IPL regulars \u00b7 sweep share v runs above par",
+   "payload": {
+    "x": {
+     "label": "Sweeps + reverse sweeps, % of balls",
+     "format": "pct0"
+    },
+    "y": {
+     "label": "Runs above par per 100 balls",
+     "format": "signed1"
+    },
+    "points": [
+     {
+      "name": "Shubman Gill",
+      "x": 7.8,
+      "y": 9.6
+     },
+     {
+      "name": "Virat Kohli",
+      "x": 5.9,
+      "y": -22.8
+     },
+     {
+      "name": "KL Rahul",
+      "x": 8.7,
+      "y": -10.2
+     },
+     {
+      "name": "Suryakumar Yadav",
+      "x": 22.2,
+      "y": 7.9
+     },
+     {
+      "name": "Jos Buttler",
+      "x": 8.5,
+      "y": 1.2
+     },
+     {
+      "name": "Tilak Varma",
+      "x": 12.9,
+      "y": 2.4
+     },
+     {
+      "name": "Sai Sudharsan",
+      "x": 10.8,
+      "y": 3.6
+     },
+     {
+      "name": "Faf du Plessis",
+      "x": 1.1,
+      "y": -20.5
+     },
+     {
+      "name": "Sanju Samson",
+      "x": 4.0,
+      "y": 12.2
+     },
+     {
+      "name": "Heinrich Klaasen",
+      "x": 5.4,
+      "y": 36.8
+     },
+     {
+      "name": "Aiden Markram",
+      "x": 2.8,
+      "y": -5.2
+     },
+     {
+      "name": "Ishan Kishan",
+      "x": 10.6,
+      "y": -3.1
+     },
+     {
+      "name": "Ruturaj Gaikwad",
+      "x": 7.6,
+      "y": -4.4
+     },
+     {
+      "name": "Shreyas Iyer",
+      "x": 6.2,
+      "y": 9.6
+     },
+     {
+      "name": "Riyan Parag",
+      "x": 8.2,
+      "y": -4.7
+     },
+     {
+      "name": "Nicholas Pooran",
+      "x": 17.0,
+      "y": 27.3,
+      "tag": true,
+      "short": "Pooran"
+     },
+     {
+      "name": "Ajinkya Rahane",
+      "x": 8.5,
+      "y": -16.6
+     },
+     {
+      "name": "Yashasvi Jaiswal",
+      "x": 13.3,
+      "y": -8.7
+     },
+     {
+      "name": "Hardik Pandya",
+      "x": 4.6,
+      "y": -0.8
+     },
+     {
+      "name": "Rishabh Pant",
+      "x": 16.4,
+      "y": -3.3
+     },
+     {
+      "name": "Shivam Dube",
+      "x": 2.8,
+      "y": 15.9
+     },
+     {
+      "name": "Abhishek Sharma",
+      "x": 5.7,
+      "y": 46.4,
+      "tag": true,
+      "short": "Abhishek"
+     },
+     {
+      "name": "Rinku Singh",
+      "x": 9.6,
+      "y": -3.2
+     },
+     {
+      "name": "Devdutt Padikkal",
+      "x": 11.0,
+      "y": -14.4
+     },
+     {
+      "name": "Mitchell Marsh",
+      "x": 9.4,
+      "y": -13.0
+     },
+     {
+      "name": "Rohit Sharma",
+      "x": 19.6,
+      "y": -10.4
+     },
+     {
+      "name": "Rajat Patidar",
+      "x": 8.9,
+      "y": 38.4
+     },
+     {
+      "name": "Axar Patel",
+      "x": 7.1,
+      "y": 14.2
+     },
+     {
+      "name": "Nitish Rana",
+      "x": 25.8,
+      "y": 8.6,
+      "highlight": true,
+      "short": "Rana 26%"
+     },
+     {
+      "name": "Prabhsimran Singh",
+      "x": 19.3,
+      "y": 8.7
+     },
+     {
+      "name": "David Miller",
+      "x": 3.8,
+      "y": 7.5
+     },
+     {
+      "name": "Cameron Green",
+      "x": 8.2,
+      "y": 2.3
+     },
+     {
+      "name": "Marcus Stoinis",
+      "x": 12.3,
+      "y": 2.9
+     },
+     {
+      "name": "Venkatesh Iyer",
+      "x": 17.9,
+      "y": -4.0
+     },
+     {
+      "name": "Ayush Badoni",
+      "x": 14.5,
+      "y": -14.4
+     },
+     {
+      "name": "Devon Conway",
+      "x": 20.3,
+      "y": -2.7
+     },
+     {
+      "name": "Dhruv Jurel",
+      "x": 8.4,
+      "y": -20.4
+     },
+     {
+      "name": "Rahul Tripathi",
+      "x": 23.3,
+      "y": 5.9
+     },
+     {
+      "name": "Nehal Wadhera",
+      "x": 15.7,
+      "y": 9.3
+     },
+     {
+      "name": "Ravindra Jadeja",
+      "x": 9.4,
+      "y": -27.6
+     },
+     {
+      "name": "Krunal Pandya",
+      "x": 12.0,
+      "y": -12.3
+     },
+     {
+      "name": "Jitesh Sharma",
+      "x": 11.7,
+      "y": 16.3
+     },
+     {
+      "name": "David Warner",
+      "x": 14.8,
+      "y": 8.5
+     },
+     {
+      "name": "Liam Livingstone",
+      "x": 8.7,
+      "y": -12.0
+     },
+     {
+      "name": "Angkrish Raghuvanshi",
+      "x": 13.9,
+      "y": -10.5
+     },
+     {
+      "name": "Quinton de Kock",
+      "x": 14.2,
+      "y": 2.3
+     },
+     {
+      "name": "Glenn Maxwell",
+      "x": 15.4,
+      "y": 18.7
+     },
+     {
+      "name": "Deepak Hooda",
+      "x": 14.3,
+      "y": -5.6
+     },
+     {
+      "name": "Sam Curran",
+      "x": 0.0,
+      "y": -10.7
+     },
+     {
+      "name": "Shikhar Dhawan",
+      "x": 14.6,
+      "y": -16.6
+     },
+     {
+      "name": "Shimron Hetmyer",
+      "x": 7.3,
+      "y": -16.2
+     },
+     {
+      "name": "Shashank Singh",
+      "x": 6.4,
+      "y": 12.4
+     },
+     {
+      "name": "Tristan Stubbs",
+      "x": 9.8,
+      "y": 7.5
+     },
+     {
+      "name": "Andre Russell",
+      "x": 9.5,
+      "y": 15.1
+     },
+     {
+      "name": "Travis Head",
+      "x": 7.6,
+      "y": 1.3
+     },
+     {
+      "name": "Nitish Kumar Reddy",
+      "x": 11.1,
+      "y": 26.2
+     },
+     {
+      "name": "Phil Salt",
+      "x": 6.0,
+      "y": 34.5
+     },
+     {
+      "name": "Wriddhiman Saha",
+      "x": 9.1,
+      "y": -30.2
+     },
+     {
+      "name": "Dewald Brevis",
+      "x": 5.7,
+      "y": 12.9
+     },
+     {
+      "name": "Manish Pandey",
+      "x": 0.0,
+      "y": -3.5
+     },
+     {
+      "name": "Abishek Porel",
+      "x": 3.9,
+      "y": -15.9
+     },
+     {
+      "name": "Rovman Powell",
+      "x": 8.1,
+      "y": -1.1
+     },
+     {
+      "name": "Will Jacks",
+      "x": 23.7,
+      "y": 1.5
+     },
+     {
+      "name": "Shahbaz Ahmed",
+      "x": 16.4,
+      "y": -22.9
+     },
+     {
+      "name": "Moeen Ali",
+      "x": 9.6,
+      "y": -11.2
+     },
+     {
+      "name": "Tim David",
+      "x": 0.0,
+      "y": 1.0
+     },
+     {
+      "name": "Dinesh Karthik",
+      "x": 24.8,
+      "y": -9.2,
+      "tag": true,
+      "short": "Karthik 25%"
+     },
+     {
+      "name": "Mayank Agarwal",
+      "x": 7.1,
+      "y": -25.7
+     },
+     {
+      "name": "Vijay Shankar",
+      "x": 11.8,
+      "y": -2.7
+     }
+    ],
+    "box": false
+   }
+  },
+  {
+   "kind": "metric_bars",
+   "start": 11.892,
+   "end": 17.815,
+   "kicker": "His shots against spin",
+   "payload": {
+    "metric": {
+     "label": "Runs above par",
+     "format": "signed1"
+    },
+    "label_width": 150,
+    "rows": [
+     {
+      "name": "Sweep",
+      "value": 42.0,
+      "highlight": true,
+      "detail": "127 off 61 \u00b7 out 5x, every 12 balls"
+     },
+     {
+      "name": "Drive",
+      "value": 27.3,
+      "highlight": false,
+      "detail": "124 off 71 \u00b7 out 2x"
+     },
+     {
+      "name": "Pull",
+      "value": 20.5,
+      "highlight": false,
+      "detail": "50 off 21 \u00b7 out 2x"
+     },
+     {
+      "name": "Cut",
+      "value": 3.2,
+      "highlight": false,
+      "detail": "37 off 26 \u00b7 out 1x"
+     },
+     {
+      "name": "Reverse sweep",
+      "value": -2.6,
+      "highlight": false,
+      "detail": "35 off 26 \u00b7 out 5x, every 5 balls"
+     },
+     {
+      "name": "Work / push",
+      "value": -13.3,
+      "highlight": false,
+      "detail": "21 off 26"
+     },
+     {
+      "name": "Flick / glance",
+      "value": -23.9,
+      "highlight": false,
+      "detail": "74 off 76 \u00b7 out 1x"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "share_bars",
+   "start": 17.815,
+   "end": 25.569,
+   "kicker": "Raina's role, a different method",
+   "payload": {
+    "groups": [
+     {
+      "key": "sweep",
+      "label": "Sweep + reverse",
+      "colour": "#e8ecf2"
+     },
+     {
+      "key": "drive",
+      "label": "Drive",
+      "colour": "#5b8def"
+     },
+     {
+      "key": "work",
+      "label": "Flick, work",
+      "colour": "#5b6b85"
+     },
+     {
+      "key": "other",
+      "label": "Other",
+      "colour": "#3a4252"
+     }
+    ],
+    "format": "pct0",
+    "label_width": 150,
+    "rows": [
+     {
+      "name": "Rana",
+      "detail": "337 balls",
+      "segments": [
+       {
+        "key": "sweep",
+        "value": 25.8
+       },
+       {
+        "key": "drive",
+        "value": 21.1
+       },
+       {
+        "key": "work",
+        "value": 30.3
+       },
+       {
+        "key": "other",
+        "value": 22.8
+       }
+      ]
+     },
+     {
+      "name": "Raina",
+      "detail": "754 balls \u00b7 sweeps 5%",
+      "segments": [
+       {
+        "key": "sweep",
+        "value": 4.6
+       },
+       {
+        "key": "drive",
+        "value": 41.8
+       },
+       {
+        "key": "work",
+        "value": 26.4
+       },
+       {
+        "key": "other",
+        "value": 27.2
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "kind": "pick_one",
+   "start": 25.569,
+   "end": 28.1,
+   "captions": false,
+   "data": {
+    "question": "Would you",
+    "lit": "bid for him?",
+    "options": [
+     {
+      "label": "Bid",
+      "line": "No. 1 sweeper"
+     },
+     {
+      "label": "Pass",
+      "line": "Reverse risk"
+     }
+    ],
+    "send": {
+     "text": "Send this to a fan of your team",
+     "anchor": {
+      "line": 4,
+      "word": 2
+     },
+     "at": 25.849
+    },
+    "credit": [
+     "Shots v spin \u00b7 IPL 2022-26 \u00b7 Raina 2015-21",
+     "hindsightcricket.com \u00b7 Data: Himanish Ganjoo & TechRadar, Cricsheet"
+    ]
+   }
+  }
+ ]
+}

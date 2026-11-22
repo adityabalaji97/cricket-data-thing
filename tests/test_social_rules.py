@@ -135,3 +135,59 @@ def test_a_hand_post_breaking_the_copy_rules_is_not_queued():
 
     with pytest.raises(ig_backlog.RuleBroken):
         ig_backlog.upsert_pack(Conn(), post, None, source="hand")
+
+
+# --- captions-off gate (SMAT round 3, 19 Nov 2026: a fact voiced over the captions-off close never appeared) ---
+import copy as _copy
+import json as _json
+from pathlib import Path as _Path
+
+_GATE = _Path(__file__).parent / "fixtures" / "reel_gate"
+
+
+def _gate_spec(name):
+    return _json.loads((_GATE / name).read_text())
+
+
+def _with_last_line(spec, line):
+    s = _copy.deepcopy(spec)
+    t = s["timing"]
+    start = s["scenes"][-1]["start"]
+    t["lines"][-1] = line
+    t["words"][-1] = [round(start + 0.3 * i, 3) for i in range(len(line.split(" ")))]
+    return s
+
+
+def test_captions_off_gate_fails_round3_close():
+    from services.social_rules import captions_off_problems, reel_problems
+    spec = _gate_spec("smat_r3_placed.json")
+    out = captions_off_problems(spec)
+    assert len(out) == 1 and "Scene 4 (pick_one)" in out[0] and "a number" in out[0]
+    assert any("captions off but voices" in p for p in reel_problems(spec))
+
+
+def test_captions_off_gate_passes_question_alone():
+    from services.social_rules import captions_off_problems
+    assert captions_off_problems(_with_last_line(_gate_spec("smat_r3_placed.json"), "Who would you bid for?")) == []
+
+
+def test_captions_off_gate_number_word_and_length():
+    from services.social_rules import captions_off_problems
+    spec = _gate_spec("smat_r3_placed.json")
+    assert "number word" in captions_off_problems(_with_last_line(spec, "Three or four?"))[0]
+    long_q = "So after all of that, who exactly would you really bid for now?"
+    assert "words (at most 10)" in captions_off_problems(_with_last_line(spec, long_q))[0]
+
+
+def test_captions_off_gate_passes_rana_and_untimed():
+    from services.social_rules import captions_off_problems
+    assert captions_off_problems(_gate_spec("rana_placed.json")) == []
+    spec = _gate_spec("smat_r3_placed.json")
+    spec.pop("timing")
+    assert captions_off_problems(spec) == []
+
+
+def test_line_charts_need_their_draw_time():
+    from services.social_rules import reel_frame
+    drawn = reel_frame()["rules"]["drawn"]
+    assert drawn["bid_trail"] >= 2.5 and drawn["metric_lines"] >= 2.5 and drawn["round_stack"] >= 3

@@ -347,6 +347,46 @@ def _item_value(payload: Any, key: str) -> Optional[float]:
     return found[0] if found else None
 
 
+_NUMBER_WORDS = re.compile(
+    r"\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
+    r"seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|lakh|crore)\b",
+    re.I)
+
+
+def captions_off_problems(spec: Dict[str, Any]) -> List[str]:
+    """A scene with captions off shows none of what it voices, so it may voice only the question: no digits, no number
+    words and at most rules.captionsOffWords words (SMAT round 3, 19 Nov 2026: "Yash Dhull, 125 off 59" was voiced over
+    the captions-off close and never appeared on screen). Words are assigned to scenes by their voiced time; with no
+    timing there is nothing to check (reel_timing.place gives estimated timing, so a dry run catches it unpaid)."""
+    timing = spec.get("timing")
+    if not timing:
+        return []
+    cap = reel_frame()["rules"].get("captionsOffWords", 10)
+    out: List[str] = []
+    voiced = [(at, w) for li, line in enumerate(timing["lines"]) for w, at in zip(line.split(" "), timing["words"][li])]
+    for i, s in enumerate(spec.get("scenes") or []):
+        if s.get("captions") is not False:
+            continue
+        a, b = s.get("start", 0), s.get("end", float("inf"))
+        words = [w for at, w in voiced if a - 1e-3 <= at < b]
+        if not words:
+            continue
+        said = " ".join(words)
+        name = f"Scene {i + 1} ({s.get('kind')})"
+        why = []
+        if re.search(r"\d", said):
+            why.append("a number")
+        elif _NUMBER_WORDS.search(said):
+            why.append(f"a number word ('{_NUMBER_WORDS.search(said).group(0)}')")
+        if len(words) > cap:
+            why.append(f"{len(words)} words (at most {cap})")
+        if why:
+            short = said if len(said) <= 60 else said[:57] + "..."
+            out.append(f"{name} has captions off but voices {' and '.join(why)}: '{short}'. Nothing it says is on "
+                       f"screen, so its line may be the question alone; give a fact its own captioned scene")
+    return out
+
+
 def reel_problems(spec: Dict[str, Any]) -> List[str]:
     """What a motion Reel's spec breaks (docs/social_rules.md, Reels; MOTION_REEL_PLAN.md M7): length, scene order and
     minimum time on screen, how long a lit item holds before the next, caption size, the closing scene's captions,
@@ -395,6 +435,7 @@ def reel_problems(spec: Dict[str, Any]) -> List[str]:
             out.append(f"{name}: the send line is too long for one line ({len(send)} characters)")
     if scenes[-1].get("captions") is not False:
         out.append("The closing scene must turn captions off (the send line is the caption)")
+    out += captions_off_problems(spec)
     for i, c in enumerate(reel_captions(spec)):
         words = [w["w"] for w in c.get("words") or []]
         if len(words) > R["captionWords"]:

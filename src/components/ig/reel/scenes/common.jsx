@@ -32,7 +32,8 @@ export const pop = (t, a, origin = 'left center') => {
 export const Count = ({ value, format = 'dec1', t, a, dur = 0.8, from = 0, suffix = '', done = '' }) => {
   const p = progress(t, a, dur);
   const v = from + countUp(value - from, p, format === 'int' || /0$/.test(format) ? 0 : format.endsWith('2') ? 2 : 1);
-  return <>{fmt(v, format)}{suffix}{p >= 1 ? done : ''}</>;
+  // a number that doesn't count (from === value: frame 0 shows the final figure) has its suffix from the start ("3-19")
+  return <>{fmt(v, format)}{suffix}{p >= 1 || from === value ? done : ''}</>;
 };
 
 /** The kicker over a scene: mono caps in the lower text tier, shrunk to fit one line (validateReel flags long ones). */
