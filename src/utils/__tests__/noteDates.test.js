@@ -12,13 +12,18 @@ test('a January match previewed in December is next year', () => {
   expect(start.toISOString()).toBe('2027-01-01T08:30:00.000Z');
 });
 
-test('a preview passes four hours after a T20 starts, nine after an ODI', () => {
+test('a December match previewed in January is the previous year', () => {
+  const start = previewStart(preview('BBL · T20 · SCG · Wed 30 Dec, 13:45 IST (08:15 GMT)', '2027-01-02T10:00:00+05:30'));
+  expect(start.toISOString()).toBe('2026-12-30T08:15:00.000Z');
+});
+
+test('a preview passes five hours after a T20 starts, ten after an ODI', () => {
   const t20 = preview('IPL · T20 · Wankhede · Fri 2 Oct, 19:30 IST (14:00 GMT)');
-  expect(previewPassed(t20, Date.parse('2026-10-02T17:00:00Z'))).toBe(false);
-  expect(previewPassed(t20, Date.parse('2026-10-02T18:30:00Z'))).toBe(true);
+  expect(previewPassed(t20, Date.parse('2026-10-02T18:30:00Z'))).toBe(false);
+  expect(previewPassed(t20, Date.parse('2026-10-02T19:30:00Z'))).toBe(true);
   const odi = preview('Australia v England · ODI · Hobart · Fri 2 Oct, 09:00 IST (03:30 GMT)');
-  expect(previewPassed(odi, Date.parse('2026-10-02T10:00:00Z'))).toBe(false);
-  expect(previewPassed(odi, Date.parse('2026-10-02T13:00:00Z'))).toBe(true);
+  expect(previewPassed(odi, Date.parse('2026-10-02T13:00:00Z'))).toBe(false);
+  expect(previewPassed(odi, Date.parse('2026-10-02T14:00:00Z'))).toBe(true);
 });
 
 test('recaps, articles and previews without a start never count as passed', () => {

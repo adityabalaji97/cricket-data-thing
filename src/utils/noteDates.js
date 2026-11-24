@@ -7,7 +7,8 @@
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 // How long after the start a match is surely over: a T20 is about 3.5 hours, an ODI about 8.
-const MATCH_HOURS = { T20: 4, ODI: 9 };
+// Rain or a slow over rate can run past that, so the margin is generous.
+const MATCH_HOURS = { T20: 5, ODI: 10 };
 
 // The preview's match start as a Date, or null when the dek doesn't carry one.
 export const previewStart = (note) => {
@@ -19,6 +20,7 @@ export const previewStart = (note) => {
   if (Number.isNaN(published.getTime())) return null;
   let year = published.getUTCFullYear();
   if (month < published.getUTCMonth() - 1) year += 1; // published in Dec for a Jan match
+  else if (month > published.getUTCMonth() + 6) year -= 1; // published in Jan for a Dec match
   // IST is UTC+5:30.
   const start = new Date(Date.UTC(year, month, Number(m[1]), Number(m[3]), Number(m[4])) - 5.5 * 3600e3);
   return Number.isNaN(start.getTime()) ? null : start;
@@ -39,6 +41,8 @@ export const noteDateLabel = (note, now = new Date()) => {
   const date = new Date(note?.published_at || note?.created_at || '');
   if (Number.isNaN(date.getTime())) return '';
   const opts = { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' };
-  if (date.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  // Years compared in IST, the zone the date is printed in, not the viewer's.
+  const istYear = (d) => d.toLocaleDateString('en-GB', { year: 'numeric', timeZone: 'Asia/Kolkata' });
+  if (istYear(date) !== istYear(now)) opts.year = 'numeric';
   return date.toLocaleDateString('en-GB', opts);
 };
