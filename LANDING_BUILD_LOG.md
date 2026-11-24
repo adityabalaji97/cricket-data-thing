@@ -5,6 +5,48 @@ Screenshots are in `docs/landing_review/build/` in this worktree (not committed:
 Local setup: front end on :3001 against the local API on :8000 through a CORS shim on :8001 (the API only allows
 :3000); headless Chrome via CDP at 390x844, 360x800 and 1440x900.
 
+## Summary (24 Nov 2026, night one)
+
+Branch `worktree-agent-af285dfac6d456c80`. Nothing pushed, nothing deployed. All eight chunks are done and reviewed.
+
+| Chunk | Commits |
+|---|---|
+| L5 credits, small breakages | 06dc50a, fixes in fbffcb9; 6baa8a6 (fixture team codes 44px) |
+| L3 notes dated, played previews hidden | 101fc1a, fixes 15e9a58 |
+| L4 two screens cut (/connect, league counts off) | fbffcb9 |
+| L8 /links as the home page's twin, #squad | 8320269, fixes c5f942a |
+| L1 promise + ask box | 64b1f80, fixes 0138c9f |
+| L2 ratings = the team page's | e937851 |
+| L7 lead card, fixture row, 19-0 row | 1fc599e, fixes c4f8b97 |
+| L6 first paint: connector module, static shell, lazy routes | 72c135b, 29a1267, fixes 00fd8af, db06c31, fixes dad3539 |
+
+Main bundle 976 kB -> 225 kB gzip. Phone page 5,580px -> ~3,400px tall at 390.
+
+**Assumptions for the owner to check**
+- Logo: /links uses the site's `cricket-icon.svg` + "Hindsight" (as the home page, app header and mockup do), not
+  the bat-h mark from the Instagram avatar. Changing to bat-h would be a site-wide swap.
+- Example chips: six hand-kept questions with checked stored queries (`EXAMPLES` in
+  `src/components/landing/AskHero.jsx`), two a day. 1-3 are from the Fable review, 4-6 are from the Nov query log.
+- India-first headline fixtures: full cards only when India (men or women) play or a major league/event runs
+  (BIG_SERIES), never for qualifiers or women's matches without India. Otherwise one row.
+- The old BIG_TEAMS list (ten Full Members) is gone, so Australia v England gets the row, not the cards.
+- The ask placeholder is shorter than the review's wording ("Ask about a player, phase or matchup"), because the
+  longer one clipped at 390.
+- The chunk-reload flag clears when a chunk loads, not when the app mounts (clearing on mount looped).
+
+**Owner to-dos**
+- Mark posts as posted in the admin queue after publishing. /links (posts from the last 14 days) and the lead
+  card (a post planned today or yesterday) only show posted ones. Prod's list currently ends 21 Oct.
+- Curate `EXAMPLES` in AskHero.jsx, and keep each stored URL checked.
+
+**Open items**
+- `/teams/elo-rankings` (routers/teams.py) splits the IPL into "Indian Premier League" (to 2025) and "IPL" (2026). The
+  landing works around this by asking for both. The endpoint should normalise them.
+- `src/components/EloLeaderboard.jsx` is unused.
+- Notes have no `match_date`, so preview expiry reads the dek. Hand-written deks never expire.
+- Not checked live: a post-led lead card and a headline-day fixture (no local data for either); real slow-4G paint.
+- `FantasyPlanner.test.jsx` fails on main too (untouched). `CompetitionFilter` is still an unused import in App.js.
+
 ## L5: credits and small breakages
 
 Files: `src/components/LandingPage.jsx`, `src/data/iplSchedule.js`, `src/App.test.js`.
