@@ -19,9 +19,10 @@ export const ORGANIZATION = {
   '@context': 'https://schema.org', '@type': 'Organization', name: SITE_NAME, url: SITE_URL,
   logo: `${SITE_URL}/brand/instagram-avatar-bat-h.png`, sameAs: SOCIAL_PROFILES,
 };
-export const DEFAULT_TITLE = 'Hindsight - T20 cricket analytics';
+// One tagline everywhere (src/brand.js, public/index.html): keep the three in step.
+export const DEFAULT_TITLE = 'Hindsight · Hindsight shows you why';
 export const DEFAULT_DESCRIPTION =
-  'Ball-by-ball T20 and ODI analytics: Impact, win probability, matchups, match previews and a query builder you can ask in plain English.';
+  "Hindsight shows you why. Every ball of men's T20s and ODIs, answered in plain words: Impact, win probability, matchups and match previews.";
 
 export async function getJSON(path, timeoutMs = 6000) {
   const controller = new AbortController();

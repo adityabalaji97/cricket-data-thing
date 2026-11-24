@@ -24,6 +24,12 @@ const CHANNELS = [
 ];
 const NOTE_KIND = { recap: 'Match recap', preview: 'Preview', analysis: 'Analysis', article: 'Article' };
 
+const POST_FRESH_DAYS = 14;
+const recentPost = (post, now = Date.now()) => {
+  const t = Date.parse(`${String(post?.planned_for || '').slice(0, 10)}T00:00:00Z`);
+  return !Number.isNaN(t) && now - t <= POST_FRESH_DAYS * 864e5;
+};
+
 const dayLabel = (iso) => {
   const d = new Date(`${String(iso || '').slice(0, 10)}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
@@ -57,11 +63,13 @@ const IgLinks = () => {
     return `${base}${base.includes('?') ? '&' : '?'}utm_source=${source}&utm_medium=bio_link${hash ? `#${hash}` : ''}`;
   };
 
-  useEffect(() => { document.title = `Hindsight · ${TAGLINE}`; }, []);
+  useEffect(() => { document.title = TAGLINE; }, []);
 
   useEffect(() => {
+    // Posts are marked posted by hand, so the list can stop weeks back (21 Oct in prod on 24 Nov). Only the last
+    // fortnight's lead the page; older ones would read as current. With none, "Latest notes" leads.
     axios.get(`${config.API_URL}/snapshots/ig/recent`, { params: { limit: 9 } })
-      .then(({ data }) => setPosts(data.posts || [])).catch(() => setPosts([]));
+      .then(({ data }) => setPosts((data.posts || []).filter((p) => recentPost(p)))).catch(() => setPosts([]));
     // Dated notes, without previews of matches already played: the fallback when no post is marked posted, and
     // the written pieces behind the posts otherwise.
     axios.get(`${config.API_URL}/notes`, { params: { limit: 8 } })

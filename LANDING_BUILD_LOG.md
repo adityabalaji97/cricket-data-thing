@@ -142,3 +142,18 @@ App.test asserts the tagline, the search box and the fallback chip; 3 unit tests
 Screenshots: `l1_390.png`, `l1_360.png`, `l1_1440.png`.
 Open: the chips' "real recent questions" are whatever visitors typed last; the filter keeps out the obvious junk,
 but an odd one can still show. A hand-kept list is the alternative.
+
+## L8 review fixes
+
+Files: `src/components/ig/IgLinks.jsx`, `public/index.html`, `api/_lib/share.mjs`.
+
+- /links drops posts planned more than 14 days ago (client-side; the endpoint is unchanged). In prod the list ends
+  21 Oct, so today "Latest notes" leads /links until posts are marked posted again.
+- /links tab title is just TAGLINE ("Hindsight shows you why").
+- The fallback head (`public/index.html`): title and og/twitter titles "Hindsight · Hindsight shows you why";
+  description, og:description and twitter:description "Hindsight shows you why. Every ball of men's T20s and
+  ODIs, answered in plain words." No more "T20 Cricket Analytics" / "2025 Wrapped". og/twitter image moved from
+  the SVG (which most unfurlers ignore) to the absolute `/_og?path=%2F` card.
+- `api/_lib/share.mjs` DEFAULT_TITLE / DEFAULT_DESCRIPTION carry the same tagline (the crawler head for every page
+  without its own summary, and the home card's text). The share image headline "Who really won the match?" stays.
+- Still assumed: the logo on /links is the site's `cricket-icon.svg`, not the bat-h mark.
