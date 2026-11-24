@@ -35,3 +35,19 @@ Checked: 390 / 360 no horizontal scroll; error state with fixtures and innings b
 Screenshots: `before_390.png`, `l5_390.png` (full page), `l5_360_top.png`, `l5_error_390.png`,
 `l5_credits_390.png`.
 Open: the team-code links inside fixture/recent cards stay 32px tall (inline in a dense card).
+
+## L3: notes dated, played previews hidden
+
+Files: `src/components/LandingPage.jsx`, new `src/utils/noteDates.js` + `src/utils/__tests__/noteDates.test.js`.
+
+- Each note's kicker reads "MATCH RECAP · 1 OCT" (publish date in IST; the year appears outside the current year).
+- A preview drops off once its match is over. The notes API has no match date, so the start is read from the dek
+  that `services/note_drafts.py` writes ("Fri 2 Oct, 05:30 IST (00:00 GMT)"), the year from the publish date (Dec
+  publish, Jan match -> next year). "Over" = start + 4h for a T20, + 9h for an ODI. A preview whose dek has no
+  start (hand-written) stays: front end only, no API change.
+- Fetches 8 and shows the first 3 left, so hiding previews doesn't empty the row.
+
+Checked: unit tests (5) and App.test pass; local data's 2 Oct preview is hidden, the three notes left are dated.
+Screenshot: `l3_notes_390.png` (cover images are broken only locally: the dev server doesn't serve /img).
+Open: hand-written previews with a different dek format never expire; a `match_date` on the notes API would
+make this exact (small backend change, not done).

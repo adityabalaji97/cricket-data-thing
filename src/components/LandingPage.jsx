@@ -30,6 +30,7 @@ import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
 import playerProfileUrl from '../utils/playerProfileUrl';
+import { noteDateLabel, previewPassed } from '../utils/noteDates';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
 // src/theme/hindsightDark.js. The names are kept short because they are used densely
@@ -1308,16 +1309,18 @@ export const TodaysGamesSection = () => {
   );
 };
 
-// "Latest notes": the three newest published notes (routers/notes.py). Hidden until there are any.
+// "Latest notes": the three newest published notes (routers/notes.py), dated, without previews of matches that
+// have already been played. Hidden until there are any.
 const NOTE_KIND = { recap: 'Match recap', preview: 'Preview', analysis: 'Analysis', article: 'Article' };
 
 const LatestNotesSection = () => {
   const [notes, setNotes] = useState([]);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${config.API_URL}/notes?limit=3`)
+    // Fetch a few extra so dropping played previews still leaves three.
+    fetch(`${config.API_URL}/notes?limit=8`)
       .then((r) => (r.ok ? r.json() : { notes: [] }))
-      .then((d) => { if (!cancelled) setNotes(d.notes || []); })
+      .then((d) => { if (!cancelled) setNotes((d.notes || []).filter((note) => !previewPassed(note)).slice(0, 3)); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -1336,6 +1339,9 @@ const LatestNotesSection = () => {
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
                 {NOTE_KIND[note.kind] || 'Note'}
+                {noteDateLabel(note) && (
+                  <Box component="span" sx={{ color: C.soft, letterSpacing: '0.04em' }}> · {noteDateLabel(note)}</Box>
+                )}
               </Typography>
               <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2,
                 display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
