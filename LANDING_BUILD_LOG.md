@@ -316,3 +316,24 @@ Files: `public/index.html`, `api/meta.mjs`, new `api/_lib/shell.mjs` + `api/_lib
   drop the shell and `/` keeps it; an empty root still works. 4/4 pass against the built file.
 - AskHero starts from whatever was typed into the static box before the app loaded.
 - Google Fonts load without blocking (`media="print" onload`), with a `<noscript>` fallback.
+
+## L6 step 3: the heavy routes split with React.lazy
+
+Files: `src/App.js`.
+
+- Every page except the home page is `React.lazy`: player, team, venue (VenuePage, and VenueNotes on the old preview),
+  query, compare, games (and the five game pages), connect, venues, IPL predictions, wrapped, search, credits,
+  fantasy planner, scorecard, the two XI pages. (Admin, notes, /links, graphics were already lazy.) The home page
+  stays in main: it's the most common first page and has the static shell in front of it.
+- One `<React.Suspense>` around the main `<Routes>`, falling back to an empty `minHeight: 100vh` box (page background,
+  `aria-busy`), so the footer can't flash up under the header and then drop when the page arrives. The existing
+  per-route `fallback={null}` Suspense wrappers stay (nested; harmless).
+- `SearchBar` is imported from its own file, not the search index (which pulled in GoogleSearchLanding eagerly).
+- **Bundle (gzip, `npm run build`)**: main **976 kB -> 224.6 kB** (-751 kB). Biggest lazy chunks: 360.2 kB (a shared
+  vendor chunk the profile/team/venue/query pages use: charts), 103.6 kB, 46.4 kB, 39.5 kB. Served from the built
+  files (`python -m http.server` on build/), `/` downloads only `main.*.js` (688 kB raw, the 224.6 kB gzip) plus the
+  small `auto-player-load.js`.
+- Checked in the dev app (390): /player?name=V Kohli, /query, /team?team=MI, /games, /connect, /credits, /games/19-0,
+  /venue?venue=Wankhede..., /compare, /search, /scorecard/1535464 all render. Full Jest suite: 169 pass; the only
+  failure is `FantasyPlanner.test.jsx`, which fails on main too.
+- Pre-existing eslint warning left alone: `CompetitionFilter` imported but unused in App.js.

@@ -13,31 +13,10 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import VenueNotes from './components/VenueNotes';
 import PreviewFilters from './components/preview/PreviewFilters';
 import CompetitionFilter from './components/CompetitionFilter';
 import LandingPage from './components/LandingPage';
-import UnifiedPlayerProfile from './components/UnifiedPlayerProfile';
-import TeamPage from './components/pages/TeamPage';
-import IntlXIPage from './components/pages/IntlXIPage';
-import XIBuilderPage from './components/pages/XIBuilderPage';
-import VenuePage from './components/pages/VenuePage';
-import QueryPage from './components/query2/QueryPage';
-import ComparePage from './components/pages/ComparePage';
-import GamesPage from './components/pages/GamesPage';
-import ConnectPage from './components/pages/ConnectPage';
-import VenuesPage from './components/pages/VenuesPage';
-import IPLPredictions from './components/IPLPredictions';
-import WrappedPage from './components/wrapped/WrappedPage';
-import { GoogleSearchLanding, SearchBar } from './components/search';
-import GuessInningsGame from './components/games/GuessInningsGame';
-import PlayerJourneysGame from './components/games/PlayerJourneysGame';
-import CallItGame from './components/games/CallItGame';
-import HigherLowerGame from './components/games/HigherLowerGame';
-import SeasonDraftGame from './components/games/SeasonDraftGame';
-import CreditsPage from './components/CreditsPage';
-import FantasyPlanner from './components/FantasyPlanner';
-import MatchScorecardPage from './components/scorecard/MatchScorecardPage';
+import SearchBar from './components/search/SearchBar';
 import MobileBottomNav, { MobileNavSpacer } from './components/nav/MobileBottomNav';
 import { colors as hsColors, fonts as hsFonts } from './theme/hindsightDark';
 import axios from 'axios';
@@ -49,6 +28,36 @@ import ExploreMenu, { ExploreButton } from './components/nav/ExploreMenu';
 import { MensT20Scope, useFormat } from './context/FormatContext';
 import { pageViewKey, trackPageView } from './utils/analytics';
 import { apiErrorText } from './utils/apiError';
+
+// Landing plan L6: every page but the home page loads when visited, so the first visit downloads the home page and
+// the app shell, not the whole site (the main bundle was 976 kB gzipped). The home page stays in the main bundle: it
+// is the most-visited first page and has a static first screen in public/index.html.
+const UnifiedPlayerProfile = React.lazy(() => import('./components/UnifiedPlayerProfile'));
+const TeamPage = React.lazy(() => import('./components/pages/TeamPage'));
+const IntlXIPage = React.lazy(() => import('./components/pages/IntlXIPage'));
+const XIBuilderPage = React.lazy(() => import('./components/pages/XIBuilderPage'));
+const VenuePage = React.lazy(() => import('./components/pages/VenuePage'));
+const QueryPage = React.lazy(() => import('./components/query2/QueryPage'));
+const ComparePage = React.lazy(() => import('./components/pages/ComparePage'));
+const GamesPage = React.lazy(() => import('./components/pages/GamesPage'));
+const ConnectPage = React.lazy(() => import('./components/pages/ConnectPage'));
+const VenuesPage = React.lazy(() => import('./components/pages/VenuesPage'));
+const IPLPredictions = React.lazy(() => import('./components/IPLPredictions'));
+const WrappedPage = React.lazy(() => import('./components/wrapped/WrappedPage'));
+const GoogleSearchLanding = React.lazy(() => import('./components/search/GoogleSearchLanding'));
+const GuessInningsGame = React.lazy(() => import('./components/games/GuessInningsGame'));
+const PlayerJourneysGame = React.lazy(() => import('./components/games/PlayerJourneysGame'));
+const CallItGame = React.lazy(() => import('./components/games/CallItGame'));
+const HigherLowerGame = React.lazy(() => import('./components/games/HigherLowerGame'));
+const SeasonDraftGame = React.lazy(() => import('./components/games/SeasonDraftGame'));
+const CreditsPage = React.lazy(() => import('./components/CreditsPage'));
+const FantasyPlanner = React.lazy(() => import('./components/FantasyPlanner'));
+const MatchScorecardPage = React.lazy(() => import('./components/scorecard/MatchScorecardPage'));
+const VenueNotes = React.lazy(() => import('./components/VenueNotes'));
+
+// While a page's code loads: an empty screen of the page background, a full viewport tall, so the footer doesn't
+// flash up under the header and then drop away when the page arrives.
+const RouteFallback = () => <Box aria-busy="true" sx={{ minHeight: '100vh' }} />;
 
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
 const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
@@ -729,6 +738,7 @@ const AppContent = () => {
 
       {!isCompactNav && <ExploreMenu open={exploreOpen} onClose={() => setExploreOpen(false)} />}
 
+      <React.Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/player" element={<UnifiedPlayerProfile isMobile={isMobile} />} />
@@ -823,6 +833,7 @@ const AppContent = () => {
           </Box>
         )} />
       </Routes>
+      </React.Suspense>
       {!location.pathname.startsWith('/wrapped') && (
         <Box
           sx={{
