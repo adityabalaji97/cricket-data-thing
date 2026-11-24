@@ -64,7 +64,7 @@ const TeamGroup = ({ scope }) => {
   const g = GROUPS[scope];
   const { state, sides, retry } = useSides(scope);
   const ready = state.status === 'ready' && sides.length > 0;
-  const rows = ready ? sides : g.fallback;
+  const rows = ready ? sides : [...g.fallback].sort((a, b) => a.name.localeCompare(b.name));
   const latest = sides.reduce((m, s) => (String(s.last || '') > m ? String(s.last) : m), '');
   return (
     <Box component="section" aria-label={g.kicker} sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.border}`,

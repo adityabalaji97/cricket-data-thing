@@ -457,3 +457,13 @@ File: `src/components/LandingPage.jsx` (`routePreview`).
   resolve, so the page opened venue-only. They now pass the full names (`team1`/`team2`, codes only as a fallback)
   plus `&story=1`, as /links does. Checked: GG v MIE (ILT20, live) opens "Gulf Giants v MI Emirates" with par,
   chasing and head to head (`fixture_preview_390.png`).
+
+### R2.4 Audit P2: the lead card's kicker follows the tab; review fixes for R2.2
+
+Files: `src/components/landing/LeadCard.jsx`, `src/components/landing/TeamRatings.jsx`, `src/components/pages/TeamList.jsx`,
+`src/navItems.js`.
+
+- The T20Is tab said "IPL 2027 · auction 16 Dec". `kicker` may now be a function of the tab: the IPL keeps the
+  auction frame, T20Is read "T20I team ratings" (its claim never used the frame). `lead_t20i_390.png`.
+- Review: the team list's fallback (ratings failed) is now really A-Z, as its scope line says.
+- Review: the header for /team reads "Teams" (navItems title), matching the page heading.

@@ -117,7 +117,7 @@ const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = n
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
         <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
           color: colors.accent }}>
-          {kicker}
+          {typeof kicker === 'function' ? kicker(scope) : kicker}
         </Typography>
         {typeof action === 'function' ? action(scope) : action}
       </Box>
