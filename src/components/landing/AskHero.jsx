@@ -59,7 +59,7 @@ const AskHero = ({ source = 'home', headingLevel = 'h1' }) => {
           borderRadius: '14px', border: `1.5px solid ${colors.accent}`, bgcolor: colors.input,
           '&:focus-within': { boxShadow: '0 0 0 3px rgba(182,242,74,0.18)' } }}>
         <Box component="input" type="search" enterKeyHint="search" aria-label="Ask a cricket question in plain words"
-          placeholder="Ask anything about a player, phase or matchup" value={text} onChange={(e) => setText(e.target.value)}
+          placeholder="Ask about a player, phase or matchup" value={text} onChange={(e) => setText(e.target.value)}
           sx={{ flex: 1, minWidth: 0, height: '100%', border: 0, outline: 0, bgcolor: 'transparent', color: colors.textHi,
             fontFamily: fonts.body, fontSize: 16, '&::placeholder': { color: colors.textLo, opacity: 1 },
             '&::-webkit-search-cancel-button': { display: 'none' } }} />

@@ -33,6 +33,7 @@ import playerProfileUrl from '../utils/playerProfileUrl';
 import { noteDateLabel, previewPassed } from '../utils/noteDates';
 import AskHero from './landing/AskHero';
 import TeamRatings from './landing/TeamRatings';
+import LeadCard from './landing/LeadCard';
 import { TAGLINE } from '../brand';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
@@ -398,6 +399,36 @@ const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
   const displayMatches = soonMatches.length ? soonMatches : [...matches].sort(fixtureOrder).slice(0, 6);
   const hasLive = displayMatches.some((match) => match.isLive);
   const hasToday = displayMatches.some((match) => match.isLive || localStart(match).date === today);
+  // Landing plan L7: the fixtures get the full cards only when India or a major league plays; otherwise one row (the
+  // next match), with the rest a tap away. The lead card above is the page's story.
+  const headline = displayMatches.some(isHeadline);
+  const [expanded, setExpanded] = useState(false);
+
+  if (loading) {
+    // The row's height: the usual case (a headline day grows to the cards).
+    return (
+      <Box component="section" aria-label="Fixtures" sx={{ mb: { xs: 3, md: 4.5 } }}>
+        <Kicker>Next match</Kicker>
+        <LoadingCard label="Loading fixtures..." minHeight={FIXTURE_ROW_HEIGHT} />
+      </Box>
+    );
+  }
+  if (!error && displayMatches.length && !headline && !expanded) {
+    const first = displayMatches[0];
+    return (
+      <Box component="section" aria-label="Fixtures" sx={{ mb: { xs: 3, md: 4.5 } }}>
+        <Kicker color={first.isLive ? C.red : C.lime}>{first.isLive ? 'Live now' : 'Next match'}</Kicker>
+        <FixtureRow match={first} />
+        {displayMatches.length > 1 && (
+          <Box component="button" type="button" onClick={() => setExpanded(true)}
+            sx={{ mt: 0.5, minHeight: 44, px: 0, border: 0, bgcolor: 'transparent', color: C.soft, fontFamily: fonts.mono, fontSize: 12,
+              cursor: 'pointer', '&:hover': { color: C.lime } }}>
+            {displayMatches.length - 1} more {displayMatches.length === 2 ? 'fixture' : 'fixtures'} ›
+          </Box>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
@@ -429,6 +460,61 @@ const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
 };
 
 const FIXTURE_CARD_HEIGHT = 280;
+const FIXTURE_ROW_HEIGHT = 56;
+
+// India, or a league or event most of our readers follow.
+const isHeadline = (match) => match.team1 === 'India' || match.team2 === 'India' || BIG_SERIES.test(match.series || '');
+
+const FixtureRow = ({ match }) => {
+  const live = Boolean(match.isLive);
+  const when = live ? 'LIVE' : (localStart(match).label || '');
+  const format = match.format === 'ODI' ? 'ODI' : 'T20';
+  const place = String(match.venue || '').split(',').slice(-1)[0].trim();
+  return (
+    <Box component={Link} to={routePreview(match)} aria-label={`${match.team1} v ${match.team2}: match preview`}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minHeight: FIXTURE_ROW_HEIGHT, px: 1.75, borderRadius: '14px',
+        bgcolor: C.surface, border: `1px solid ${live ? 'rgba(229,72,77,0.5)' : C.hairline}`, textDecoration: 'none', color: C.mid,
+        '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' } }}>
+      <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, flexShrink: 0 }}>{when}</Typography>
+      <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: 0.75, overflow: 'hidden' }}>
+        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>
+          {match.team1Abbr || match.team1} v {match.team2Abbr || match.team2}
+        </Typography>
+        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {format}{place ? `, ${place}` : ''}
+        </Typography>
+      </Box>
+      <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Preview ›</Typography>
+    </Box>
+  );
+};
+
+// Daily games under the lead card and the fixture (decided 17 Nov 2026): one row for 19-0, the most-viewed page, and
+// a link to the rest on /games.
+const GamesRow = () => (
+  <Box component="section" aria-label="Games" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
+    <Kicker>Play</Kicker>
+    <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1 }}>
+      <Box component={Link} to="/games/19-0"
+        sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.25, minHeight: FIXTURE_ROW_HEIGHT, px: 1.75,
+          borderRadius: '14px', bgcolor: C.surface, border: '1px solid rgba(182,242,74,0.35)', textDecoration: 'none',
+          '&:hover': { bgcolor: C.raised } }}>
+        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 18, flexShrink: 0 }}>19-0</Typography>
+        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap', flex: 1 }}>
+          Draft an IPL XI from 19 seasons
+        </Typography>
+        <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, flexShrink: 0 }}>Play ›</Typography>
+      </Box>
+      <Box component={Link} to="/games"
+        sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', px: 1.5, minHeight: FIXTURE_ROW_HEIGHT, borderRadius: '14px',
+          border: `1px solid ${C.hairlineStrong}`, color: C.mid, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none',
+          whiteSpace: 'nowrap', '&:hover': { color: C.lime } }}>
+        All games
+      </Box>
+    </Box>
+  </Box>
+);
 
 const TodayMatchCard = ({ match }) => {
   const live = Boolean(match.isLive);
@@ -1200,6 +1286,7 @@ const LandingPage = ({ showLeagueCounts = false }) => {
   // FormatSpec to pick strike-rate bands. The landing showcase is single-format by nature.
   const { pinnedFormatParams: formatParams } = useFormat();
   const [navOpen, setNavOpen] = useState(false);
+  const [leadKind, setLeadKind] = useState(null);
   const navigate = useNavigate();
   // Other pages set their own titles; coming back home must not keep theirs. Same words as public/index.html.
   useEffect(() => { document.title = `Hindsight · ${TAGLINE}`; }, []);
@@ -1326,9 +1413,10 @@ const LandingPage = ({ showLeagueCounts = false }) => {
       <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
         <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
         <AskHero />
+        <Box sx={{ mb: { xs: 2, md: 3 } }}><LeadCard onKind={setLeadKind} /></Box>
         <TodaySection matches={fixtures} loading={fixturesLoading} error={fixturesError}
           onRetry={() => setFixturesTry((n) => n + 1)} isMobile={isMobile} />
-        <TodaysGamesSection />
+        <GamesRow />
         <LatestNotesSection />
         <RecentMatchesSection
           data={recentData}
@@ -1347,7 +1435,8 @@ const LandingPage = ({ showLeagueCounts = false }) => {
         />
         <FeaturedInningsSection innings={innings} loading={inningsLoading} error={inningsError}
           onRetry={() => setInningsTry((n) => n + 1)} isMobile={isMobile} />
-        <Box sx={{ mb: { xs: 3.75, md: 5.5 } }}><TeamRatings /></Box>
+        {/* The ratings lower down only when a post leads; otherwise they are the lead card. */}
+        {leadKind === 'post' && <Box sx={{ mb: { xs: 3.75, md: 5.5 } }}><TeamRatings /></Box>}
         <ConnectRow />
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
         <CreditsSection />

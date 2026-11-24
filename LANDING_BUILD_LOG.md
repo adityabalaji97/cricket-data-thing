@@ -210,3 +210,44 @@ Files: new `src/components/landing/TeamRatings.jsx` + `src/components/landing/__
 Checked: 390, 360, 1440; T20Is view (12 sides); 3 unit tests (merge/rename/defunct, intl codes, claim); App.test;
 build. Screenshots: `l2_390.png`, `l2_intl_360.png`, `l2_1440.png`.
 Open: the dot scale runs from the lowest to the highest rating, so the last side always sits at the left end.
+
+## L7: the lead card, the fixture row, games below
+
+Files: new `src/components/landing/LeadCard.jsx` + `__tests__/leadCard.test.js`, `src/components/landing/TeamRatings.jsx`,
+`src/components/landing/AskHero.jsx` (placeholder), `src/components/LandingPage.jsx`.
+
+- Page order now: top bar, promise + ask box (L1), **lead card**, the fixture (a row), Play (19-0 + All games), latest
+  notes, recent matches, standout innings, (ratings only when a post leads), connector row, credits.
+- Lead card (decided: automatic with a hand-pick override): the override is the day's post, an IG carousel planned
+  for today (IST) and marked posted (`/snapshots/ig/recent`): slide 1, its title, "All N slides ›", credit. Without
+  one: the ten IPL sides' ratings (L2's card), tied to the calendar. Until 16 Dec the kicker is
+  "IPL 2027 · auction 16 Dec" ("auction today" on the day) and the claim reads "Bengaluru go into the auction as the
+  top-rated side. Lucknow are 10th of 10." (cities, as people say them); after it, "IPL team ratings" with the plain
+  claim. "All squads ›" goes to /team. When a post leads, the ratings card still shows lower down; when the
+  ratings lead, it isn't repeated.
+- Fixtures (decided: shrink to a row unless India or a major league plays): `isHeadline` = India in the match, or
+  the series matches the existing BIG_SERIES list (IPL, World Cup, Asia Cup, Champions Trophy, BBL, PSL, SA20, CPL,
+  the Hundred, MLC). Otherwise one 56px row: start time (or LIVE in red), "GG v MIE", "T20, <place>", "Preview ›",
+  the whole row a link to the preview; "N more fixtures ›" (44px) expands to the old cards. Headline days keep the
+  cards. Loading shows a row-height loader (so a headline day grows; the usual day doesn't jump).
+- Games (decided: below the lead card and fixture): one row for 19-0 ("Draft an IPL XI from 19 seasons", Play ›)
+  and an "All games" link to /games. The daily four are on /games (unchanged, `TodaysGamesSection` still exported).
+- The page at 390 went from 4,597px to 3,368px.
+- **Deviation**: the ask placeholder is "Ask about a player, phase or matchup", not the requested "Ask anything about
+  a player, phase or matchup": at 390 the longer one clipped ("...or mat") at 16px (16px is needed so iOS doesn't
+  zoom on focus).
+- Review fix folded in: the ratings credit is "hindsightcricket.com · Data: Cricsheet".
+
+Checked: 390, 360, 1440 (no horizontal scroll); unit tests (today's post by IST date, the auction frame, the city
+claim); App.test; build. Screenshots: `l7_390.png` (first screen), `l7_390_s2.png` (second), `l7_390_full.png`,
+`l7_360.png`, `l7_1440.png`.
+Not checked live: the post-led card (no post is marked posted locally) and a headline-day fixture (today's only
+fixtures are ILT20); both paths are small and unit-tested where pure.
+
+## Open items (for the owner / later)
+
+- `routers/teams.py` `/teams/elo-rankings` treats "Indian Premier League" and "IPL" as two leagues (2026 matches are
+  stored as "IPL"). The landing works around it by asking for both; the endpoint should normalise.
+- `src/components/EloLeaderboard.jsx` is unused and could be deleted.
+- Owner: curate the ask box's example chips (`EXAMPLES` in `src/components/landing/AskHero.jsx`).
+- Owner: posts must be marked posted for /links and the lead card to show them (the coordinator is telling the owner).

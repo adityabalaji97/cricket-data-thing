@@ -53,18 +53,26 @@ const dayLabel = (iso) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-// The claim: who leads, and who is last.
-export const ratingsClaim = (sides, scope) => {
+// A franchise by its city, as people say it ("Mumbai are 9th").
+const IPL_CITY = { CSK: 'Chennai', DC: 'Delhi', GT: 'Gujarat', KKR: 'Kolkata', LSG: 'Lucknow', MI: 'Mumbai', PBKS: 'Punjab',
+  RCB: 'Bengaluru', RR: 'Rajasthan', SRH: 'Hyderabad' };
+
+// The claim: who leads, and who is last. Before the auction (context 'auction') it says where they start it.
+export const ratingsClaim = (sides, scope, context = null) => {
   if (sides.length < 2) return '';
   const top = sides[0];
   const last = sides[sides.length - 1];
+  if (scope === 'ipl' && context === 'auction') {
+    const city = (s) => IPL_CITY[s.abbr] || s.name;
+    return `${city(top)} go into the auction as the top-rated side. ${city(last)} are ${ordinal(last.rank)} of ${sides.length}.`;
+  }
   const what = scope === 'ipl' ? 'IPL side' : 'T20I side among the top 12';
   return `${top.name} are the top-rated ${what}. ${last.name} are ${ordinal(last.rank)} of ${sides.length}.`;
 };
 
 const routeTeam = (abbr) => `/team?team=${encodeURIComponent(abbr)}&autoload=true`;
 
-const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = null }) => {
+const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = null, context = null }) => {
   const [scope, setScope] = useState(initialScope);
   const [state, setState] = useState({ status: 'loading', rows: [] });
   const [attempt, setAttempt] = useState(0);
@@ -98,7 +106,7 @@ const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = n
       {/* Claim */}
       <Typography component="h2" sx={{ m: 0, mt: 0.75, fontFamily: fonts.display, fontWeight: 700, fontSize: { xs: 20, md: 24 },
         lineHeight: 1.15, color: colors.textHi, minHeight: { xs: 46, md: 28 } }}>
-        {state.status === 'ready' ? ratingsClaim(sides, scope) : ' '}
+        {state.status === 'ready' ? ratingsClaim(sides, scope, context) : ' '}
       </Typography>
       <Box role="tablist" aria-label="Which sides" sx={{ display: 'flex', gap: 0.75, mt: 1 }}>
         {Object.entries(SCOPES).map(([key, s]) => (
@@ -165,7 +173,7 @@ const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = n
           {latest ? `, to ${dayLabel(latest)}` : ''}. The same rating as each team page; tap a side for its page.
         </Typography>
         <Typography sx={{ fontSize: 12, color: colors.textFaint, mt: 0.25 }}>
-          hindsightcricket.com · Data: Himanish Ganjoo &amp; TechRadar, Cricsheet
+          hindsightcricket.com · Data: Cricsheet
         </Typography>
       </Box>
     </Box>
