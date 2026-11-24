@@ -14,15 +14,20 @@ import TeamRatings from './TeamRatings';
 export const AUCTION_DAY = '2026-12-16';
 const istToday = (now = Date.now()) => new Date(now + 5.5 * 3600e3).toISOString().slice(0, 10);
 
-// The post to lead with, or null: one planned for today and marked posted.
-export const todaysPost = (posts, now = Date.now()) => (posts || []).find((p) => String(p.planned_for || '').slice(0, 10) === istToday(now)) || null;
+// The post to lead with, or null: the newest one marked posted that was planned for today or yesterday (IST), so a
+// post that went out after midnight, or is marked the morning after, still leads. The list comes newest first.
+export const todaysPost = (posts, now = Date.now()) => {
+  const days = [istToday(now), istToday(now - 864e5)];
+  return (posts || []).find((p) => days.includes(String(p.planned_for || '').slice(0, 10))) || null;
+};
 
 // The ratings card's kicker and claim, tied to the calendar: before the auction it frames the ratings as where each
 // side starts it.
 export const ratingsFrame = (now = Date.now()) => {
   const today = istToday(now);
   if (today <= AUCTION_DAY) {
-    const label = today === AUCTION_DAY ? 'auction today' : 'auction 16 Dec';
+    // A no-break space keeps "16 Dec" together when the kicker wraps at 360.
+    const label = today === AUCTION_DAY ? 'auction today' : 'auction 16\u00a0Dec';
     return { kicker: `IPL 2027 · ${label}`, context: 'auction' };
   }
   return { kicker: 'IPL team ratings', context: null };
@@ -48,8 +53,9 @@ const PostLead = ({ post }) => (
         color: colors.accent, fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
         {post.slides ? `All ${post.slides} slides ›` : 'See it ›'}
       </Box>
+      {/* The recent-posts data carries no credit of its own, so the site-wide one. */}
       <Typography sx={{ fontSize: 12, color: colors.textFaint }}>
-        hindsightcricket.com · Data: Himanish Ganjoo &amp; TechRadar, Cricsheet
+        Data: Hindsight (hindsightcricket.com)
       </Typography>
     </Box>
   </Box>
@@ -60,7 +66,7 @@ const LeadCard = ({ onKind }) => {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${config.API_URL}/snapshots/ig/recent?limit=3`)
+    fetch(`${config.API_URL}/snapshots/ig/recent?limit=9`)
       .then((r) => (r.ok ? r.json() : { posts: [] }))
       .then((d) => { if (!cancelled) setPost(todaysPost(d.posts)); })
       .catch(() => { if (!cancelled) setPost(null); });

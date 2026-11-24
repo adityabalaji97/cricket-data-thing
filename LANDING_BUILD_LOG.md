@@ -251,3 +251,14 @@ fixtures are ILT20); both paths are small and unit-tested where pure.
 - `src/components/EloLeaderboard.jsx` is unused and could be deleted.
 - Owner: curate the ask box's example chips (`EXAMPLES` in `src/components/landing/AskHero.jsx`).
 - Owner: posts must be marked posted for /links and the lead card to show them (the coordinator is telling the owner).
+
+## L7 review fixes
+
+- The lead post: the newest marked-posted post planned for today **or yesterday** (IST), from `?limit=9` (was 3),
+  so a post marked after midnight still leads. Test: "planned yesterday, after midnight" leads; two days on it doesn't.
+- The kicker keeps "16 Dec" together (no-break space) when it wraps at 360.
+- The post card's credit is "Data: Hindsight (hindsightcricket.com)" (the recent-posts data carries no credit).
+- `isHeadline` is now the one helper (exported from LandingPage.jsx): India (men or women) always; otherwise a major
+  league or event (BIG_SERIES), never a qualifier, never a women's match without India. It also orders the fixtures
+  within a day (it replaced `isBig`; the old BIG_TEAMS list of ten Full Members is gone, so Australia v England no
+  longer jumps the queue: India-first). Tests: `src/components/landing/__tests__/headline.test.js`.

@@ -376,17 +376,28 @@ const localStart = (match) => {
   return { date, label: `${day}${time}` };
 };
 
-// The sides and leagues whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.
-const BIG_TEAMS = new Set(['India', 'Australia', 'England', 'South Africa', 'New Zealand', 'Pakistan', 'Sri Lanka',
-  'West Indies', 'Afghanistan', 'Bangladesh']);
+// The leagues and events whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.
+// (The old BIG_TEAMS list, ten Full Members, is gone: landing plan L7 is India-first, so Australia v England gets the
+// row, not the cards.)
 const BIG_SERIES = /\b(IPL|INDIAN PREMIER LEAGUE|WORLD CUP|ASIA CUP|CHAMPIONS TROPHY|BIG BASH|BBL|PSL|SA20|CPL|THE HUNDRED|MLC)\b/i;
-const isBig = (match) => BIG_TEAMS.has(match.team1) || BIG_TEAMS.has(match.team2) || BIG_SERIES.test(match.series || '');
+const WOMEN = /\bwomen\b/i;
+const QUALIFIER = /\bqualif/i;
+const isIndia = (team) => /^India( Women)?$/i.test(String(team || '').trim());
+// One test for "a match our readers came for": India (men or women), or a major league or event; never a
+// qualifier, and no women's match unless India play. It orders the fixtures (these lead within a day) and decides
+// whether they get full cards (landing plan L7) or one row.
+export const isHeadline = (match) => {
+  if (isIndia(match.team1) || isIndia(match.team2)) return true;
+  const series = match.series || '';
+  if (QUALIFIER.test(series) || WOMEN.test(series) || WOMEN.test(match.team1 || '') || WOMEN.test(match.team2 || '')) return false;
+  return BIG_SERIES.test(series);
+};
 const AHEAD_MS = 36 * 3600e3; // today's matches, plus anything starting in the next day and a half
 
 // Live first, then by day; within a day the big matches lead, then by start time.
 const fixtureOrder = (a, b) => (Number(b.isLive) - Number(a.isLive))
   || localStart(a).date.localeCompare(localStart(b).date)
-  || (Number(isBig(b)) - Number(isBig(a)))
+  || (Number(isHeadline(b)) - Number(isHeadline(a)))
   || String(a.startUtc || a.time || '').localeCompare(String(b.startUtc || b.time || ''));
 
 const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
@@ -462,8 +473,6 @@ const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
 const FIXTURE_CARD_HEIGHT = 280;
 const FIXTURE_ROW_HEIGHT = 56;
 
-// India, or a league or event most of our readers follow.
-const isHeadline = (match) => match.team1 === 'India' || match.team2 === 'India' || BIG_SERIES.test(match.series || '');
 
 const FixtureRow = ({ match }) => {
   const live = Boolean(match.isLive);
