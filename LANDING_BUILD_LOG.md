@@ -343,3 +343,24 @@ Files: `src/App.js`.
 - The team codes on the fixture cards (headline days, or "N more fixtures") were 32px links: now 44px, with the
   "VS" line tightened. The card grew to 306px at 390 (two-line series chip), so `FIXTURE_CARD_HEIGHT` is 306 (cards and
   the error card share it). This closes the last tap-target item from L5. Screenshot: `fixture_cards_390.png`.
+
+## L6 review fixes 2: stale chunks after a deploy
+
+Files: new `src/utils/lazyWithRetry.js` + `src/utils/__tests__/lazyWithRetry.test.jsx`, new
+`src/components/ui/ChunkErrorBoundary.jsx`, `src/App.js`.
+
+- Every lazy page (the new ones and the older admin/notes/links ones) goes through `lazyWithRetry`. On an error
+  matching `/Loading chunk|ChunkLoadError|dynamically imported module/i`, the first time in a session it sets
+  `sessionStorage['chunk-reload']`, reloads, and returns a never-settling promise; otherwise it rethrows. Every
+  sessionStorage access is in try/catch (if storage is blocked, it doesn't reload; the error shows).
+- **Deviation from the review**: the flag is cleared when a page's chunk *loads*, not when the app mounts. The app
+  mounts before the failing page's chunk is requested, so clearing on mount reloaded forever. I saw this in the
+  browser: with TeamPage's chunk blocked, the first version kept reloading. Now: one reload, then the boundary.
+- `ChunkErrorBoundary` wraps the main `<Suspense>`: "Couldn't load this page", "Check your connection, then reload.",
+  and a 44px lime Reload button on the page background. It resets when the path changes.
+- The redundant inner `<Suspense fallback={null}>` wrappers on /scorecards, /admin*, /notes*, /g, /links and
+  /graphics are gone. The /ig Suspense stays: that branch renders outside the main one.
+- Tests (4): a stale chunk reloads once, then the error goes through; a successful load clears the flag; other errors
+  never reload; the boundary renders the message and button. Browser check: `/team?team=MI` with the TeamPage chunk
+  blocked shows the boundary after one reload (`l6_chunk_error_390.png`). Unblocked, it renders normally.
+- main bundle: 225.2 kB gzip (+0.5 kB).

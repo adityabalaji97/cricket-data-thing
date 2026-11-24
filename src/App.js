@@ -28,49 +28,51 @@ import ExploreMenu, { ExploreButton } from './components/nav/ExploreMenu';
 import { MensT20Scope, useFormat } from './context/FormatContext';
 import { pageViewKey, trackPageView } from './utils/analytics';
 import { apiErrorText } from './utils/apiError';
+import lazyWithRetry from './utils/lazyWithRetry';
+import ChunkErrorBoundary from './components/ui/ChunkErrorBoundary';
 
 // Landing plan L6: every page but the home page loads when visited, so the first visit downloads the home page and
 // the app shell, not the whole site (the main bundle was 976 kB gzipped). The home page stays in the main bundle: it
 // is the most-visited first page and has a static first screen in public/index.html.
-const UnifiedPlayerProfile = React.lazy(() => import('./components/UnifiedPlayerProfile'));
-const TeamPage = React.lazy(() => import('./components/pages/TeamPage'));
-const IntlXIPage = React.lazy(() => import('./components/pages/IntlXIPage'));
-const XIBuilderPage = React.lazy(() => import('./components/pages/XIBuilderPage'));
-const VenuePage = React.lazy(() => import('./components/pages/VenuePage'));
-const QueryPage = React.lazy(() => import('./components/query2/QueryPage'));
-const ComparePage = React.lazy(() => import('./components/pages/ComparePage'));
-const GamesPage = React.lazy(() => import('./components/pages/GamesPage'));
-const ConnectPage = React.lazy(() => import('./components/pages/ConnectPage'));
-const VenuesPage = React.lazy(() => import('./components/pages/VenuesPage'));
-const IPLPredictions = React.lazy(() => import('./components/IPLPredictions'));
-const WrappedPage = React.lazy(() => import('./components/wrapped/WrappedPage'));
-const GoogleSearchLanding = React.lazy(() => import('./components/search/GoogleSearchLanding'));
-const GuessInningsGame = React.lazy(() => import('./components/games/GuessInningsGame'));
-const PlayerJourneysGame = React.lazy(() => import('./components/games/PlayerJourneysGame'));
-const CallItGame = React.lazy(() => import('./components/games/CallItGame'));
-const HigherLowerGame = React.lazy(() => import('./components/games/HigherLowerGame'));
-const SeasonDraftGame = React.lazy(() => import('./components/games/SeasonDraftGame'));
-const CreditsPage = React.lazy(() => import('./components/CreditsPage'));
-const FantasyPlanner = React.lazy(() => import('./components/FantasyPlanner'));
-const MatchScorecardPage = React.lazy(() => import('./components/scorecard/MatchScorecardPage'));
-const VenueNotes = React.lazy(() => import('./components/VenueNotes'));
+const UnifiedPlayerProfile = lazyWithRetry(() => import('./components/UnifiedPlayerProfile'));
+const TeamPage = lazyWithRetry(() => import('./components/pages/TeamPage'));
+const IntlXIPage = lazyWithRetry(() => import('./components/pages/IntlXIPage'));
+const XIBuilderPage = lazyWithRetry(() => import('./components/pages/XIBuilderPage'));
+const VenuePage = lazyWithRetry(() => import('./components/pages/VenuePage'));
+const QueryPage = lazyWithRetry(() => import('./components/query2/QueryPage'));
+const ComparePage = lazyWithRetry(() => import('./components/pages/ComparePage'));
+const GamesPage = lazyWithRetry(() => import('./components/pages/GamesPage'));
+const ConnectPage = lazyWithRetry(() => import('./components/pages/ConnectPage'));
+const VenuesPage = lazyWithRetry(() => import('./components/pages/VenuesPage'));
+const IPLPredictions = lazyWithRetry(() => import('./components/IPLPredictions'));
+const WrappedPage = lazyWithRetry(() => import('./components/wrapped/WrappedPage'));
+const GoogleSearchLanding = lazyWithRetry(() => import('./components/search/GoogleSearchLanding'));
+const GuessInningsGame = lazyWithRetry(() => import('./components/games/GuessInningsGame'));
+const PlayerJourneysGame = lazyWithRetry(() => import('./components/games/PlayerJourneysGame'));
+const CallItGame = lazyWithRetry(() => import('./components/games/CallItGame'));
+const HigherLowerGame = lazyWithRetry(() => import('./components/games/HigherLowerGame'));
+const SeasonDraftGame = lazyWithRetry(() => import('./components/games/SeasonDraftGame'));
+const CreditsPage = lazyWithRetry(() => import('./components/CreditsPage'));
+const FantasyPlanner = lazyWithRetry(() => import('./components/FantasyPlanner'));
+const MatchScorecardPage = lazyWithRetry(() => import('./components/scorecard/MatchScorecardPage'));
+const VenueNotes = lazyWithRetry(() => import('./components/VenueNotes'));
 
 // While a page's code loads: an empty screen of the page background, a full viewport tall, so the footer doesn't
 // flash up under the header and then drop away when the page arrives.
 const RouteFallback = () => <Box aria-busy="true" sx={{ minHeight: '100vh' }} />;
 
 // Admin queue: loaded only when visited, so it adds nothing to the public bundle.
-const AdminPage = React.lazy(() => import('./components/admin/AdminPage'));
-const IgSlide = React.lazy(() => import('./components/ig/IgSlide'));
-const IgLinks = React.lazy(() => import('./components/ig/IgLinks'));
-const IgReel = React.lazy(() => import('./components/ig/reel/IgReel'));
-const NotesList = React.lazy(() => import('./components/notes/NotesList'));
-const NotePage = React.lazy(() => import('./components/notes/NotePage'));
-const ScorecardsBrowse = React.lazy(() => import('./components/scorecard/ScorecardsBrowse'));
-const GraphicPage = React.lazy(() => import('./components/GraphicPage'));
-const GraphicsLanding = React.lazy(() => import('./components/GraphicsLanding'));
-const AdminNotes = React.lazy(() => import('./components/notes/AdminNotes'));
-const AdminStorylines = React.lazy(() => import('./components/admin/AdminStorylines'));
+const AdminPage = lazyWithRetry(() => import('./components/admin/AdminPage'));
+const IgSlide = lazyWithRetry(() => import('./components/ig/IgSlide'));
+const IgLinks = lazyWithRetry(() => import('./components/ig/IgLinks'));
+const IgReel = lazyWithRetry(() => import('./components/ig/reel/IgReel'));
+const NotesList = lazyWithRetry(() => import('./components/notes/NotesList'));
+const NotePage = lazyWithRetry(() => import('./components/notes/NotePage'));
+const ScorecardsBrowse = lazyWithRetry(() => import('./components/scorecard/ScorecardsBrowse'));
+const GraphicPage = lazyWithRetry(() => import('./components/GraphicPage'));
+const GraphicsLanding = lazyWithRetry(() => import('./components/GraphicsLanding'));
+const AdminNotes = lazyWithRetry(() => import('./components/notes/AdminNotes'));
+const AdminStorylines = lazyWithRetry(() => import('./components/admin/AdminStorylines'));
 
 const TEAM_NAME_TO_ABBREVIATION = {
   'chennai super kings': 'CSK',
@@ -738,6 +740,7 @@ const AppContent = () => {
 
       {!isCompactNav && <ExploreMenu open={exploreOpen} onClose={() => setExploreOpen(false)} />}
 
+      <ChunkErrorBoundary resetKey={location.pathname}>
       <React.Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -770,15 +773,15 @@ const AppContent = () => {
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/fantasy-planner" element={<MensT20Scope><FantasyPlanner isMobile={isMobile} /></MensT20Scope>} />
         <Route path="/scorecard/:matchId" element={<MatchScorecardPage />} />
-        <Route path="/scorecards" element={<React.Suspense fallback={null}><ScorecardsBrowse /></React.Suspense>} />
-        <Route path="/admin" element={<React.Suspense fallback={null}><AdminPage /></React.Suspense>} />
-        <Route path="/admin/notes" element={<React.Suspense fallback={null}><AdminNotes /></React.Suspense>} />
-        <Route path="/admin/storylines" element={<React.Suspense fallback={null}><AdminStorylines /></React.Suspense>} />
-        <Route path="/notes" element={<React.Suspense fallback={null}><NotesList /></React.Suspense>} />
-        <Route path="/notes/:slug" element={<React.Suspense fallback={null}><NotePage /></React.Suspense>} />
-        <Route path="/g/:id" element={<React.Suspense fallback={null}><GraphicPage /></React.Suspense>} />
-        <Route path="/links" element={<React.Suspense fallback={null}><IgLinks /></React.Suspense>} />
-        <Route path="/graphics" element={<React.Suspense fallback={null}><GraphicsLanding /></React.Suspense>} />
+        <Route path="/scorecards" element={<ScorecardsBrowse />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/notes" element={<AdminNotes />} />
+        <Route path="/admin/storylines" element={<AdminStorylines />} />
+        <Route path="/notes" element={<NotesList />} />
+        <Route path="/notes/:slug" element={<NotePage />} />
+        <Route path="/g/:id" element={<GraphicPage />} />
+        <Route path="/links" element={<IgLinks />} />
+        <Route path="/graphics" element={<GraphicsLanding />} />
         <Route path="/venue" element={venueOnly ? <VenuePage /> : (
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
             <PreviewFilters
@@ -834,6 +837,7 @@ const AppContent = () => {
         )} />
       </Routes>
       </React.Suspense>
+      </ChunkErrorBoundary>
       {!location.pathname.startsWith('/wrapped') && (
         <Box
           sx={{
