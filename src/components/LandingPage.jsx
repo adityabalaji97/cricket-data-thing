@@ -76,9 +76,10 @@ const routeTeam = (team) => `/team?team=${encodeURIComponent(team || '')}&autolo
 const routePlayer = (player) => `/player?name=${encodeURIComponent(player || '')}&autoload=true`;
 const routePreview = (match) => (
   `/venue?venue=${encodeURIComponent(match.venue || '')}` +
-  `&team1=${encodeURIComponent(match.team1Abbr || match.team1 || '')}` +
-  `&team2=${encodeURIComponent(match.team2Abbr || match.team2 || '')}` +
-  `&includeInternational=true&topTeams=20&autoload=true` +
+  // Full names, as /links does: the preview can't resolve every short code (GG, MIE opened a venue-only page).
+  `&team1=${encodeURIComponent(match.team1 || match.team1Abbr || '')}` +
+  `&team2=${encodeURIComponent(match.team2 || match.team2Abbr || '')}` +
+  `&includeInternational=true&topTeams=20&autoload=true&story=1` +
   // The preview is one format's record; ODI fixtures must open in ODI, not the global default.
   `&fmt=${match.format === 'ODI' ? 'mens-odi' : 'mens-t20'}` +
   `${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`

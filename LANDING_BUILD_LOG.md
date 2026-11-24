@@ -448,3 +448,12 @@ Files: new `src/components/pages/TeamList.jsx` + `src/components/pages/__tests__
 - Checked at 390 and 360: 22 rows, all 44px, no horizontal scroll; T20Is tab -> All squads -> `/team?scope=t20i`
   with T20Is first; tapping MI opens Mumbai Indians at the top (`teams_ipl.png`, `teams_t20i.png`,
   `teams_bottom_360.png`, `mi_page_390.png`).
+
+### R2.3 Audit P1: fixture previews open with both teams
+
+File: `src/components/LandingPage.jsx` (`routePreview`).
+
+- The fixture row and the expanded card's Match preview passed short codes (GG, MIE), which the preview can't
+  resolve, so the page opened venue-only. They now pass the full names (`team1`/`team2`, codes only as a fallback)
+  plus `&story=1`, as /links does. Checked: GG v MIE (ILT20, live) opens "Gulf Giants v MI Emirates" with par,
+  chasing and head to head (`fixture_preview_390.png`).
