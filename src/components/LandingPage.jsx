@@ -305,7 +305,7 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
   return (
     <Box sx={{ mb: { xs: 3, md: 4.2 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.4 }}>
-        <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none' }}>
+        <Box component={Link} to="/" sx={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: 1, textDecoration: 'none' }}>
           <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 32, height: 32 }} />
           <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: { xs: 18, md: 20 } }}>
             Hindsight
@@ -411,7 +411,7 @@ const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
         title="Today's Matches"
         // Only once the fixtures are in: while they load, "No match today" was a guess.
         // A blank line while loading keeps the header's height, so the cards below don't jump.
-        subtitle={loading ? ' ' : error || !displayMatches.length ? null
+        subtitle={loading ? '\u00a0' : error || !displayMatches.length ? null
           : hasToday ? 'Live, today and the next day and a half: T20 and ODI' : 'No match today, showing the next fixtures'}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || displayMatches.length < 2} />}
       />
@@ -560,27 +560,9 @@ const CONNECTOR_PROMPTS = [
   'Preview South Africa v Australia at Kingsmead in ODIs',
 ];
 
-const ConnectorSection = () => {
+// Lives on /connect (ConnectPage) since the landing redesign: setup instructions aren't a home-page section.
+export const ConnectorSection = () => {
   const [copied, setCopied] = useState(false);
-  const ref = useRef(null);
-  // hindsightcricket.com/mcp opened in a browser lands here (vercel.json). The sections above load after this one
-  // renders and push it down, so scroll again as they arrive, for a few seconds, until the reader scrolls themselves.
-  useEffect(() => {
-    if (window.location.hash !== '#connector') return undefined;
-    let stopped = false;
-    const stop = () => { stopped = true; };
-    const go = () => { if (!stopped && ref.current) ref.current.scrollIntoView({ block: 'start' }); };
-    const timers = [0, 400, 1000, 2000, 3500, 5000].map((ms) => setTimeout(go, ms));
-    window.addEventListener('wheel', stop, { passive: true });
-    window.addEventListener('touchstart', stop, { passive: true });
-    window.addEventListener('keydown', stop);
-    return () => {
-      timers.forEach(clearTimeout);
-      window.removeEventListener('wheel', stop);
-      window.removeEventListener('touchstart', stop);
-      window.removeEventListener('keydown', stop);
-    };
-  }, []);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(CONNECTOR_URL);
@@ -597,7 +579,7 @@ const ConnectorSection = () => {
     </Typography>
   );
   return (
-    <Box component="section" id="connector" ref={ref} sx={{ mb: { xs: 3.75, md: 5.5 }, scrollMarginTop: 72 }}>
+    <Box component="section" id="connector" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
         kicker="Connect"
         title="Use Hindsight in Claude or ChatGPT"
@@ -611,7 +593,7 @@ const ConnectorSection = () => {
           <Button
             onClick={copy}
             startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
-            sx={{ flexShrink: 0, minHeight: 40, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 12, '&:hover': { bgcolor: C.limeHover } }}
+            sx={{ flexShrink: 0, minHeight: 44, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 12, '&:hover': { bgcolor: C.limeHover } }}
           >
             {copied ? 'Copied' : 'Copy'}
           </Button>
@@ -790,7 +772,7 @@ const RecentMatchTile = ({ match }) => {
           display: 'flex',
           alignItems: 'center',
           gap: 0.75,
-          minHeight: 34,
+          minHeight: 44,
           color: C.mid,
           fontFamily: fonts.body,
           fontSize: 13,
@@ -814,7 +796,7 @@ const RecentMatchTile = ({ match }) => {
 };
 
 const ScoreRow = ({ team, score, winner }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.25 }}>
+  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
     <Typography component={Link} to={routeTeam(team)} sx={{
       color: winner ? C.lime : C.mid,
       fontFamily: fonts.display,
@@ -823,7 +805,7 @@ const ScoreRow = ({ team, score, winner }) => (
       lineHeight: 1,
       display: 'inline-flex',
       alignItems: 'center',
-      minHeight: 32,
+      minHeight: 44,
       textDecoration: 'none',
       '&:hover': { color: C.lime },
     }}>
@@ -1078,7 +1060,7 @@ const EloRow = ({ team }) => {
 
 const LEAGUE_COUNTS_PREVIEW = 10;
 
-const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
+const LeagueCountsSection = ({ stats, showLeagueCounts = false }) => {
   // A health check, not a headline: the biggest ten competitions, the other ~50 on request.
   const [showAll, setShowAll] = useState(false);
   if (!showLeagueCounts) return null;
@@ -1117,7 +1099,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
           component="button"
           type="button"
           onClick={() => setShowAll((prev) => !prev)}
-          sx={{ mt: 1.25, minHeight: 40, px: 1.5, bgcolor: 'transparent', color: C.lime, border: `1px solid ${C.hairlineStrong}`, borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, cursor: 'pointer' }}
+          sx={{ mt: 1.25, minHeight: 44, px: 1.5, bgcolor: 'transparent', color: C.lime, border: `1px solid ${C.hairlineStrong}`, borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, cursor: 'pointer' }}
         >
           {showAll ? 'Show fewer' : `Show all ${items.length}`}
         </Box>
@@ -1125,6 +1107,23 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
     </Box>
   );
 };
+
+// One line where the connector block used to be: the setup lives on /connect.
+const ConnectRow = () => (
+  <Box
+    component={Link}
+    to="/connect"
+    sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 56, px: 2, py: 1.25, mb: { xs: 3.75, md: 5.5 },
+      borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${C.hairline}`, textDecoration: 'none',
+      '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' } }}
+  >
+    <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17 }}>Ask Hindsight from Claude or ChatGPT</Typography>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13 }}>Add the connector once, then ask in plain words.</Typography>
+    </Box>
+    <ChevronRightIcon sx={{ color: C.lime, flexShrink: 0 }} />
+  </Box>
+);
 
 const CreditsSection = () => {
   const year = new Date().getFullYear();
@@ -1135,14 +1134,15 @@ const CreditsSection = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.3, mt: 1.8 }}>
         <CreditCard title="Data sources">
           <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4 }}>Ball-by-ball tracking</Typography>
-          <CreditLink href="https://twitter.com/himganj153">Himanish Ganjoo &amp; TechRadar</CreditLink>
-          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4, mt: 0.6 }}>Scorecards and match data</Typography>
+          <CreditLink href="https://x.com/himganj153">Himanish Ganjoo &amp; TechRadar</CreditLink>
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4, mt: 0.6 }}>Scorecards</Typography>
           <CreditLink href="https://cricsheet.org/">Cricsheet.org</CreditLink>
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4, mt: 0.6 }}>Player information</Typography>
           <CreditLink href="https://cricmetric.com/">Cricmetric</CreditLink>
         </CreditCard>
         <CreditCard title="Inspiration">
           {['@prasannalara', '@cricketingview', '@IndianMourinho', '@himganj153', '@randomcricstat', '@kaustats', '@cricviz', '@ajarrodkimber'].map((handle) => (
-            <CreditChip key={handle} href={`https://twitter.com/${handle.slice(1)}`}>{handle}</CreditChip>
+            <CreditChip key={handle} href={`https://x.com/${handle.slice(1)}`}>{handle}</CreditChip>
           ))}
         </CreditCard>
         <CreditCard title="Development">
@@ -1151,7 +1151,7 @@ const CreditsSection = () => {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <CreditChip href="https://github.com/adityabalaji97/cricket-data-thing" icon={<GitHubIcon sx={{ fontSize: 14 }} />}>GitHub</CreditChip>
-            <CreditChip href="https://twitter.com/maybe_eybe" icon={<XIcon sx={{ fontSize: 13 }} />}>@maybe_eybe</CreditChip>
+            <CreditChip href="https://x.com/maybe_eybe" icon={<XIcon sx={{ fontSize: 13 }} />}>@maybe_eybe</CreditChip>
           </Box>
           <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, mt: 1.4 }}>
             Hindsight (c) {year}
@@ -1175,7 +1175,7 @@ const CreditLink = ({ href, children }) => (
   <Typography component="a" href={href} target="_blank" rel="noopener noreferrer" sx={{
     display: 'flex',
     alignItems: 'center',
-    minHeight: 36,
+    minHeight: 44,
     color: C.lime,
     fontFamily: fonts.body,
     fontWeight: 600,
@@ -1194,7 +1194,7 @@ const CreditChip = ({ href, icon, children }) => (
     gap: 0.5,
     mr: 0.6,
     mb: 0.7,
-    minHeight: 36,
+    minHeight: 44,
     px: 1,
     color: C.mid,
     bgcolor: C.muted,
@@ -1362,7 +1362,8 @@ const LatestNotesSection = () => {
   );
 };
 
-const LandingPage = ({ showLeagueCounts = true }) => {
+// League match counts are a pipeline health check, not a public section: off unless a caller asks for them.
+const LandingPage = ({ showLeagueCounts = false }) => {
   // Match the app-wide breakpoint from App.js rather than a page-specific pixel value;
   // three different mobile thresholds across the hero pages made behaviour inconsistent.
   const theme = useTheme();
@@ -1372,6 +1373,12 @@ const LandingPage = ({ showLeagueCounts = true }) => {
   // FormatSpec to pick strike-rate bands. The landing showcase is single-format by nature.
   const { pinnedFormatParams: formatParams } = useFormat();
   const [navOpen, setNavOpen] = useState(false);
+  const navigate = useNavigate();
+  // The connector block moved to /connect; old links (and hindsightcricket.com/mcp before vercel.json changed)
+  // still arrive as /#connector.
+  useEffect(() => {
+    if (window.location.hash === '#connector') navigate('/connect', { replace: true });
+  }, [navigate]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [fixtures, setFixtures] = useState([]);
   const [fixturesLoading, setFixturesLoading] = useState(true);
@@ -1511,7 +1518,7 @@ const LandingPage = ({ showLeagueCounts = true }) => {
         <FeaturedInningsSection innings={innings} loading={inningsLoading} error={inningsError}
           onRetry={() => setInningsTry((n) => n + 1)} isMobile={isMobile} />
         <EloSection isMobile={isMobile} openDropdown={openDropdown} setOpenDropdown={setOpenDropdown} />
-        <ConnectorSection />
+        <ConnectRow />
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
         <CreditsSection />
       </Box>

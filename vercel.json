@@ -69,7 +69,7 @@
       "methods": ["GET"],
       "has": [{"type": "header", "key": "accept", "value": ".*text/html.*"}],
       "status": 302,
-      "headers": {"Location": "/#connector"}
+      "headers": {"Location": "/connect"}
     },
     {
       "src": "/mcp/?",

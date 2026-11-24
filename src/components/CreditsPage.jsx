@@ -55,7 +55,15 @@ const CreditsPage = () => (
       <Grid item xs={12} md={4}>
         <SectionCard title="Data Sources">
           <Typography variant="body1" sx={{ mb: 1.5, fontWeight: 600 }}>
-            Ball-by-ball data
+            Ball-by-ball tracking (line, length, shot)
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            <Link href="https://twitter.com/himganj153" target="_blank" rel="noopener noreferrer">
+              Himanish Ganjoo &amp; TechRadar
+            </Link>
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 1.5, fontWeight: 600 }}>
+            Scorecards
           </Typography>
           <Typography variant="body2" sx={{ mb: 2 }}>
             <Link href="https://cricsheet.org/" target="_blank" rel="noopener noreferrer">
@@ -82,7 +90,7 @@ const CreditsPage = () => (
               ['@prasannalara', 'https://twitter.com/prasannalara'],
               ['@cricketingview', 'https://twitter.com/cricketingview'],
               ['@IndianMourinho', 'https://twitter.com/IndianMourinho'],
-              ['@hganjoo_153', 'https://twitter.com/hganjoo_153'],
+              ['@himganj153', 'https://twitter.com/himganj153'],
               ['@randomcricstat', 'https://twitter.com/randomcricstat'],
               ['@kaustats', 'https://twitter.com/kaustats'],
               ['@cricviz', 'https://twitter.com/cricviz'],
@@ -109,7 +117,7 @@ const CreditsPage = () => (
         <SectionCard title="Contextual metrics">
           <Typography variant="body2" sx={{ mb: 1.5 }}>
             Impact, RAA, WAA, WPA and leverage follow{' '}
-            <Link href="https://twitter.com/hganjoo_153" target="_blank" rel="noopener noreferrer">Himanish Ganjoo</Link>&apos;s{' '}
+            <Link href="https://twitter.com/himganj153" target="_blank" rel="noopener noreferrer">Himanish Ganjoo</Link>&apos;s{' '}
             <i>T20 Metrics: A Primer</i> (August 2026), refit on Hindsight&apos;s men&apos;s T20 data (2015 onward, the
             Hundred excluded).
           </Typography>

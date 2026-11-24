@@ -43,7 +43,7 @@ Files: `src/components/LandingPage.jsx`, new `src/utils/noteDates.js` + `src/uti
 - Each note's kicker reads "MATCH RECAP · 1 OCT" (publish date in IST; the year appears outside the current year).
 - A preview drops off once its match is over. The notes API has no match date, so the start is read from the dek
   that `services/note_drafts.py` writes ("Fri 2 Oct, 05:30 IST (00:00 GMT)"), the year from the publish date (Dec
-  publish, Jan match -> next year). "Over" = start + 4h for a T20, + 9h for an ODI. A preview whose dek has no
+  publish, Jan match -> next year). "Over" = start + 5h for a T20, + 10h for an ODI (raised from 4h/9h after review). A preview whose dek has no
   start (hand-written) stays: front end only, no API change.
 - Fetches 8 and shows the first 3 left, so hiding previews doesn't empty the row.
 
@@ -51,3 +51,33 @@ Checked: unit tests (5) and App.test pass; local data's 2 Oct preview is hidden,
 Screenshot: `l3_notes_390.png` (cover images are broken only locally: the dev server doesn't serve /img).
 Open: hand-written previews with a different dek format never expire; a `match_date` on the notes API would
 make this exact (small backend change, not done).
+
+## Review fixes (L5, L3)
+
+- L5: the loading subtitle is now the explicit escape `' '` (it was already a literal NBSP byte, which read as
+  a space in review; the escape makes it unambiguous). 44px: credit links and chips, the connector Copy button,
+  the league counts "Show all", the top-bar logo link. Recent-match tiles: team-name and result links are 44px
+  (tiles grow ~30px). Credit links now go to x.com (all of them, for one host).
+- L3: a Dec match previewed in Jan gets the previous year (test added); the date label compares IST years;
+  margins 5h (T20) / 10h (ODI).
+- Still under 44px: the fixture card's team codes (32px, "GG"/"MIE"): raising them grows the 280px card.
+
+## L4: two screens cut
+
+Files: `src/components/LandingPage.jsx`, new `src/components/pages/ConnectPage.jsx`, `src/App.js`, `src/navItems.js`,
+`vercel.json`, `src/components/CreditsPage.jsx`.
+
+- League Match Counts: `showLeagueCounts` now defaults to false (LandingPage and the section); nothing in the app
+  passes it, so it's off the public page. The component stays for a caller that wants it.
+- Connector block: `ConnectorSection` is exported and rendered by a new `/connect` page (title "Connect" in the
+  app header). Its hash-scroll effect is gone. The landing page keeps one 67px row, "Ask Hindsight from Claude or
+  ChatGPT ›", linking to /connect. `/#connector` redirects to `/connect` (replace) on the client, and vercel.json's
+  browser rule for `/mcp` now 302s to `/connect` instead of `/#connector`. (A config change, not an API one; the
+  crawler rule for /mcp is unchanged.)
+- Credits: labels fixed against CreditsPage: Himanish Ganjoo & TechRadar = ball-by-ball tracking, Cricsheet =
+  scorecards, Cricmetric = player information. `/credits` (CreditsPage) also had `@hganjoo_153` twice and no
+  Himanish/TechRadar data credit: both fixed there too.
+
+Checked: /#connector lands on /connect; /connect at 390 has no horizontal scroll; landing at 390 went from 5,580px
+to 4,597px tall; build; App.test + noteDates tests.
+Screenshots: `l4_390.png` (full page), `l4_connect_390.png`, `l4_connectrow_390.png`, `l5fix_390.png`.

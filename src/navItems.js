@@ -62,6 +62,7 @@ const UNLISTED_TITLES = [
   { match: (path) => path === '/team-builder', title: 'Fix my team' },
   { match: (path) => path === '/pick-xi', title: 'Pick your XI' },
   { match: (path) => path === '/credits', title: 'Credits & Acknowledgements' },
+  { match: (path) => path === '/connect', title: 'Connect' },
   { match: (path) => path.startsWith('/scorecard'), title: 'Match Scorecard' },
   { match: (path) => path.startsWith('/wrapped'), title: '2025 Wrapped' },
   { match: (path) => path.startsWith('/notes/'), title: 'Notes' },

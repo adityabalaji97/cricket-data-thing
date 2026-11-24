@@ -25,6 +25,7 @@ import VenuePage from './components/pages/VenuePage';
 import QueryPage from './components/query2/QueryPage';
 import ComparePage from './components/pages/ComparePage';
 import GamesPage from './components/pages/GamesPage';
+import ConnectPage from './components/pages/ConnectPage';
 import VenuesPage from './components/pages/VenuesPage';
 import IPLPredictions from './components/IPLPredictions';
 import WrappedPage from './components/wrapped/WrappedPage';
@@ -737,6 +738,7 @@ const AppContent = () => {
         <Route path="/matchups" element={<Navigate to="/compare?tab=matchup" replace />} />
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/games" element={<GamesPage />} />
+        <Route path="/connect" element={<ConnectPage />} />
         <Route path="/venues" element={<VenuesPage />} />
         <Route path="/query" element={<QueryPage isMobile={isMobile} />} />
         <Route path="/team" element={<TeamPage />} />
