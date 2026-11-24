@@ -51,8 +51,9 @@ const AskHero = ({ source = 'home', headingLevel = 'h1' }) => {
     <Box component="section" aria-label="Ask Hindsight" sx={{ mb: { xs: 3, md: 4.5 } }}>
       <Typography component={headingLevel} sx={{ m: 0, color: colors.textHi, fontFamily: fonts.display, fontWeight: 700,
         fontSize: { xs: 27, md: 38 }, lineHeight: 1.1, letterSpacing: '-0.005em' }}>
+        {/* The tagline gets its own line (round 2, 24 Nov). The space keeps the text right for readers and crawlers. */}
         Cricket, ball by ball.{' '}
-        <Box component="span" sx={{ color: colors.accent }}>{TAGLINE}.</Box>
+        <Box component="span" sx={{ display: 'block', color: colors.accent }}>{TAGLINE}.</Box>
       </Typography>
       <Typography sx={{ color: colors.textLo, fontFamily: fonts.body, fontSize: { xs: 14, md: 16 }, mt: 0.75 }}>
         {PROMISE}

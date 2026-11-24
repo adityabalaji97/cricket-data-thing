@@ -406,3 +406,19 @@ Files: new `src/utils/lazyWithRetry.js` + `src/utils/__tests__/lazyWithRetry.tes
   never reload; the boundary renders the message and button. Browser check: `/team?team=MI` with the TeamPage chunk
   blocked shows the boundary after one reload (`l6_chunk_error_390.png`). Unblocked, it renders normally.
 - main bundle: 225.2 kB gzip (+0.5 kB).
+
+## Round 2 (24 Nov, evening)
+
+Builder: worktree `agent-afe273a40aee056dd`, branch `worktree-agent-afe273a40aee056dd`, from `2ece6b2` (PR #336).
+Nothing pushed or deployed. Front end on :3002 against the :8000 API through a CORS shim on :8002 (scratchpad, not
+committed). Screenshots in `docs/landing_review/build_r2/` (uncommitted).
+
+### R2.1 The tagline on its own line
+
+Files: `src/components/landing/AskHero.jsx`, `public/index.html`, `src/components/ig/IgLinks.jsx`.
+
+- "Hindsight shows you why." is a block span under "Cricket, ball by ball.", still lime. The text keeps its space, so
+  the heading reads the same to screen readers and crawlers.
+- The static shell's `h1 em` is `display: block` too, so the swap to the app still doesn't move anything.
+- Assumed: /links (IgLinks, the home page's twin) gets the same break, so the two stay alike.
+- Checked at 390 and 360: two lines (h1 59px tall), no horizontal scroll (`hero.png`, `hero_360.png`).
