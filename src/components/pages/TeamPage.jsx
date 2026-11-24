@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Autocomplete, Box, TextField } from '@mui/material';
+import { Box } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import config from '../../config';
 import { rememberEntity } from '../../utils/recentEntities';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { getTeamAbbr } from '../../utils/teamAbbreviations';
@@ -9,6 +8,7 @@ import ProfileCard from '../playerProfile/cards/ProfileCard';
 import ProfileFilters from '../playerProfile/cards/ProfileFilters';
 import TeamSquad from './TeamSquad';
 import XICard from './XICard';
+import TeamList from './TeamList';
 import {
   Eyebrow, PageFooter, PageHeader, PageSkeleton, SummaryRows, ValueList, ordinal, readWindow, signed, usePageData, windowChip,
   windowQuery, writeSearch,
@@ -192,24 +192,8 @@ const AgainstCard = ({ team, against }) => {
   );
 };
 
-export const TeamPicker = () => {
-  const navigate = useNavigate();
-  const [teams, setTeams] = useState([]);
-  useEffect(() => {
-    fetch(`${config.API_URL}/teams/`).then((r) => r.json())
-      .then((d) => setTeams((Array.isArray(d) ? d : []).sort((a, b) => a.full_name.localeCompare(b.full_name))))
-      .catch(() => setTeams([]));
-  }, []);
-  return (
-    <Box sx={{ px: 2, pt: 3, display: 'flex', flexDirection: 'column', gap: 1.5, maxWidth: 520, mx: 'auto', color: colors.textHi }}>
-      <Box component="h1" sx={{ m: 0, fontFamily: fonts.display, fontWeight: 700, fontSize: 28 }}>Teams</Box>
-      <Box sx={{ color: colors.textLo, fontSize: 14 }}>How good is a side, phase by phase? Pick one.</Box>
-      <Autocomplete options={teams} getOptionLabel={(t) => t.full_name}
-        onChange={(_, v) => v && navigate(`/team?team=${encodeURIComponent(v.full_name)}`)}
-        renderInput={(params) => <TextField {...params} label="Team" autoFocus />} />
-    </Box>
-  );
-};
+// No team picked: the list of sides (TeamList.jsx). The old empty dropdown is its "Search any team" box.
+export const TeamPicker = TeamList;
 
 const TeamPage = () => {
   const location = useLocation();

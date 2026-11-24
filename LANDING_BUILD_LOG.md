@@ -422,3 +422,29 @@ Files: `src/components/landing/AskHero.jsx`, `public/index.html`, `src/component
 - The static shell's `h1 em` is `display: block` too, so the swap to the app still doesn't move anything.
 - Assumed: /links (IgLinks, the home page's twin) gets the same break, so the two stay alike.
 - Checked at 390 and 360: two lines (h1 59px tall), no horizontal scroll (`hero.png`, `hero_360.png`).
+
+### R2.2 "All squads" leads to a team list, not an empty dropdown
+
+Files: new `src/components/pages/TeamList.jsx` + `src/components/pages/__tests__/teamList.test.js`,
+`src/components/pages/TeamPage.jsx`, `src/components/landing/TeamRatings.jsx`, `src/components/landing/LeadCard.jsx`,
+`src/components/landing/__tests__/teamRatings.test.js`.
+
+- `/team` with no team (the menu's Teams, a bare link, "All squads") now shows two cards: the ten IPL sides and the
+  12 T20I sides the landing card ranks. Each card: kicker, claim (who leads, who is last), one 44px row per side
+  (rank, team-colour bar, full name, rating, ›), scope line (Elo after the latest match, to the date), credit.
+  Each row goes to `/team?team=<code or name>&autoload=true`, the URL the landing rows use.
+- Order: `?scope=t20i` puts T20Is first; `?league=IPL`, no param, or anything else IPL-ish puts the IPL first.
+  "All squads" passes the tab that's open (`action` may now be a function of the scope).
+- Ratings: the landing card's fetch moved into `fetchRankings`/`useSides` in TeamRatings.jsx, memoised per scope
+  for the page load (2 calls for the IPL, 1 for T20Is; a failure is dropped so Try again re-asks). Home -> /team
+  makes no new ratings calls. While loading, or if it fails, the sides still list (A-Z, no ratings) and are tappable.
+- The old dropdown stays as "Search any team" under the cards; it fetches `/teams/` only when opened, not on load.
+- Rows (here and on the landing card) scroll to the top on tap: the app keeps scroll position across routes, so a
+  low row opened its team page half-way down.
+- Assumed: the IPL claim now names sides by city outside the auction frame too ("Bengaluru are the top-rated IPL
+  side. Lucknow are 10th of 10."); the full names ran to three lines at 390. Test updated.
+- Assumed: with no param, the IPL leads (India-first).
+- Desktop: the two cards sit side by side (max 1040px).
+- Checked at 390 and 360: 22 rows, all 44px, no horizontal scroll; T20Is tab -> All squads -> `/team?scope=t20i`
+  with T20Is first; tapping MI opens Mumbai Indians at the top (`teams_ipl.png`, `teams_t20i.png`,
+  `teams_bottom_360.png`, `mi_page_390.png`).
