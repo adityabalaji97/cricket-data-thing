@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import LandingPage from './components/LandingPage';
+import { FormatProvider } from './context/FormatContext';
 
+// ChartExportButton imports axios, which ships as ESM that Jest doesn't transform.
+jest.mock('axios', () => ({ get: jest.fn(), post: jest.fn() }));
+
+// react-router-dom 7 ships ES modules Jest can't resolve; plain anchors stand in for Link.
 jest.mock('react-router-dom', () => {
   const React = require('react');
   return {
@@ -8,6 +13,7 @@ jest.mock('react-router-dom', () => {
       <a ref={ref} href={typeof to === 'string' ? to : '#'} {...props}>{children}</a>
     )),
     useNavigate: () => jest.fn(),
+    useLocation: () => ({ pathname: '/', search: '', hash: '' }),
   };
 }, { virtual: true });
 
@@ -82,7 +88,7 @@ beforeEach(() => {
 });
 
 test('renders redesigned landing sections and explore drawer', async () => {
-  render(<LandingPage />);
+  render(<FormatProvider><LandingPage /></FormatProvider>);
 
   expect(await screen.findByText("Today's Matches")).toBeInTheDocument();
   expect(screen.getByText('Recent Matches')).toBeInTheDocument();
@@ -96,6 +102,22 @@ test('renders redesigned landing sections and explore drawer', async () => {
   fireEvent.click(screen.getByRole('button', { name: /explore/i }));
 
   expect(screen.getByText('Hindsight tools')).toBeInTheDocument();
-  expect(screen.getByText('Batter Profiles')).toBeInTheDocument();
-  expect(screen.getByText('Query Builder')).toBeInTheDocument();
+  expect(screen.getByText('Himanish Ganjoo & TechRadar')).toBeInTheDocument();
+  expect(screen.getByText('@himganj153')).toBeInTheDocument();
+});
+
+test('a failed fixtures request shows an error with a retry, not "No match today"', async () => {
+  const ok = global.fetch.getMockImplementation();
+  let fail = true;
+  global.fetch.mockImplementation((url) => (String(url).includes('/fixtures/upcoming') && fail
+    ? Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({}) })
+    : ok(url)));
+  render(<FormatProvider><LandingPage /></FormatProvider>);
+
+  expect(await screen.findByText("Couldn't load the fixtures.")).toBeInTheDocument();
+  expect(screen.queryByText(/No match today/)).not.toBeInTheDocument();
+
+  fail = false;
+  fireEvent.click(screen.getAllByRole('button', { name: 'Try again' })[0]);
+  await waitFor(() => expect(screen.queryByText("Couldn't load the fixtures.")).not.toBeInTheDocument());
 });

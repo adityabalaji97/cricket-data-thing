@@ -118,7 +118,7 @@ const Kicker = ({ children, color = C.lime }) => (
     sx={{
       color,
       fontFamily: fonts.mono,
-      fontSize: 11,
+      fontSize: 12,
       letterSpacing: '0.16em',
       textTransform: 'uppercase',
       fontWeight: 600,
@@ -159,8 +159,8 @@ const CarouselButtons = ({ trackRef, hide }) => {
 };
 
 const arrowButtonSx = {
-  width: 38,
-  height: 38,
+  width: 44,
+  height: 44,
   color: C.hi,
   border: `1px solid ${C.hairlineStrong}`,
   bgcolor: C.surface,
@@ -193,14 +193,14 @@ const LandingDropdown = ({ id, label, value, options, onChange, openDropdown, se
         sx={{
           justifyContent: 'space-between',
           width: '100%',
-          minHeight: 42,
+          minHeight: 44,
           px: compact ? 1 : 1.3,
           borderRadius: 2,
           color: C.mid,
           bgcolor: C.surface,
           border: `1px solid ${open ? 'rgba(182,242,74,0.45)' : C.hairlineStrong}`,
           fontFamily: fonts.mono,
-          fontSize: 11,
+          fontSize: 12,
           letterSpacing: '0.06em',
           textTransform: 'uppercase',
           overflow: 'hidden',
@@ -325,16 +325,16 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
           startIcon={<MenuIcon />}
           sx={{
             ml: isMobile ? 0 : 0.5,
-            minWidth: isMobile ? 42 : 116,
-            width: isMobile ? 42 : 'auto',
-            height: 42,
+            minWidth: isMobile ? 44 : 116,
+            width: isMobile ? 44 : 'auto',
+            height: 44,
             px: isMobile ? 0 : 1.5,
             borderRadius: 2,
             color: C.bg,
             bgcolor: C.lime,
             fontFamily: fonts.mono,
             fontWeight: 700,
-            fontSize: 11,
+            fontSize: 12,
             letterSpacing: '0.12em',
             '& .MuiButton-startIcon': { mr: isMobile ? 0 : 0.9 },
             '&:hover': { bgcolor: C.limeHover },
@@ -351,8 +351,8 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
 
 const topIconSx = {
   ml: 'auto',
-  width: 42,
-  height: 42,
+  width: 44,
+  height: 44,
   color: C.hi,
   bgcolor: C.surface,
   border: `1px solid ${C.hairlineStrong}`,
@@ -391,7 +391,7 @@ const fixtureOrder = (a, b) => (Number(b.isLive) - Number(a.isLive))
   || (Number(isBig(b)) - Number(isBig(a)))
   || String(a.startUtc || a.time || '').localeCompare(String(b.startUtc || b.time || ''));
 
-const TodaySection = ({ matches, loading, isMobile }) => {
+const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
   const trackRef = useRef(null);
   const today = new Date().toLocaleDateString('en-CA');
   const now = Date.now();
@@ -405,14 +405,20 @@ const TodaySection = ({ matches, loading, isMobile }) => {
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
-        kicker={hasLive ? 'Live now' : '01 / Today'}
+        kicker={hasLive ? 'Live now' : 'Today'}
         kickerColor={hasLive ? C.red : C.lime}
         title="Today's Matches"
-        subtitle={hasToday ? 'Live, today and the next day and a half: T20 and ODI' : 'No match today, showing the next fixtures'}
+        // Only once the fixtures are in: while they load, "No match today" was a guess.
+        // A blank line while loading keeps the header's height, so the cards below don't jump.
+        subtitle={loading ? ' ' : error || !displayMatches.length ? null
+          : hasToday ? 'Live, today and the next day and a half: T20 and ODI' : 'No match today, showing the next fixtures'}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || displayMatches.length < 2} />}
       />
       {loading ? (
-        <LoadingCard label="Loading fixtures..." />
+        // The real card's height, so the page doesn't jump when the fixtures arrive.
+        <LoadingCard label="Loading fixtures..." minHeight={FIXTURE_CARD_HEIGHT} />
+      ) : error ? (
+        <ErrorCard label="Couldn't load the fixtures." onRetry={onRetry} minHeight={FIXTURE_CARD_HEIGHT} />
       ) : (
         <Box ref={trackRef} sx={carouselSx}>
           {displayMatches.map((match) => (
@@ -424,6 +430,8 @@ const TodaySection = ({ matches, loading, isMobile }) => {
     </Box>
   );
 };
+
+const FIXTURE_CARD_HEIGHT = 280;
 
 const TodayMatchCard = ({ match }) => {
   const live = Boolean(match.isLive);
@@ -437,7 +445,7 @@ const TodayMatchCard = ({ match }) => {
         scrollSnapAlign: 'start',
         flex: '0 0 auto',
         width: { xs: 290, md: 360 },
-        minHeight: 236,
+        minHeight: FIXTURE_CARD_HEIGHT,
         p: 2,
         borderRadius: 3,
         bgcolor: C.surface,
@@ -445,12 +453,12 @@ const TodayMatchCard = ({ match }) => {
         border: `1px solid ${live ? 'rgba(229,72,77,0.5)' : C.hairline}`,
       }}
     >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.2, mb: 2 }}>
-        <Typography sx={chipSx}>{match.format === 'ODI' ? `ODI · ${match.series || ''}` : (match.series || 'T20')}</Typography>
-        <Typography sx={{ ...monoSx, color: live ? C.red : C.soft }}>{status}</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.2, mb: 2 }}>
+        <Typography sx={seriesChipSx}>{match.format === 'ODI' ? `ODI · ${match.series || ''}` : (match.series || 'T20')}</Typography>
+        <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, minWidth: 0, maxWidth: '58%', whiteSpace: 'normal', textAlign: 'right', lineHeight: 1.3, pt: 0.45 }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
-      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 11, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 12, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />
@@ -484,7 +492,7 @@ const chipSx = {
   py: 0.45,
   borderRadius: 1,
   fontFamily: fonts.mono,
-  fontSize: 11,
+  fontSize: 12,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
   maxWidth: '62%',
@@ -493,9 +501,22 @@ const chipSx = {
   whiteSpace: 'nowrap',
 };
 
+// The fixture card's series chip: up to two lines, then an ellipsis, rather than one clipped line.
+const seriesChipSx = {
+  ...chipSx,
+  maxWidth: 'none',
+  flex: '0 1 auto',
+  minWidth: '40%',
+  whiteSpace: 'normal',
+  lineHeight: 1.3,
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+};
+
 const monoSx = {
   fontFamily: fonts.mono,
-  fontSize: 11,
+  fontSize: 12,
   letterSpacing: '0.04em',
   whiteSpace: 'nowrap',
 };
@@ -517,13 +538,13 @@ const teamLinkSx = {
 
 const limeButtonSx = {
   mt: 1.7,
-  height: 42,
+  height: 44,
   borderRadius: 2,
   bgcolor: C.lime,
   color: C.bg,
   fontFamily: fonts.mono,
   fontWeight: 700,
-  fontSize: 11,
+  fontSize: 12,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
   '&:hover': { bgcolor: C.limeHover },
@@ -577,7 +598,7 @@ const ConnectorSection = () => {
   return (
     <Box component="section" id="connector" ref={ref} sx={{ mb: { xs: 3.75, md: 5.5 }, scrollMarginTop: 72 }}>
       <SectionHeader
-        kicker="05 / Connect"
+        kicker="Connect"
         title="Use Hindsight in Claude or ChatGPT"
         subtitle="Ask questions in plain English and get tables, charts and a link back here."
       />
@@ -589,7 +610,7 @@ const ConnectorSection = () => {
           <Button
             onClick={copy}
             startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
-            sx={{ flexShrink: 0, minHeight: 40, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 11, '&:hover': { bgcolor: C.limeHover } }}
+            sx={{ flexShrink: 0, minHeight: 40, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 12, '&:hover': { bgcolor: C.limeHover } }}
           >
             {copied ? 'Copied' : 'Copy'}
           </Button>
@@ -614,6 +635,8 @@ const ConnectorSection = () => {
 const RecentMatchesSection = ({
   data,
   loading,
+  error,
+  onRetry,
   activeCompetition,
   setActiveCompetition,
   teamFilter,
@@ -651,7 +674,7 @@ const RecentMatchesSection = ({
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
-        kicker="02 / Browse"
+        kicker="Browse"
         title="Recent Matches"
         subtitle={`${matches.length} matches - filter by team, competition & recency`}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || matches.length < 2} />}
@@ -698,10 +721,10 @@ const RecentMatchesSection = ({
               color: C.lime,
               border: `1px solid rgba(182,242,74,0.35)`,
               borderRadius: 2,
-              height: 38,
+              height: 44,
               px: 1.3,
               fontFamily: fonts.mono,
-              fontSize: 11,
+              fontSize: 12,
               textTransform: 'uppercase',
             }}
           >
@@ -711,6 +734,8 @@ const RecentMatchesSection = ({
       </Box>
       {loading ? (
         <LoadingCard label="Loading recent matches..." />
+      ) : error ? (
+        <ErrorCard label="Couldn't load recent matches." onRetry={onRetry} />
       ) : matches.length ? (
         <Box ref={trackRef} sx={carouselSx}>
           {matches.map((match) => <RecentMatchTile key={match.match_id} match={match} />)}
@@ -816,18 +841,20 @@ const ScoreRow = ({ team, score, winner }) => (
   </Box>
 );
 
-const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
+const FeaturedInningsSection = ({ innings, loading, error, onRetry, isMobile }) => {
   const trackRef = useRef(null);
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
-        kicker="03 / Form"
+        kicker="Form"
         title="Recent Standout Innings"
         subtitle="Top hitting from the last 30 days - tap a name for the full profile"
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || innings.length < 2} />}
       />
       {loading ? (
         <LoadingCard label="Loading standout innings..." />
+      ) : error ? (
+        <ErrorCard label="Couldn't load the standout innings." onRetry={onRetry} />
       ) : (
         <Box ref={trackRef} sx={carouselSx}>
           {innings.map((item, index) => (
@@ -859,7 +886,7 @@ const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
                 <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 26, lineHeight: 1, fontVariantNumeric: 'tabular-nums', mt: 0.4 }}>
                   {item.runs} <Box component="span" sx={{ color: C.soft, fontSize: 16 }}>({item.balls})</Box>
                 </Typography>
-                <Typography sx={{ color: C.mid, fontFamily: fonts.mono, fontSize: 11, mt: 0.8 }}>
+                <Typography sx={{ color: C.mid, fontFamily: fonts.mono, fontSize: 12, mt: 0.8 }}>
                   SR {item.strike_rate} - {item.fours}x4 - {item.sixes}x6
                 </Typography>
                 <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, mt: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -886,11 +913,14 @@ const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
   const [eloRange, setEloRange] = useState('all');
   const [rankings, setRankings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const fetchRankings = async () => {
       setLoading(true);
+      setError(false);
       const params = new URLSearchParams();
       if (eloComp === 'international') {
         params.set('include_international', 'true');
@@ -921,22 +951,26 @@ const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
         const response = await fetch(
           `${config.API_URL}/teams/elo-rankings?${params.toString()}`,
         );
+        if (!response.ok) throw new Error(`elo rankings: ${response.status}`);
         const payload = await response.json();
         if (!cancelled) setRankings(payload.rankings || []);
       } catch (error) {
         console.error('Error fetching ELO rankings:', error);
-        if (!cancelled) setRankings([]);
+        if (!cancelled) {
+          setRankings([]);
+          setError(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     fetchRankings();
     return () => { cancelled = true; };
-  }, [eloComp, eloRange, formatParams.format, formatParams.gender]);
+  }, [eloComp, eloRange, formatParams.format, formatParams.gender, attempt]);
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <SectionHeader kicker="04 / Rank" kickerColor={C.gold} title="ELO Team Rankings" />
+      <SectionHeader kicker="Rank" kickerColor={C.gold} title="ELO Team Rankings" />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.7, flexWrap: 'wrap' }}>
         <LandingDropdown
           id="elo"
@@ -961,12 +995,14 @@ const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
           setOpenDropdown={setOpenDropdown}
           compact={isMobile}
         />
-        <Typography sx={{ ml: { md: 'auto' }, color: C.low, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.08em' }}>
+        <Typography sx={{ ml: { md: 'auto' }, color: C.low, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em' }}>
           K-FACTOR 32 - TOP 10
         </Typography>
       </Box>
       {loading ? (
         <LoadingCard label="Loading ELO rankings..." />
+      ) : error ? (
+        <ErrorCard label="Couldn't load the rankings." onRetry={() => setAttempt((n) => n + 1)} />
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.15 }}>
           {rankings.slice(0, 10).map((team) => <EloRow key={team.team_name} team={team} />)}
@@ -1023,7 +1059,7 @@ const EloRow = ({ team }) => {
         <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', mt: 0.35 }}>
           {team.team_name}
         </Typography>
-        <Typography sx={{ color: winColor, fontFamily: fonts.mono, fontSize: 11, mt: 0.45 }}>
+        <Typography sx={{ color: winColor, fontFamily: fonts.mono, fontSize: 12, mt: 0.45 }}>
           {team.wins || 0}-{team.losses || 0} - {Math.round(winPct)}%
         </Typography>
       </Box>
@@ -1031,7 +1067,7 @@ const EloRow = ({ team }) => {
         <Typography sx={{ color: C.lime, fontFamily: fonts.display, fontWeight: 700, fontSize: 19, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
           {Math.round(Number(team.current_elo || 0))}
         </Typography>
-        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.1em' }}>
+        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.1em' }}>
           ELO
         </Typography>
       </Box>
@@ -1051,7 +1087,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <Kicker>06 / Pipeline</Kicker>
+      <Kicker>Pipeline</Kicker>
       <Typography sx={{ ...sectionTitleSx, fontSize: { xs: 17, md: 20 } }}>League Match Counts</Typography>
       <Typography sx={{ color: C.soft, mt: 0.6, mb: 1.8, fontFamily: fonts.body, fontSize: 13 }}>
         Ingested match totals per competition - data-pipeline health check
@@ -1069,7 +1105,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
             <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 24, fontVariantNumeric: 'tabular-nums', lineHeight: 1.05, mt: 0.7 }}>
               {(item.match_count || 0).toLocaleString()}
             </Typography>
-            <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, mt: 0.5 }}>
+            <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, mt: 0.5 }}>
               latest {toDateLabel(item.latest_date)}
             </Typography>
           </Box>
@@ -1093,15 +1129,18 @@ const CreditsSection = () => {
   const year = new Date().getFullYear();
   return (
     <Box component="section" sx={{ borderTop: `1px solid ${C.hairline}`, pt: { xs: 2.6, md: 3.3 }, pb: 2 }}>
-      <Kicker>06 / Thanks</Kicker>
+      <Kicker>Thanks</Kicker>
       <Typography sx={sectionTitleSx}>Credits & Acknowledgements</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.3, mt: 1.8 }}>
         <CreditCard title="Data sources">
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4 }}>Ball-by-ball tracking</Typography>
+          <CreditLink href="https://twitter.com/himganj153">Himanish Ganjoo &amp; TechRadar</CreditLink>
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4, mt: 0.6 }}>Scorecards and match data</Typography>
           <CreditLink href="https://cricsheet.org/">Cricsheet.org</CreditLink>
           <CreditLink href="https://cricmetric.com/">Cricmetric</CreditLink>
         </CreditCard>
         <CreditCard title="Inspiration">
-          {['@prasannalara', '@cricketingview', '@IndianMourinho', '@hganjoo_153', '@randomcricstat', '@kaustats', '@cricviz', '@ajarrodkimber'].map((handle) => (
+          {['@prasannalara', '@cricketingview', '@IndianMourinho', '@himganj153', '@randomcricstat', '@kaustats', '@cricviz', '@ajarrodkimber'].map((handle) => (
             <CreditChip key={handle} href={`https://twitter.com/${handle.slice(1)}`}>{handle}</CreditChip>
           ))}
         </CreditCard>
@@ -1113,7 +1152,7 @@ const CreditsSection = () => {
             <CreditChip href="https://github.com/adityabalaji97/cricket-data-thing" icon={<GitHubIcon sx={{ fontSize: 14 }} />}>GitHub</CreditChip>
             <CreditChip href="https://twitter.com/maybe_eybe" icon={<XIcon sx={{ fontSize: 13 }} />}>@maybe_eybe</CreditChip>
           </Box>
-          <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, mt: 1.4 }}>
+          <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, mt: 1.4 }}>
             Hindsight (c) {year}
           </Typography>
         </CreditCard>
@@ -1133,13 +1172,14 @@ const CreditCard = ({ title, children }) => (
 
 const CreditLink = ({ href, children }) => (
   <Typography component="a" href={href} target="_blank" rel="noopener noreferrer" sx={{
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: 36,
     color: C.lime,
     fontFamily: fonts.body,
     fontWeight: 600,
     fontSize: 14,
     textDecoration: 'none',
-    mb: 0.8,
     '&:hover': { color: C.limeHover },
   }}>
     {children}
@@ -1153,14 +1193,14 @@ const CreditChip = ({ href, icon, children }) => (
     gap: 0.5,
     mr: 0.6,
     mb: 0.7,
-    px: 0.75,
-    py: 0.45,
+    minHeight: 36,
+    px: 1,
     color: C.mid,
     bgcolor: C.muted,
     border: `1px solid ${C.hairline}`,
     borderRadius: 1,
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 12,
     textDecoration: 'none',
     '&:hover': { color: C.lime, borderColor: 'rgba(182,242,74,0.35)' },
   }}>
@@ -1169,11 +1209,25 @@ const CreditChip = ({ href, icon, children }) => (
   </Box>
 );
 
-const LoadingCard = ({ label }) => (
-  <Box sx={{ minHeight: 130, display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5 }}>
+const LoadingCard = ({ label, minHeight = 130 }) => (
+  <Box sx={{ minHeight, width: '100%', display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5 }}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, color: C.soft }}>
       <CircularProgress size={18} sx={{ color: C.lime }} />
       <Typography sx={{ fontFamily: fonts.body, fontSize: 14 }}>{label}</Typography>
+    </Box>
+  </Box>
+);
+
+// A failed request says so and offers a retry, rather than rendering nothing.
+const ErrorCard = ({ label, onRetry, minHeight = 130 }) => (
+  <Box role="alert" sx={{ minHeight, width: '100%', display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5, p: 2 }}>
+    <Box sx={{ textAlign: 'center' }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 14 }}>{label}</Typography>
+      {onRetry && (
+        <Button type="button" onClick={onRetry} sx={{ mt: 1, minHeight: 44, px: 2, color: C.lime, border: '1px solid rgba(182,242,74,0.35)', borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, fontWeight: 700, letterSpacing: '0.08em' }}>
+          Try again
+        </Button>
+      )}
     </Box>
   </Box>
 );
@@ -1273,14 +1327,14 @@ const LatestNotesSection = () => {
       <SectionHeader
         kicker="Notes"
         title="Latest notes"
-        action={<Typography component={Link} to="/notes" sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap' }}>All notes →</Typography>}
+        action={<Typography component={Link} to="/notes" sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>All notes →</Typography>}
       />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.25 }}>
         {notes.map((note) => (
           <Box key={note.id} component={Link} to={`/notes/${note.slug}`}
             sx={{ display: 'flex', gap: 1.5, p: 1.75, borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${C.hairline}`, textDecoration: 'none', minWidth: 0, '&:hover': { bgcolor: C.raised } }}>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
+              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
                 {NOTE_KIND[note.kind] || 'Note'}
               </Typography>
               <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2,
@@ -1315,32 +1369,44 @@ const LandingPage = ({ showLeagueCounts = true }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [fixtures, setFixtures] = useState([]);
   const [fixturesLoading, setFixturesLoading] = useState(true);
+  const [fixturesError, setFixturesError] = useState(false);
+  const [fixturesTry, setFixturesTry] = useState(0);
   const [recentData, setRecentData] = useState(null);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState(false);
+  const [recentTry, setRecentTry] = useState(0);
   const [activeCompetition, setActiveCompetition] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [innings, setInnings] = useState([]);
   const [inningsLoading, setInningsLoading] = useState(true);
+  const [inningsError, setInningsError] = useState(false);
+  const [inningsTry, setInningsTry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const loadFixtures = async () => {
       setFixturesLoading(true);
-      const nextMatches = await fetchUpcomingMatches(20);
-      if (!cancelled) {
-        setFixtures(nextMatches);
-        setFixturesLoading(false);
+      setFixturesError(false);
+      try {
+        const nextMatches = await fetchUpcomingMatches(20);
+        if (!cancelled) setFixtures(nextMatches);
+      } catch (error) {
+        console.error('Error fetching upcoming matches:', error);
+        if (!cancelled) setFixturesError(true);
+      } finally {
+        if (!cancelled) setFixturesLoading(false);
       }
     };
     loadFixtures();
     return () => { cancelled = true; };
-  }, []);
+  }, [fixturesTry]);
 
   useEffect(() => {
     let cancelled = false;
     const loadRecent = async () => {
       setRecentLoading(true);
+      setRecentError(false);
       const params = new URLSearchParams({
         ...formatParams,
         competition: activeCompetition || 'all',
@@ -1356,38 +1422,47 @@ const LandingPage = ({ showLeagueCounts = true }) => {
       if (teamFilter !== 'all') params.set('team', teamFilter);
       try {
         const response = await fetch(`${config.API_URL}/recent-matches/discover?${params.toString()}`);
+        if (!response.ok) throw new Error(`recent matches: ${response.status}`);
         const payload = await response.json();
         if (cancelled) return;
         setRecentData(payload);
       } catch (error) {
         console.error('Error fetching recent matches:', error);
-        if (!cancelled) setRecentData(null);
+        if (!cancelled) {
+          setRecentData(null);
+          setRecentError(true);
+        }
       } finally {
         if (!cancelled) setRecentLoading(false);
       }
     };
     loadRecent();
     return () => { cancelled = true; };
-  }, [activeCompetition, teamFilter, dateFilter]);
+  }, [activeCompetition, teamFilter, dateFilter, recentTry]);
 
   useEffect(() => {
     let cancelled = false;
     const loadInnings = async () => {
       setInningsLoading(true);
+      setInningsError(false);
       try {
         const response = await fetch(`${config.API_URL}/landing/featured-innings`);
+        if (!response.ok) throw new Error(`featured innings: ${response.status}`);
         const payload = await response.json();
         if (!cancelled) setInnings(Array.isArray(payload) ? payload : []);
       } catch (error) {
         console.error('Error fetching featured innings:', error);
-        if (!cancelled) setInnings([]);
+        if (!cancelled) {
+          setInnings([]);
+          setInningsError(true);
+        }
       } finally {
         if (!cancelled) setInningsLoading(false);
       }
     };
     loadInnings();
     return () => { cancelled = true; };
-  }, []);
+  }, [inningsTry]);
 
   return (
     <Box
@@ -1408,12 +1483,15 @@ const LandingPage = ({ showLeagueCounts = true }) => {
       {openDropdown && <Box onClick={() => setOpenDropdown(null)} sx={{ position: 'fixed', inset: 0, zIndex: 35 }} />}
       <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
         <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
-        <TodaySection matches={fixtures} loading={fixturesLoading} isMobile={isMobile} />
+        <TodaySection matches={fixtures} loading={fixturesLoading} error={fixturesError}
+          onRetry={() => setFixturesTry((n) => n + 1)} isMobile={isMobile} />
         <TodaysGamesSection />
         <LatestNotesSection />
         <RecentMatchesSection
           data={recentData}
           loading={recentLoading}
+          error={recentError}
+          onRetry={() => setRecentTry((n) => n + 1)}
           activeCompetition={activeCompetition}
           setActiveCompetition={setActiveCompetition}
           teamFilter={teamFilter}
@@ -1424,7 +1502,8 @@ const LandingPage = ({ showLeagueCounts = true }) => {
           setOpenDropdown={setOpenDropdown}
           isMobile={isMobile}
         />
-        <FeaturedInningsSection innings={innings} loading={inningsLoading} isMobile={isMobile} />
+        <FeaturedInningsSection innings={innings} loading={inningsLoading} error={inningsError}
+          onRetry={() => setInningsTry((n) => n + 1)} isMobile={isMobile} />
         <EloSection isMobile={isMobile} openDropdown={openDropdown} setOpenDropdown={setOpenDropdown} />
         <ConnectorSection />
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
