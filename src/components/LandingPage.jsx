@@ -25,13 +25,14 @@ import { siteOrigin } from './ui/ChartExportButton';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
 import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
-import { getTeamColor, readableOnDark, textOn } from '../utils/teamColors';
+import { getTeamColor, readableOnDark } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
 import playerProfileUrl from '../utils/playerProfileUrl';
 import { noteDateLabel, previewPassed } from '../utils/noteDates';
 import AskHero from './landing/AskHero';
+import TeamRatings from './landing/TeamRatings';
 import { TAGLINE } from '../brand';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
@@ -64,13 +65,6 @@ const DATE_OPTIONS = [
   { value: '90', label: 'Last 3 months', mobileLabel: '3 months' },
 ];
 
-const ELO_RANGE_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: '24m', label: 'Last 24 months' },
-  { value: '12m', label: 'Last 12 months' },
-  { value: 'ytd', label: '2026 only' },
-];
-
 
 const toDateLabel = (value) => {
   if (!value) return '';
@@ -78,8 +72,6 @@ const toDateLabel = (value) => {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
-
-const dateInput = (date) => date.toISOString().slice(0, 10);
 
 const routeTeam = (team) => `/team?team=${encodeURIComponent(team || '')}&autoload=true`;
 const routePlayer = (player) => `/player?name=${encodeURIComponent(player || '')}&autoload=true`;
@@ -893,176 +885,6 @@ const FeaturedInningsSection = ({ innings, loading, error, onRetry, isMobile }) 
   );
 };
 
-const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
-  // Pinned, not the raw selection: ELO is one rating stream per format, so "All formats" has
-  // no meaning here and /teams/elo-rankings cannot resolve it. Falls back to men's T20.
-  const { pinnedFormatParams: formatParams } = useFormat();
-  const [eloComp, setEloComp] = useState('international');
-  const [eloRange, setEloRange] = useState('all');
-  const [rankings, setRankings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchRankings = async () => {
-      setLoading(true);
-      setError(false);
-      const params = new URLSearchParams();
-      if (eloComp === 'international') {
-        params.set('include_international', 'true');
-        params.set('top_teams', '10');
-      } else {
-        params.set('include_international', 'false');
-        params.set('league', 'Indian Premier League');
-      }
-      const now = new Date();
-      if (eloRange === '24m') {
-        const start = new Date(now);
-        start.setMonth(start.getMonth() - 24);
-        params.set('start_date', dateInput(start));
-        params.set('end_date', dateInput(now));
-      } else if (eloRange === '12m') {
-        const start = new Date(now);
-        start.setMonth(start.getMonth() - 12);
-        params.set('start_date', dateInput(start));
-        params.set('end_date', dateInput(now));
-      } else if (eloRange === 'ytd') {
-        params.set('start_date', `${now.getFullYear()}-01-01`);
-        params.set('end_date', dateInput(now));
-      }
-      // ELO is a separate stream per format, so the ranking must be scoped to the selection.
-      params.set('format', formatParams.format);
-      params.set('gender', formatParams.gender);
-      try {
-        const response = await fetch(
-          `${config.API_URL}/teams/elo-rankings?${params.toString()}`,
-        );
-        if (!response.ok) throw new Error(`elo rankings: ${response.status}`);
-        const payload = await response.json();
-        if (!cancelled) setRankings(payload.rankings || []);
-      } catch (error) {
-        console.error('Error fetching ELO rankings:', error);
-        if (!cancelled) {
-          setRankings([]);
-          setError(true);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchRankings();
-    return () => { cancelled = true; };
-  }, [eloComp, eloRange, formatParams.format, formatParams.gender, attempt]);
-
-  return (
-    <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <SectionHeader kicker="Rank" kickerColor={C.gold} title="ELO Team Rankings" />
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.7, flexWrap: 'wrap' }}>
-        <LandingDropdown
-          id="elo"
-          label="Competition"
-          value={eloComp}
-          options={[
-            { value: 'international', label: 'International Teams' },
-            { value: 'ipl', label: 'IPL Teams' },
-          ]}
-          onChange={setEloComp}
-          openDropdown={openDropdown}
-          setOpenDropdown={setOpenDropdown}
-          compact={isMobile}
-        />
-        <LandingDropdown
-          id="eloRange"
-          label="Range"
-          value={eloRange}
-          options={ELO_RANGE_OPTIONS}
-          onChange={setEloRange}
-          openDropdown={openDropdown}
-          setOpenDropdown={setOpenDropdown}
-          compact={isMobile}
-        />
-        <Typography sx={{ ml: { md: 'auto' }, color: C.low, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.08em' }}>
-          K-FACTOR 32 - TOP 10
-        </Typography>
-      </Box>
-      {loading ? (
-        <LoadingCard label="Loading ELO rankings..." />
-      ) : error ? (
-        <ErrorCard label="Couldn't load the rankings." onRetry={() => setAttempt((n) => n + 1)} />
-      ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.15 }}>
-          {rankings.slice(0, 10).map((team) => <EloRow key={team.team_name} team={team} />)}
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const EloRow = ({ team }) => {
-  const color = getTeamColor(team.team_abbreviation || team.team_name) || C.low;
-  const rank = Number(team.rank || 0);
-  const medal = rank === 1 ? C.gold : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : 'transparent';
-  const winPct = Number(team.win_percentage || 0);
-  const winColor = winPct >= 60 ? C.lime : winPct >= 45 ? C.gold : C.red;
-
-  return (
-    <Box
-      component={Link}
-      to={routeTeam(team.team_abbreviation || team.team_name)}
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: '42px minmax(0,1fr) auto',
-        alignItems: 'center',
-        gap: 1.2,
-        p: 1.25,
-        minHeight: 70,
-        bgcolor: C.surface,
-        border: `1px solid ${C.hairline}`,
-        borderRadius: 2.2,
-        textDecoration: 'none',
-        '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' },
-      }}
-    >
-      <Box sx={{
-        width: 34,
-        height: 34,
-        borderRadius: '50%',
-        display: 'grid',
-        placeItems: 'center',
-        bgcolor: color,
-        color: textOn(color),
-        border: rank <= 3 ? `2px solid ${medal}` : '0',
-        fontFamily: fonts.display,
-        fontWeight: 700,
-        fontSize: 15,
-      }}>
-        {rank}
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1 }}>
-          {team.team_abbreviation || team.team_name}
-        </Typography>
-        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', mt: 0.35 }}>
-          {team.team_name}
-        </Typography>
-        <Typography sx={{ color: winColor, fontFamily: fonts.mono, fontSize: 12, mt: 0.45 }}>
-          {team.wins || 0}-{team.losses || 0} - {Math.round(winPct)}%
-        </Typography>
-      </Box>
-      <Box sx={{ textAlign: 'right' }}>
-        <Typography sx={{ color: C.lime, fontFamily: fonts.display, fontWeight: 700, fontSize: 19, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-          {Math.round(Number(team.current_elo || 0))}
-        </Typography>
-        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.1em' }}>
-          ELO
-        </Typography>
-      </Box>
-    </Box>
-  );
-};
-
 const LEAGUE_COUNTS_PREVIEW = 10;
 
 const LeagueCountsSection = ({ stats, showLeagueCounts = false }) => {
@@ -1525,7 +1347,7 @@ const LandingPage = ({ showLeagueCounts = false }) => {
         />
         <FeaturedInningsSection innings={innings} loading={inningsLoading} error={inningsError}
           onRetry={() => setInningsTry((n) => n + 1)} isMobile={isMobile} />
-        <EloSection isMobile={isMobile} openDropdown={openDropdown} setOpenDropdown={setOpenDropdown} />
+        <Box sx={{ mb: { xs: 3.75, md: 5.5 } }}><TeamRatings /></Box>
         <ConnectRow />
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
         <CreditsSection />

@@ -99,7 +99,7 @@ test('renders redesigned landing sections and explore drawer', async () => {
   chips.forEach((a) => expect(a.getAttribute('href')).not.toContain('nl='));
   expect(screen.getByText('Recent Matches')).toBeInTheDocument();
   expect(screen.getByText('Recent Standout Innings')).toBeInTheDocument();
-  expect(screen.getByText('ELO Team Rankings')).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'IPL' })).toBeInTheDocument();
 
   await waitFor(() => {
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('competition=all'));

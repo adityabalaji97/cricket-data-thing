@@ -179,3 +179,34 @@ Files: `src/components/landing/AskHero.jsx`, `src/components/landing/__tests__/a
 - **Owner: curate this list** (`EXAMPLES` in AskHero.jsx): swap in questions you want showcased; keep each URL
   checked.
 - Placeholder: "Ask anything about a player, phase or matchup" (no longer repeats a chip).
+
+## L2: one rating, the team page's
+
+Files: new `src/components/landing/TeamRatings.jsx` + `src/components/landing/__tests__/teamRatings.test.js`,
+`src/components/LandingPage.jsx` (old `EloSection`/`EloRow`, the range dropdown and `dateInput` removed),
+`src/App.test.js`.
+
+- Root cause of "Mumbai 6th at 1546 here, 9th at 1468 on the team page": the IPL is stored under two competition
+  names, "Indian Premier League" to 2025 and "IPL" from 2026. `/teams/elo-rankings?league=Indian Premier League`
+  never saw a 2026 match, so every side sat at its 2025 rating (locally: MI 4th at 1528 vs the team page's 9th at
+  1456). Front-end fix: fetch both league names and keep each side at its latest match. Locally the list now has
+  MI 9th at 1456, matching `/team-page?team=MI` exactly (rating.now 1456, rank 9 of 10). The order matches the
+  mockup's (RCB, SRH/GT, ... LSG). **Backend note**: the endpoint itself still splits the IPL; anything else that
+  calls it with one league name has the same bug (worth a small normalisation later; not done: front end only).
+- Current franchises only: merged by code (Bangalore/Bengaluru, Kings XI/Punjab Kings, Daredevils/Capitals count
+  once, at the latest), filtered to the ten current sides (Rising Pune, Kochi, Gujarat Lions, Pune Warriors gone).
+  International: the top 12 (the team page's peers), with proper codes (IND, SA, NZ, WI...) and the country name
+  for the team page link.
+- One number a row: rank, code, a dot on one shared scale (lowest to highest rating, team colour), the rating.
+  W-L and win % gone; "K-FACTOR 32 - TOP 10" gone; the range dropdown gone (a window only changed which "latest"
+  was picked). An IPL / T20Is toggle (44px tabs) stays.
+- Card anatomy: claim ("Royal Challengers Bengaluru are the top-rated IPL side. Lucknow Super Giants are 10th of
+  10."), picture (the dot scale), scope ("Elo rating after each side's latest IPL match, to 31 May 2026. The same
+  rating as each team page; tap a side for its page."), credit ("hindsightcricket.com · Data: Himanish Ganjoo &
+  TechRadar, Cricsheet", as on the mockup). Each row is a 44px link to the team page.
+- Loading and error states keep the card's height; error has Try again.
+- Built as a card component so L7 can lift it into the lead slot.
+
+Checked: 390, 360, 1440; T20Is view (12 sides); 3 unit tests (merge/rename/defunct, intl codes, claim); App.test;
+build. Screenshots: `l2_390.png`, `l2_intl_360.png`, `l2_1440.png`.
+Open: the dot scale runs from the lowest to the highest rating, so the last side always sits at the left end.
