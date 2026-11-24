@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
-import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { PROMISE, TAGLINE } from '../../brand';
 import { track } from '../../utils/analytics';
@@ -11,50 +10,31 @@ import { track } from '../../utils/analytics';
 // four to one, so the box is the page's one lime action. A question goes to /query?nl=, as the header search's
 // fallback does. public/index.html draws the same block before the app loads (L6); keep the two in step.
 
-// Shown when /query-recent has nothing usable: questions people have asked, India first.
-export const FALLBACK_EXAMPLES = [
-  { q: 'Rinku Singh vs pace', to: `/query?nl=${encodeURIComponent('Rinku Singh vs pace')}` },
-  { q: 'Jurel vs Buttler, by phase', to: `/query?nl=${encodeURIComponent('Jurel vs Buttler, by phase')}` },
+// The example chips: a hand-kept list, never visitors' raw text (it sits on the most-viewed spot on the site). Each
+// is a question people asked (the Fable review's picks and the query log, Nov 2026), paired with a stored query
+// checked to answer exactly what its label says, so a tap opens the answer without a model call.
+// Owner: curate this list (LANDING_BUILD_LOG.md).
+const q = (label, search) => ({ q: label, to: `/query?${search}&q=${encodeURIComponent(label)}` });
+export const EXAMPLES = [
+  q('Rinku Singh vs pace', 'batters=Rinku+Singh&bowl_kind=pace+bowler&group_by=year&fmt=mens-t20'),
+  q('Jurel vs Buttler, by phase', 'batters=Dhruv+Jurel&batters=Jos+Buttler&group_by=batter&group_by=phase&fmt=mens-t20'),
+  q('Sanju Samson vs pace', 'batters=Sanju+Samson&bowl_kind=pace+bowler&group_by=year&fmt=mens-t20'),
+  q('Tilak Varma at the death, by length', 'batters=Tilak+Varma&over_min=15&over_max=19&group_by=length&fmt=mens-t20'),
+  q('Shubman Gill since 2024, by phase', 'batters=Shubman+Gill&start_date=2024-01-01&group_by=phase&fmt=mens-t20'),
+  q('New Zealand bowling at the death since 2024', 'bowling_teams=New+Zealand&start_date=2024-01-01&over_min=15&over_max=19&group_by=bowler&fmt=mens-t20'),
 ];
 
-// A recent question makes a good chip if it reads as a question someone would tap: short, not truncated, not a
-// filter-chip trail ("Sanju Samson … Batting at 3,4,5"), and capitalised as a name would be ("India vs australia"
-// is someone's quick typing, not a showcase).
-const LOWERCASE_SIDE = /\b(india|australia|england|pakistan|africa|zealand|lanka|indies|afghanistan|bangladesh|ireland|zimbabwe)\b/;
-export const goodExample = (item) => {
-  const q = String(item?.q || '').trim();
-  return q.length >= 12 && q.length <= 40 && !q.includes('…') && /^[A-Z]/.test(q) && q.includes(' ')
-    && !LOWERCASE_SIDE.test(q);
-};
-
-export const pickExamples = (items, n = 2) => {
-  const seen = new Set();
-  const picked = [];
-  for (const item of items || []) {
-    const key = String(item.q || '').trim().toLowerCase();
-    // Two chips that are one question with a year added would waste the second slot.
-    if (!goodExample(item) || [...seen].some((s) => s.startsWith(key) || key.startsWith(s))) continue;
-    seen.add(key);
-    // The stored search re-opens the parsed query without asking the model again.
-    picked.push({ q: item.q.trim(), to: item.search ? `/query${item.search}` : `/query?nl=${encodeURIComponent(item.q.trim())}` });
-    if (picked.length === n) break;
-  }
-  return picked.length === n ? picked : FALLBACK_EXAMPLES;
+// Two a day, in IST, cycling through the list.
+export const examplesFor = (now = Date.now(), n = 2) => {
+  const day = Math.floor((now + 5.5 * 3600e3) / 864e5);
+  const start = (day * n) % EXAMPLES.length;
+  return Array.from({ length: n }, (_, i) => EXAMPLES[(start + i) % EXAMPLES.length]);
 };
 
 const AskHero = ({ source = 'home', headingLevel = 'h1' }) => {
   const navigate = useNavigate();
   const [text, setText] = useState('');
-  const [examples, setExamples] = useState(FALLBACK_EXAMPLES);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${config.API_URL}/query-recent`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled) setExamples(pickExamples(d?.items)); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const [examples] = useState(() => examplesFor());
 
   const submit = (event) => {
     event.preventDefault();
@@ -79,7 +59,7 @@ const AskHero = ({ source = 'home', headingLevel = 'h1' }) => {
           borderRadius: '14px', border: `1.5px solid ${colors.accent}`, bgcolor: colors.input,
           '&:focus-within': { boxShadow: '0 0 0 3px rgba(182,242,74,0.18)' } }}>
         <Box component="input" type="search" enterKeyHint="search" aria-label="Ask a cricket question in plain words"
-          placeholder="Ask anything: Rinku Singh vs pace" value={text} onChange={(e) => setText(e.target.value)}
+          placeholder="Ask anything about a player, phase or matchup" value={text} onChange={(e) => setText(e.target.value)}
           sx={{ flex: 1, minWidth: 0, height: '100%', border: 0, outline: 0, bgcolor: 'transparent', color: colors.textHi,
             fontFamily: fonts.body, fontSize: 16, '&::placeholder': { color: colors.textLo, opacity: 1 },
             '&::-webkit-search-cancel-button': { display: 'none' } }} />

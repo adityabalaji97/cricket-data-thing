@@ -157,3 +157,25 @@ Files: `src/components/ig/IgLinks.jsx`, `public/index.html`, `api/_lib/share.mjs
 - `api/_lib/share.mjs` DEFAULT_TITLE / DEFAULT_DESCRIPTION carry the same tagline (the crawler head for every page
   without its own summary, and the home card's text). The share image headline "Who really won the match?" stays.
 - Still assumed: the logo on /links is the site's `cricket-icon.svg`, not the bat-h mark.
+
+## L1 review fixes
+
+Files: `src/components/landing/AskHero.jsx`, `src/components/landing/__tests__/askExamples.test.js`, `src/App.test.js`.
+
+- The chips no longer read `/query-recent` (visitor text on the most-viewed spot; and stored queries can be wrong:
+  "Shubman Gill in ODIs since 2024 by phase" was stored grouped by wagon zone). `EXAMPLES` is a hand-kept list of six,
+  each a label plus a stored `/query?...` (label as `q=`), two a day by IST date, cycling over three days. A tap never
+  calls the model (no `nl=`; a unit test checks every entry).
+- The six, each checked by rendering its URL in the local app (screenshots `l1fix_chip1..6.png`):
+  1. Rinku Singh vs pace: by year, "strike rate 161 in 2026, from 157 in 2024".
+  2. Jurel vs Buttler, by phase: batter x phase, six rows.
+  3. Sanju Samson vs pace: by year.
+  4. Tilak Varma at the death, by length: overs 16-20 by length.
+  5. Shubman Gill since 2024, by phase: T20, three phases.
+  6. New Zealand bowling at the death since 2024: overs 16-20 by bowler, Boult cheapest.
+  Sources: 1-3 are the Fable review's picks (from the production log), 4-6 are questions in the query log
+  (5 Nov), rewritten to the query they asked for. The ODI versions (Gill in ODIs, India v Australia in ODIs) were
+  dropped: the local DB's ODIs are too thin to check them.
+- **Owner: curate this list** (`EXAMPLES` in AskHero.jsx): swap in questions you want showcased; keep each URL
+  checked.
+- Placeholder: "Ask anything about a player, phase or matchup" (no longer repeats a chip).

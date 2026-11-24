@@ -94,7 +94,9 @@ test('renders redesigned landing sections and explore drawer', async () => {
   // L1: the promise and the ask box come first.
   expect(screen.getByText('Hindsight shows you why.')).toBeInTheDocument();
   expect(screen.getByRole('searchbox', { name: /ask a cricket question/i })).toBeInTheDocument();
-  expect(screen.getByText('Rinku Singh vs pace')).toBeInTheDocument();
+  const chips = screen.getAllByRole('link').filter((a) => (a.getAttribute('href') || '').startsWith('/query?'));
+  expect(chips).toHaveLength(2);
+  chips.forEach((a) => expect(a.getAttribute('href')).not.toContain('nl='));
   expect(screen.getByText('Recent Matches')).toBeInTheDocument();
   expect(screen.getByText('Recent Standout Innings')).toBeInTheDocument();
   expect(screen.getByText('ELO Team Rankings')).toBeInTheDocument();

@@ -1,31 +1,31 @@
-import { FALLBACK_EXAMPLES, pickExamples } from '../AskHero';
+import { EXAMPLES, examplesFor } from '../AskHero';
 
 // react-router-dom 7 ships ES modules Jest can't resolve; only the pure helpers are tested here.
 jest.mock('react-router-dom', () => ({ Link: () => null, useNavigate: () => () => {} }), { virtual: true });
 
-const recent = [
-  { q: 'Sanju Samson … Batting at 3,4,5', search: '?q=x' },
-  { q: 'India vs australia 2023', search: '?q=y' },
-  { q: 'India vs australia', search: '?q=z' },
-  { q: 'Tilak Varma batting at the death by line and length', search: '?q=long' },
-  { q: 'Shubman Gill in ODIs since 2024 by phase', search: '?q=gill' },
-  { q: 'Shubman Gill in ODIs since 2024 by phase', search: '?q=gill2' },
-  { q: 'Hnry Stadium: pace or spin since 2023' },
-];
-
-test('picks two short, well-formed, distinct recent questions', () => {
-  expect(pickExamples(recent)).toEqual([
-    { q: 'Shubman Gill in ODIs since 2024 by phase', to: '/query?q=gill' },
-    { q: 'Hnry Stadium: pace or spin since 2023', to: `/query?nl=${encodeURIComponent('Hnry Stadium: pace or spin since 2023')}` },
-  ]);
+test('every chip opens a stored query, never a model call, labelled with its own question', () => {
+  for (const ex of EXAMPLES) {
+    expect(ex.to.startsWith('/query?')).toBe(true);
+    const params = new URLSearchParams(ex.to.slice('/query?'.length));
+    expect(params.has('nl')).toBe(false);
+    expect(params.get('q')).toBe(ex.q);
+    expect(params.getAll('group_by').length).toBeGreaterThan(0);
+    expect(params.get('fmt')).toBeTruthy();
+  }
 });
 
-test('a question and the same question with a year added count once', () => {
-  const picked = pickExamples([{ q: 'Rohit Sharma vs spin' }, { q: 'Rohit Sharma vs spin 2024' }, { q: 'Bumrah at the death' }]);
-  expect(picked.map((p) => p.q)).toEqual(['Rohit Sharma vs spin', 'Bumrah at the death']);
+test('two a day, different from each other, changing at IST midnight', () => {
+  const day = (iso) => examplesFor(Date.parse(iso)).map((e) => e.q);
+  const today = day('2026-11-24T12:00:00Z');
+  expect(today).toHaveLength(2);
+  expect(today[0]).not.toBe(today[1]);
+  // 18:29 UTC is 23:59 IST the same day; 18:31 UTC is past midnight IST.
+  expect(day('2026-11-24T18:29:00Z')).toEqual(today);
+  expect(day('2026-11-24T18:31:00Z')).not.toEqual(today);
 });
 
-test('falls back to the curated pair when fewer than two qualify', () => {
-  expect(pickExamples([{ q: 'india vs pak' }])).toBe(FALLBACK_EXAMPLES);
-  expect(pickExamples(undefined)).toBe(FALLBACK_EXAMPLES);
+test('the six cycle over three days', () => {
+  const seen = new Set();
+  for (let d = 0; d < 3; d += 1) examplesFor(Date.parse('2026-11-24T06:00:00Z') + d * 864e5).forEach((e) => seen.add(e.q));
+  expect(seen.size).toBe(EXAMPLES.length);
 });
