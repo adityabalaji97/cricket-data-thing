@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { track } from '../utils/analytics';
 import {
   Box,
   Button,
@@ -16,8 +15,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
-import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import XIcon from '@mui/icons-material/X';
 import config from '../config';
@@ -32,6 +29,7 @@ import { useFormat } from '../context/FormatContext';
 import playerProfileUrl from '../utils/playerProfileUrl';
 import { noteDateLabel, previewPassed } from '../utils/noteDates';
 import AskHero from './landing/AskHero';
+import { Kicker, SectionHeader, chipSx, monoSx, sectionTitleSx } from './landing/sectionKit';
 import TeamRatings from './landing/TeamRatings';
 import LeadCard from './landing/LeadCard';
 import { TAGLINE } from '../brand';
@@ -101,44 +99,8 @@ const flattenRecentMatches = (data) => {
   return (data.groups || []).flatMap((group) => group.matches || []);
 };
 
-const sectionTitleSx = {
-  color: C.hi,
-  fontFamily: fonts.display,
-  fontWeight: 700,
-  fontSize: { xs: 20, md: 25 },
-  lineHeight: 1.05,
-};
 
-const Kicker = ({ children, color = C.lime }) => (
-  <Typography
-    sx={{
-      color,
-      fontFamily: fonts.mono,
-      fontSize: 12,
-      letterSpacing: '0.16em',
-      textTransform: 'uppercase',
-      fontWeight: 600,
-      mb: 0.75,
-    }}
-  >
-    {children}
-  </Typography>
-);
 
-const SectionHeader = ({ kicker, kickerColor, title, subtitle, action }) => (
-  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, mb: 1.75 }}>
-    <Box sx={{ minWidth: 0 }}>
-      <Kicker color={kickerColor}>{kicker}</Kicker>
-      <Typography sx={sectionTitleSx}>{title}</Typography>
-      {subtitle && (
-        <Typography sx={{ color: C.soft, mt: 0.6, fontFamily: fonts.body, fontSize: { xs: 13, md: 14 } }}>
-          {subtitle}
-        </Typography>
-      )}
-    </Box>
-    {action}
-  </Box>
-);
 
 const CarouselButtons = ({ trackRef, hide }) => {
   if (hide) return null;
@@ -577,21 +539,6 @@ const TeamFixtureRow = ({ color, abbr, name }) => (
   </Box>
 );
 
-const chipSx = {
-  color: C.mid,
-  bgcolor: C.muted,
-  px: 0.8,
-  py: 0.45,
-  borderRadius: 1,
-  fontFamily: fonts.mono,
-  fontSize: 12,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  maxWidth: '62%',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
 
 // The fixture card's series chip: up to two lines, then an ellipsis, rather than one clipped line.
 const seriesChipSx = {
@@ -606,12 +553,6 @@ const seriesChipSx = {
   WebkitBoxOrient: 'vertical',
 };
 
-const monoSx = {
-  fontFamily: fonts.mono,
-  fontSize: 12,
-  letterSpacing: '0.04em',
-  whiteSpace: 'nowrap',
-};
 
 const teamLinkSx = {
   color: C.hi,
@@ -644,68 +585,6 @@ const outlineButtonSx = {
 };
 
 
-// The Hindsight MCP connector (mcp_server/): lets Claude / ChatGPT query the data directly.
-const CONNECTOR_URL = 'https://hindsightcricket.com/mcp';
-const CONNECTOR_PROMPTS = [
-  "Kohli's strike rate vs pace and spin by year in T20s",
-  'Top 10 IPL 2026 strike rates, min 100 balls',
-  'Preview South Africa v Australia at Kingsmead in ODIs',
-];
-
-// Lives on /connect (ConnectPage) since the landing redesign: setup instructions aren't a home-page section.
-export const ConnectorSection = () => {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(CONNECTOR_URL);
-      track('connector_copy');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-  const step = (label, text) => (
-    <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 14, lineHeight: 1.5 }}>
-      <Box component="span" sx={{ color: C.hi, fontWeight: 700 }}>{label}</Box> {text}
-    </Typography>
-  );
-  return (
-    <Box component="section" id="connector" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <SectionHeader
-        kicker="Connect"
-        title="Use Hindsight in Claude or ChatGPT"
-        subtitle="Ask questions in plain English and get tables, charts and a link back here."
-      />
-      <Box sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 3, bgcolor: C.surface, border: `1px solid ${C.hairline}`, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, p: 1, pl: 1.5, borderRadius: 2, bgcolor: C.inset, border: `1px solid ${C.hairlineStrong}` }}>
-          <Typography sx={{ ...monoSx, color: C.lime, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-            {CONNECTOR_URL}
-          </Typography>
-          <Button
-            onClick={copy}
-            startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
-            sx={{ flexShrink: 0, minHeight: 44, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 12, '&:hover': { bgcolor: C.limeHover } }}
-          >
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
-        </Box>
-        {step('Claude:', 'Settings → Connectors → Add custom connector → paste the URL.')}
-        {step('ChatGPT:', 'Settings → Apps & Connectors → turn on Developer mode → Create → paste the URL, no authentication.')}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, pt: 0.5 }}>
-          {CONNECTOR_PROMPTS.map((prompt) => (
-            <Typography key={prompt} sx={{ ...chipSx, maxWidth: '100%', whiteSpace: 'normal', textTransform: 'none', letterSpacing: 0, fontSize: 12 }}>
-              “{prompt}”
-            </Typography>
-          ))}
-        </Box>
-        <Typography sx={{ color: C.low, fontFamily: fonts.body, fontSize: 12 }}>
-          Read-only and free to use; results are aggregated and rate-limited.
-        </Typography>
-      </Box>
-    </Box>
-  );
-};
 
 const RecentMatchesSection = ({
   data,

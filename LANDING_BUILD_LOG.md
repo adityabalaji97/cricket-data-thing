@@ -262,3 +262,18 @@ fixtures are ILT20); both paths are small and unit-tested where pure.
   league or event (BIG_SERIES), never a qualifier, never a women's match without India. It also orders the fixtures
   within a day (it replaced `isBig`; the old BIG_TEAMS list of ten Full Members is gone, so Australia v England no
   longer jumps the queue: India-first). Tests: `src/components/landing/__tests__/headline.test.js`.
+
+## L6 step 1: ConnectorSection out of LandingPage
+
+Files: new `src/components/connect/ConnectorSection.jsx`, new `src/components/landing/sectionKit.jsx`,
+`src/components/LandingPage.jsx`, `src/components/pages/ConnectPage.jsx`.
+
+- `ConnectorSection`, `CONNECTOR_URL` and `CONNECTOR_PROMPTS` live in `src/components/connect/ConnectorSection.jsx`.
+- The section pieces both pages use (`Kicker`, `SectionHeader`, `sectionTitleSx`, `chipSx`, `monoSx`) live in
+  `src/components/landing/sectionKit.jsx` (with the few tokens they need), so neither page imports the other.
+  `/connect` no longer pulls in the landing page.
+- Unused imports dropped from LandingPage (copy/check icons, `track`).
+- Bundle baseline for L6 (`npm run build`, gzip): **main 976 kB** (`main.388dc930.js`), the largest other chunk
+  15.6 kB. Every route except a few admin/notes pages is in main.
+
+Checked: /connect renders the connector; / renders; tests; build.

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box } from '@mui/material';
 import { colors } from '../../theme/hindsightDark';
-import { ConnectorSection } from '../LandingPage';
+import ConnectorSection from '../connect/ConnectorSection';
 
 // The MCP connector's setup (landing plan L4): its own page rather than a home-page section.
 // hindsightcricket.com/mcp opened in a browser lands here (vercel.json), and so does the old /#connector.
