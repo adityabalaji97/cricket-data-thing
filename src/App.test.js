@@ -91,6 +91,10 @@ test('renders redesigned landing sections and explore drawer', async () => {
   render(<FormatProvider><LandingPage /></FormatProvider>);
 
   expect(await screen.findByText("Today's Matches")).toBeInTheDocument();
+  // L1: the promise and the ask box come first.
+  expect(screen.getByText('Hindsight shows you why.')).toBeInTheDocument();
+  expect(screen.getByRole('searchbox', { name: /ask a cricket question/i })).toBeInTheDocument();
+  expect(screen.getByText('Rinku Singh vs pace')).toBeInTheDocument();
   expect(screen.getByText('Recent Matches')).toBeInTheDocument();
   expect(screen.getByText('Recent Standout Innings')).toBeInTheDocument();
   expect(screen.getByText('ELO Team Rankings')).toBeInTheDocument();

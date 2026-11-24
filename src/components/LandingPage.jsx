@@ -31,6 +31,8 @@ import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
 import playerProfileUrl from '../utils/playerProfileUrl';
 import { noteDateLabel, previewPassed } from '../utils/noteDates';
+import AskHero from './landing/AskHero';
+import { TAGLINE } from '../brand';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
 // src/theme/hindsightDark.js. The names are kept short because they are used densely
@@ -331,14 +333,16 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
             height: 44,
             px: isMobile ? 0 : 1.5,
             borderRadius: 2,
-            color: C.bg,
-            bgcolor: C.lime,
+            // Outlined, not lime: the ask box below is the page's one lime action (landing plan L1).
+            color: C.hi,
+            bgcolor: C.surface,
+            border: `1px solid ${C.hairlineStrong}`,
             fontFamily: fonts.mono,
             fontWeight: 700,
             fontSize: 12,
             letterSpacing: '0.12em',
             '& .MuiButton-startIcon': { mr: isMobile ? 0 : 0.9 },
-            '&:hover': { bgcolor: C.limeHover },
+            '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.35)' },
           }}
         >
           {isMobile ? '' : 'Explore'}
@@ -467,7 +471,7 @@ const TodayMatchCard = ({ match }) => {
       <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, minHeight: 36 }}>
         {match.venue || 'Venue TBA'}
       </Typography>
-      <Button component={Link} to={routePreview(match)} fullWidth sx={limeButtonSx}>
+      <Button component={Link} to={routePreview(match)} fullWidth sx={outlineButtonSx}>
         Match Preview
       </Button>
     </Box>
@@ -537,18 +541,19 @@ const teamLinkSx = {
   '&:hover': { color: C.lime },
 };
 
-const limeButtonSx = {
+// The cards' buttons: lime text on an outline, so they don't compete with the ask box.
+const outlineButtonSx = {
   mt: 1.7,
   height: 44,
   borderRadius: 2,
-  bgcolor: C.lime,
-  color: C.bg,
+  color: C.lime,
+  border: '1px solid rgba(182,242,74,0.35)',
   fontFamily: fonts.mono,
   fontWeight: 700,
   fontSize: 12,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  '&:hover': { bgcolor: C.limeHover },
+  '&:hover': { bgcolor: 'rgba(182,242,74,0.08)', borderColor: C.lime },
 };
 
 
@@ -788,7 +793,7 @@ const RecentMatchTile = ({ match }) => {
       <Typography sx={{ color: C.low, fontFamily: fonts.body, fontSize: 12, lineHeight: 1.25, minHeight: 32, mt: 0.4 }}>
         {match.venue || 'Venue unavailable'}
       </Typography>
-      <Button component={Link} to={`/scorecard/${match.match_id}`} fullWidth sx={limeButtonSx}>
+      <Button component={Link} to={`/scorecard/${match.match_id}`} fullWidth sx={outlineButtonSx}>
         Scorecard
       </Button>
     </Box>
@@ -1374,6 +1379,8 @@ const LandingPage = ({ showLeagueCounts = false }) => {
   const { pinnedFormatParams: formatParams } = useFormat();
   const [navOpen, setNavOpen] = useState(false);
   const navigate = useNavigate();
+  // Other pages set their own titles; coming back home must not keep theirs. Same words as public/index.html.
+  useEffect(() => { document.title = `Hindsight · ${TAGLINE}`; }, []);
   // The connector block moved to /connect; old links (and hindsightcricket.com/mcp before vercel.json changed)
   // still arrive as /#connector.
   useEffect(() => {
@@ -1496,6 +1503,7 @@ const LandingPage = ({ showLeagueCounts = false }) => {
       {openDropdown && <Box onClick={() => setOpenDropdown(null)} sx={{ position: 'fixed', inset: 0, zIndex: 35 }} />}
       <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
         <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
+        <AskHero />
         <TodaySection matches={fixtures} loading={fixturesLoading} error={fixturesError}
           onRetry={() => setFixturesTry((n) => n + 1)} isMobile={isMobile} />
         <TodaysGamesSection />

@@ -115,3 +115,30 @@ Files: `src/components/ig/IgLinks.jsx`, new `src/brand.js`, `src/components/page
 Checked: /links at 390 (no horizontal scroll, only sub-12px text is the app's bottom nav); #squad; build; tests.
 Screenshots: `l8_links_390.png`, `l8_squad_390.png`.
 Open: the posts grid couldn't be checked with real posts locally (none marked posted).
+
+## L1: promise and ask box above everything
+
+Files: new `src/components/landing/AskHero.jsx` + `src/components/landing/__tests__/askExamples.test.js`,
+`src/components/LandingPage.jsx`, `src/App.test.js`.
+
+- Above Today's Matches: "Cricket, ball by ball. **Hindsight shows you why.**" (TAGLINE from `src/brand.js`, lime),
+  the promise line under it, then the ask box: 54px, lime border, a 44px lime go button. Submitting goes to
+  `/query?nl=<question>`, as the header search's fallback does (checked: "Kohli vs spin" ->
+  `/query?nl=Kohli+vs+spin&fmt=mens-t20`). Tracks `landing_ask` / `landing_example`.
+- Two example chips (44px) from real recent questions: `GET /query-recent` (already public: the query builder's
+  "Recently asked"). A chip opens the stored parsed query (`/query?...`), so it costs no model call. Filter: 12-40
+  characters, no "…" trails, starts with a capital, no lower-cased team names ("India vs australia" is quick
+  typing), and no chip that's another with a year added. Fewer than two qualify -> the curated pair "Rinku Singh vs
+  pace" / "Jurel vs Buttler, by phase" (the mockup's). Today's local picks: "Shubman Gill in ODIs since 2024 by
+  phase", "Hnry Stadium: pace or spin since 2023".
+- One lime action: the fixture card's "Match Preview" and the recent tiles' "Scorecard" are now outlined (lime text,
+  faint lime border); the desktop Explore button is outlined too. (The header SearchBar's own "Search" button on
+  desktop is still lime-ish; it's a shared component, untouched.)
+- The home page sets `document.title` to "Hindsight · Hindsight shows you why" (pages set their own titles, and
+  coming back home kept theirs).
+
+Checked: 390, 360, 1440 (no horizontal scroll; at 390 the hero, ask box and chips fit above the first fixture card);
+App.test asserts the tagline, the search box and the fallback chip; 3 unit tests for the chip picker; build.
+Screenshots: `l1_390.png`, `l1_360.png`, `l1_1440.png`.
+Open: the chips' "real recent questions" are whatever visitors typed last; the filter keeps out the obvious junk,
+but an odd one can still show. A hand-kept list is the alternative.
