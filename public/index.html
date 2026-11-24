@@ -34,7 +34,9 @@
     <!-- Fonts start with the HTML, not after the bundle (src/index.css still imports them for the app). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+    <!-- Non-blocking: the shell paints in system fonts at once and swaps when these arrive. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <!-- Landing plan L6: the home page's first screen (logo, promise, ask box) is drawn here, before the ~1 MB
          bundle arrives (about 7 s on slow 4G). React replaces it on its first render. It mirrors
          src/components/landing/AskHero.jsx and LandingPage's top bar at phone and desktop widths: keep them in step.
@@ -84,6 +86,6 @@
           placeholder="Ask about a player, phase or matchup" />
         <button type="submit" aria-label="Ask"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M5 13h11.17l-4.88 4.88c-.39.39-.39 1.03 0 1.42.39.39 1.02.39 1.41 0l6.59-6.59c.39-.39.39-1.02 0-1.41l-6.58-6.6a.996.996 0 0 0-1.41 0c-.39.39-.39 1.02 0 1.41L16.17 11H5c-.55 0-1 .45-1 1s.45 1 1 1"/></svg></button>
       </form>
-    </div><!--/shell--></div>
+    </div><template id="shell-end"></template></div>
   </body>
 </html>

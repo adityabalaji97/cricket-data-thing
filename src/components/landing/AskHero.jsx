@@ -33,7 +33,10 @@ export const examplesFor = (now = Date.now(), n = 2) => {
 
 const AskHero = ({ source = 'home', headingLevel = 'h1' }) => {
   const navigate = useNavigate();
-  const [text, setText] = useState('');
+  // A question typed into public/index.html's static ask box before the app loaded carries over (landing plan L6).
+  const [text, setText] = useState(() => {
+    try { return document.querySelector('#shell input')?.value || ''; } catch { return ''; }
+  });
   const [examples] = useState(() => examplesFor());
 
   const submit = (event) => {

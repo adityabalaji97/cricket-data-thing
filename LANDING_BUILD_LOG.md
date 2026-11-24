@@ -300,3 +300,19 @@ Checked: JS blocked (`static/js/*`) at 390 and 1440 shows the shell (`l6_shell_3
 `/player` with JS blocked hides it; build output contains the shell and the new title.
 Not measured: real slow-4G first paint (the CDP throttle in my script didn't take effect on the dev server); the
 shell is plain HTML+CSS in the first response, so it paints with the document.
+
+## L6 review fixes (blocker: the shell marker didn't survive the build)
+
+Files: `public/index.html`, `api/meta.mjs`, new `api/_lib/shell.mjs` + `api/_lib/shell.test.mjs`,
+`src/components/landing/AskHero.jsx`.
+
+- The production build minifies index.html and strips comments, so `<!--/shell-->` was gone and the crawler root
+  regex matched nothing (no note bodies for crawlers; every page kept the home heading). The shell now ends with a
+  real element, `<template id="shell-end"></template>` (kept by the minifier: checked in `build/index.html`).
+- The regex and the replace live in `api/_lib/shell.mjs` (`ROOT`, `rootFor(html, path, body)`); meta.mjs calls
+  `rootFor`. `ROOT` still matches an empty `<div id="root"></div>`.
+- `node --test api/_lib/shell.test.mjs` reads `build/index.html` when there is one (else public/index.html) and
+  checks: the shell is in #root and ROOT matches; a note body replaces the whole root, shell included; other pages
+  drop the shell and `/` keeps it; an empty root still works. 4/4 pass against the built file.
+- AskHero starts from whatever was typed into the static box before the app loaded.
+- Google Fonts load without blocking (`media="print" onload`), with a `<noscript>` fallback.
