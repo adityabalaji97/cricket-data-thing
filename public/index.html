@@ -9,32 +9,83 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0a0c11" />
     <meta name="color-scheme" content="dark" />
+    <!-- One tagline everywhere: src/brand.js and api/_lib/share.mjs carry the same words. Crawlers get a
+         page-specific head from api/meta.mjs; this is the fallback. -->
     <meta
       name="description"
-      content="Hindsight - T20 cricket analytics and visualization. Explore player stats, team comparisons, venue analysis, and 2025 Wrapped."
+      content="Hindsight shows you why. Every ball of men's T20s and ODIs, answered in plain words."
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/cricket-logo192.svg" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://hindsightcricket.com/" />
-    <meta property="og:title" content="Hindsight - T20 Cricket Analytics" />
-    <meta property="og:description" content="Explore T20 cricket like never before. In-depth analytics, player comparisons, and 2025 Wrapped - your year in cricket data." />
-    <meta property="og:image" content="%PUBLIC_URL%/cricket-og-image.svg" />
+    <meta property="og:title" content="Hindsight · Hindsight shows you why" />
+    <meta property="og:description" content="Hindsight shows you why. Every ball of men's T20s and ODIs, answered in plain words." />
+    <meta property="og:image" content="https://hindsightcricket.com/_og?path=%2F" />
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:url" content="https://hindsightcricket.com/" />
-    <meta property="twitter:title" content="Hindsight - T20 Cricket Analytics" />
-    <meta property="twitter:description" content="Explore T20 cricket like never before. In-depth analytics, player comparisons, and 2025 Wrapped - your year in cricket data." />
-    <meta property="twitter:image" content="%PUBLIC_URL%/cricket-og-image.svg" />
+    <meta property="twitter:title" content="Hindsight · Hindsight shows you why" />
+    <meta property="twitter:description" content="Hindsight shows you why. Every ball of men's T20s and ODIs, answered in plain words." />
+    <meta property="twitter:image" content="https://hindsightcricket.com/_og?path=%2F" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>Hindsight - T20 Cricket Analytics</title>
+    <!-- Fonts start with the HTML, not after the bundle (src/index.css still imports them for the app). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Non-blocking: the shell paints in system fonts at once and swaps when these arrive. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
+    <!-- Landing plan L6: the home page's first screen (logo, promise, ask box) is drawn here, before the ~1 MB
+         bundle arrives (about 7 s on slow 4G). React replaces it on its first render. It mirrors
+         src/components/landing/AskHero.jsx and LandingPage's top bar at phone and desktop widths: keep them in step.
+         Only "/" shows it; other paths get the dark background alone. -->
+    <style>
+      html, body { margin: 0; background: #0a0c11; color: #f3f4f6; }
+      #shell { box-sizing: border-box; max-width: 1248px; margin: 0 auto; padding: 16px 14px 0;
+        font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      html.noshell #shell { display: none; }
+      #shell .bar { display: flex; align-items: center; gap: 8px; height: 44px; margin-bottom: 24px; }
+      #shell .bar img { width: 32px; height: 32px; }
+      #shell .bar b { font: 700 18px 'Barlow Semi Condensed', sans-serif; }
+      #shell h1 { margin: 0; font: 700 27px/1.1 'Barlow Semi Condensed', sans-serif; letter-spacing: -0.005em; }
+      #shell h1 em { font-style: normal; color: #b6f24a; }
+      #shell p { margin: 6px 0 0; color: #9aa1ac; font-size: 14px; line-height: 1.5; }
+      #shell form { box-sizing: border-box; margin-top: 14px; max-width: 640px; height: 54px; display: flex; align-items: center;
+        gap: 8px; padding: 0 4px 0 14px; border: 1.5px solid #b6f24a; border-radius: 14px; background: #0d1015; }
+      #shell input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: #f3f4f6;
+        font: 16px 'Barlow', sans-serif; }
+      #shell input::placeholder { color: #9aa1ac; opacity: 1; }
+      #shell button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px;
+        background: #b6f24a; color: #0a0c11; cursor: pointer; }
+      @media (min-width: 900px) {
+        #shell { max-width: 1288px; padding: 26px 34px 0; }
+        #shell .bar { height: 56px; margin-bottom: 34px; }
+        #shell .bar b { font-size: 20px; }
+        #shell h1 { font-size: 38px; }
+        #shell p { font-size: 16px; }
+      }
+    </style>
+    <script>
+      if (location.pathname !== '/') document.documentElement.className += ' noshell';
+    </script>
+    <title>Hindsight · Hindsight shows you why</title>
     <!-- Script to help with auto-loading players from URLs -->
     <script src="%PUBLIC_URL%/auto-player-load.js"></script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <div id="root"><div id="shell">
+      <div class="bar"><img src="%PUBLIC_URL%/cricket-icon.svg" alt="" /><b>Hindsight</b></div>
+      <h1>Cricket, ball by ball. <em>Hindsight shows you why.</em></h1>
+      <p>Every ball of men's T20s and ODIs, answered in plain words.</p>
+      <!-- Works before the app loads: /query?nl= asks the question, as the app's ask box does. -->
+      <form action="/query" method="get" role="search">
+        <input type="search" name="nl" enterkeyhint="search" aria-label="Ask a cricket question in plain words"
+          placeholder="Ask about a player, phase or matchup" />
+        <button type="submit" aria-label="Ask"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M5 13h11.17l-4.88 4.88c-.39.39-.39 1.03 0 1.42.39.39 1.02.39 1.41 0l6.59-6.59c.39-.39.39-1.02 0-1.41l-6.58-6.6a.996.996 0 0 0-1.41 0c-.39.39-.39 1.02 0 1.41L16.17 11H5c-.55 0-1 .45-1 1s.45 1 1 1"/></svg></button>
+      </form>
+    </div><template id="shell-end"></template></div>
   </body>
 </html>

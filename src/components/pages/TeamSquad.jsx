@@ -92,10 +92,18 @@ const TeamSquad = ({ team }) => {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [team]);
-  if (!data?.cards?.length) return null;
+  // /team?team=MI#squad (Reels, X threads, /links) opens on the squad. The squad loads after the rest of the page,
+  // so TeamPage's own hash scroll runs before this block exists: scroll again once it's here.
+  const hasCards = Boolean(data?.cards?.length);
+  useEffect(() => {
+    if (!hasCards || window.location.hash !== '#squad') return;
+    const el = document.getElementById('squad');
+    if (el) el.scrollIntoView({ block: 'start' });
+  }, [hasCards]);
+  if (!hasCards) return null;
   const asOf = new Date(data.as_of).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+    <Box id="squad" sx={{ display: 'flex', flexDirection: 'column', gap: 1.75, scrollMarginTop: '72px' }}>
       {/* Fix my team is The XI card's header action (13 Nov 2026), not a banner here. */}
       <Eyebrow right={<Box component="span" sx={{ fontSize: 11, color: colors.textLo }}>{`as of ${asOf}`}</Box>}>IPL 2027 squad</Eyebrow>
       {data.cards.map((c) => {

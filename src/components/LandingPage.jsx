@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { track } from '../utils/analytics';
 import {
   Box,
   Button,
@@ -16,8 +15,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
-import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import XIcon from '@mui/icons-material/X';
 import config from '../config';
@@ -25,11 +22,17 @@ import { siteOrigin } from './ui/ChartExportButton';
 import { fetchUpcomingMatches } from '../data/iplSchedule';
 import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
-import { getTeamColor, readableOnDark, textOn } from '../utils/teamColors';
+import { getTeamColor, readableOnDark } from '../utils/teamColors';
 import SearchBar from './search/SearchBar';
 import { colors as dark, fonts } from '../theme/hindsightDark';
 import { useFormat } from '../context/FormatContext';
 import playerProfileUrl from '../utils/playerProfileUrl';
+import { noteDateLabel, previewPassed } from '../utils/noteDates';
+import AskHero from './landing/AskHero';
+import { Kicker, SectionHeader, chipSx, monoSx, sectionTitleSx } from './landing/sectionKit';
+import TeamRatings from './landing/TeamRatings';
+import LeadCard from './landing/LeadCard';
+import { TAGLINE } from '../brand';
 
 // Mapped onto the shared dark-theme tokens rather than redefining them; see
 // src/theme/hindsightDark.js. The names are kept short because they are used densely
@@ -61,13 +64,6 @@ const DATE_OPTIONS = [
   { value: '90', label: 'Last 3 months', mobileLabel: '3 months' },
 ];
 
-const ELO_RANGE_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: '24m', label: 'Last 24 months' },
-  { value: '12m', label: 'Last 12 months' },
-  { value: 'ytd', label: '2026 only' },
-];
-
 
 const toDateLabel = (value) => {
   if (!value) return '';
@@ -75,8 +71,6 @@ const toDateLabel = (value) => {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
-
-const dateInput = (date) => date.toISOString().slice(0, 10);
 
 const routeTeam = (team) => `/team?team=${encodeURIComponent(team || '')}&autoload=true`;
 const routePlayer = (player) => `/player?name=${encodeURIComponent(player || '')}&autoload=true`;
@@ -105,44 +99,8 @@ const flattenRecentMatches = (data) => {
   return (data.groups || []).flatMap((group) => group.matches || []);
 };
 
-const sectionTitleSx = {
-  color: C.hi,
-  fontFamily: fonts.display,
-  fontWeight: 700,
-  fontSize: { xs: 20, md: 25 },
-  lineHeight: 1.05,
-};
 
-const Kicker = ({ children, color = C.lime }) => (
-  <Typography
-    sx={{
-      color,
-      fontFamily: fonts.mono,
-      fontSize: 11,
-      letterSpacing: '0.16em',
-      textTransform: 'uppercase',
-      fontWeight: 600,
-      mb: 0.75,
-    }}
-  >
-    {children}
-  </Typography>
-);
 
-const SectionHeader = ({ kicker, kickerColor, title, subtitle, action }) => (
-  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, mb: 1.75 }}>
-    <Box sx={{ minWidth: 0 }}>
-      <Kicker color={kickerColor}>{kicker}</Kicker>
-      <Typography sx={sectionTitleSx}>{title}</Typography>
-      {subtitle && (
-        <Typography sx={{ color: C.soft, mt: 0.6, fontFamily: fonts.body, fontSize: { xs: 13, md: 14 } }}>
-          {subtitle}
-        </Typography>
-      )}
-    </Box>
-    {action}
-  </Box>
-);
 
 const CarouselButtons = ({ trackRef, hide }) => {
   if (hide) return null;
@@ -159,8 +117,8 @@ const CarouselButtons = ({ trackRef, hide }) => {
 };
 
 const arrowButtonSx = {
-  width: 38,
-  height: 38,
+  width: 44,
+  height: 44,
   color: C.hi,
   border: `1px solid ${C.hairlineStrong}`,
   bgcolor: C.surface,
@@ -193,14 +151,14 @@ const LandingDropdown = ({ id, label, value, options, onChange, openDropdown, se
         sx={{
           justifyContent: 'space-between',
           width: '100%',
-          minHeight: 42,
+          minHeight: 44,
           px: compact ? 1 : 1.3,
           borderRadius: 2,
           color: C.mid,
           bgcolor: C.surface,
           border: `1px solid ${open ? 'rgba(182,242,74,0.45)' : C.hairlineStrong}`,
           fontFamily: fonts.mono,
-          fontSize: 11,
+          fontSize: 12,
           letterSpacing: '0.06em',
           textTransform: 'uppercase',
           overflow: 'hidden',
@@ -304,7 +262,7 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
   return (
     <Box sx={{ mb: { xs: 3, md: 4.2 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.4 }}>
-        <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none' }}>
+        <Box component={Link} to="/" sx={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: 1, textDecoration: 'none' }}>
           <Box component="img" src="/cricket-icon.svg" alt="" sx={{ width: 32, height: 32 }} />
           <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: { xs: 18, md: 20 } }}>
             Hindsight
@@ -325,19 +283,21 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
           startIcon={<MenuIcon />}
           sx={{
             ml: isMobile ? 0 : 0.5,
-            minWidth: isMobile ? 42 : 116,
-            width: isMobile ? 42 : 'auto',
-            height: 42,
+            minWidth: isMobile ? 44 : 116,
+            width: isMobile ? 44 : 'auto',
+            height: 44,
             px: isMobile ? 0 : 1.5,
             borderRadius: 2,
-            color: C.bg,
-            bgcolor: C.lime,
+            // Outlined, not lime: the ask box below is the page's one lime action (landing plan L1).
+            color: C.hi,
+            bgcolor: C.surface,
+            border: `1px solid ${C.hairlineStrong}`,
             fontFamily: fonts.mono,
             fontWeight: 700,
-            fontSize: 11,
+            fontSize: 12,
             letterSpacing: '0.12em',
             '& .MuiButton-startIcon': { mr: isMobile ? 0 : 0.9 },
-            '&:hover': { bgcolor: C.limeHover },
+            '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.35)' },
           }}
         >
           {isMobile ? '' : 'Explore'}
@@ -351,8 +311,8 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
 
 const topIconSx = {
   ml: 'auto',
-  width: 42,
-  height: 42,
+  width: 44,
+  height: 44,
   color: C.hi,
   bgcolor: C.surface,
   border: `1px solid ${C.hairlineStrong}`,
@@ -378,20 +338,31 @@ const localStart = (match) => {
   return { date, label: `${day}${time}` };
 };
 
-// The sides and leagues whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.
-const BIG_TEAMS = new Set(['India', 'Australia', 'England', 'South Africa', 'New Zealand', 'Pakistan', 'Sri Lanka',
-  'West Indies', 'Afghanistan', 'Bangladesh']);
+// The leagues and events whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.
+// (The old BIG_TEAMS list, ten Full Members, is gone: landing plan L7 is India-first, so Australia v England gets the
+// row, not the cards.)
 const BIG_SERIES = /\b(IPL|INDIAN PREMIER LEAGUE|WORLD CUP|ASIA CUP|CHAMPIONS TROPHY|BIG BASH|BBL|PSL|SA20|CPL|THE HUNDRED|MLC)\b/i;
-const isBig = (match) => BIG_TEAMS.has(match.team1) || BIG_TEAMS.has(match.team2) || BIG_SERIES.test(match.series || '');
+const WOMEN = /\bwomen\b/i;
+const QUALIFIER = /\bqualif/i;
+const isIndia = (team) => /^India( Women)?$/i.test(String(team || '').trim());
+// One test for "a match our readers came for": India (men or women), or a major league or event; never a
+// qualifier, and no women's match unless India play. It orders the fixtures (these lead within a day) and decides
+// whether they get full cards (landing plan L7) or one row.
+export const isHeadline = (match) => {
+  if (isIndia(match.team1) || isIndia(match.team2)) return true;
+  const series = match.series || '';
+  if (QUALIFIER.test(series) || WOMEN.test(series) || WOMEN.test(match.team1 || '') || WOMEN.test(match.team2 || '')) return false;
+  return BIG_SERIES.test(series);
+};
 const AHEAD_MS = 36 * 3600e3; // today's matches, plus anything starting in the next day and a half
 
 // Live first, then by day; within a day the big matches lead, then by start time.
 const fixtureOrder = (a, b) => (Number(b.isLive) - Number(a.isLive))
   || localStart(a).date.localeCompare(localStart(b).date)
-  || (Number(isBig(b)) - Number(isBig(a)))
+  || (Number(isHeadline(b)) - Number(isHeadline(a)))
   || String(a.startUtc || a.time || '').localeCompare(String(b.startUtc || b.time || ''));
 
-const TodaySection = ({ matches, loading, isMobile }) => {
+const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
   const trackRef = useRef(null);
   const today = new Date().toLocaleDateString('en-CA');
   const now = Date.now();
@@ -401,18 +372,54 @@ const TodaySection = ({ matches, loading, isMobile }) => {
   const displayMatches = soonMatches.length ? soonMatches : [...matches].sort(fixtureOrder).slice(0, 6);
   const hasLive = displayMatches.some((match) => match.isLive);
   const hasToday = displayMatches.some((match) => match.isLive || localStart(match).date === today);
+  // Landing plan L7: the fixtures get the full cards only when India or a major league plays; otherwise one row (the
+  // next match), with the rest a tap away. The lead card above is the page's story.
+  const headline = displayMatches.some(isHeadline);
+  const [expanded, setExpanded] = useState(false);
+
+  if (loading) {
+    // The row's height: the usual case (a headline day grows to the cards).
+    return (
+      <Box component="section" aria-label="Fixtures" sx={{ mb: { xs: 3, md: 4.5 } }}>
+        <Kicker>Next match</Kicker>
+        <LoadingCard label="Loading fixtures..." minHeight={FIXTURE_ROW_HEIGHT} />
+      </Box>
+    );
+  }
+  if (!error && displayMatches.length && !headline && !expanded) {
+    const first = displayMatches[0];
+    return (
+      <Box component="section" aria-label="Fixtures" sx={{ mb: { xs: 3, md: 4.5 } }}>
+        <Kicker color={first.isLive ? C.red : C.lime}>{first.isLive ? 'Live now' : 'Next match'}</Kicker>
+        <FixtureRow match={first} />
+        {displayMatches.length > 1 && (
+          <Box component="button" type="button" onClick={() => setExpanded(true)}
+            sx={{ mt: 0.5, minHeight: 44, px: 0, border: 0, bgcolor: 'transparent', color: C.soft, fontFamily: fonts.mono, fontSize: 12,
+              cursor: 'pointer', '&:hover': { color: C.lime } }}>
+            {displayMatches.length - 1} more {displayMatches.length === 2 ? 'fixture' : 'fixtures'} ›
+          </Box>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
-        kicker={hasLive ? 'Live now' : '01 / Today'}
+        kicker={hasLive ? 'Live now' : 'Today'}
         kickerColor={hasLive ? C.red : C.lime}
         title="Today's Matches"
-        subtitle={hasToday ? 'Live, today and the next day and a half: T20 and ODI' : 'No match today, showing the next fixtures'}
+        // Only once the fixtures are in: while they load, "No match today" was a guess.
+        // A blank line while loading keeps the header's height, so the cards below don't jump.
+        subtitle={loading ? '\u00a0' : error || !displayMatches.length ? null
+          : hasToday ? 'Live, today and the next day and a half: T20 and ODI' : 'No match today, showing the next fixtures'}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || displayMatches.length < 2} />}
       />
       {loading ? (
-        <LoadingCard label="Loading fixtures..." />
+        // The real card's height, so the page doesn't jump when the fixtures arrive.
+        <LoadingCard label="Loading fixtures..." minHeight={FIXTURE_CARD_HEIGHT} />
+      ) : error ? (
+        <ErrorCard label="Couldn't load the fixtures." onRetry={onRetry} minHeight={FIXTURE_CARD_HEIGHT} />
       ) : (
         <Box ref={trackRef} sx={carouselSx}>
           {displayMatches.map((match) => (
@@ -424,6 +431,61 @@ const TodaySection = ({ matches, loading, isMobile }) => {
     </Box>
   );
 };
+
+const FIXTURE_CARD_HEIGHT = 306; // measured at 390 with a two-line series chip and 44px team codes
+const FIXTURE_ROW_HEIGHT = 56;
+
+
+const FixtureRow = ({ match }) => {
+  const live = Boolean(match.isLive);
+  const when = live ? 'LIVE' : (localStart(match).label || '');
+  const format = match.format === 'ODI' ? 'ODI' : 'T20';
+  const place = String(match.venue || '').split(',').slice(-1)[0].trim();
+  return (
+    <Box component={Link} to={routePreview(match)} aria-label={`${match.team1} v ${match.team2}: match preview`}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minHeight: FIXTURE_ROW_HEIGHT, px: 1.75, borderRadius: '14px',
+        bgcolor: C.surface, border: `1px solid ${live ? 'rgba(229,72,77,0.5)' : C.hairline}`, textDecoration: 'none', color: C.mid,
+        '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' } }}>
+      <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, flexShrink: 0 }}>{when}</Typography>
+      <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: 0.75, overflow: 'hidden' }}>
+        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>
+          {match.team1Abbr || match.team1} v {match.team2Abbr || match.team2}
+        </Typography>
+        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {format}{place ? `, ${place}` : ''}
+        </Typography>
+      </Box>
+      <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Preview ›</Typography>
+    </Box>
+  );
+};
+
+// Daily games under the lead card and the fixture (decided 17 Nov 2026): one row for 19-0, the most-viewed page, and
+// a link to the rest on /games.
+const GamesRow = () => (
+  <Box component="section" aria-label="Games" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
+    <Kicker>Play</Kicker>
+    <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1 }}>
+      <Box component={Link} to="/games/19-0"
+        sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.25, minHeight: FIXTURE_ROW_HEIGHT, px: 1.75,
+          borderRadius: '14px', bgcolor: C.surface, border: '1px solid rgba(182,242,74,0.35)', textDecoration: 'none',
+          '&:hover': { bgcolor: C.raised } }}>
+        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 18, flexShrink: 0 }}>19-0</Typography>
+        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap', flex: 1 }}>
+          Draft an IPL XI from 19 seasons
+        </Typography>
+        <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, flexShrink: 0 }}>Play ›</Typography>
+      </Box>
+      <Box component={Link} to="/games"
+        sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', px: 1.5, minHeight: FIXTURE_ROW_HEIGHT, borderRadius: '14px',
+          border: `1px solid ${C.hairlineStrong}`, color: C.mid, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none',
+          whiteSpace: 'nowrap', '&:hover': { color: C.lime } }}>
+        All games
+      </Box>
+    </Box>
+  </Box>
+);
 
 const TodayMatchCard = ({ match }) => {
   const live = Boolean(match.isLive);
@@ -437,7 +499,7 @@ const TodayMatchCard = ({ match }) => {
         scrollSnapAlign: 'start',
         flex: '0 0 auto',
         width: { xs: 290, md: 360 },
-        minHeight: 236,
+        minHeight: FIXTURE_CARD_HEIGHT,
         p: 2,
         borderRadius: 3,
         bgcolor: C.surface,
@@ -445,12 +507,12 @@ const TodayMatchCard = ({ match }) => {
         border: `1px solid ${live ? 'rgba(229,72,77,0.5)' : C.hairline}`,
       }}
     >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.2, mb: 2 }}>
-        <Typography sx={chipSx}>{match.format === 'ODI' ? `ODI · ${match.series || ''}` : (match.series || 'T20')}</Typography>
-        <Typography sx={{ ...monoSx, color: live ? C.red : C.soft }}>{status}</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.2, mb: 2 }}>
+        <Typography sx={seriesChipSx}>{match.format === 'ODI' ? `ODI · ${match.series || ''}` : (match.series || 'T20')}</Typography>
+        <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, minWidth: 0, maxWidth: '58%', whiteSpace: 'normal', textAlign: 'right', lineHeight: 1.3, pt: 0.45 }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
-      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 11, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 12, lineHeight: 1, textAlign: 'center', my: -0.25 }}>
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />
@@ -458,7 +520,7 @@ const TodayMatchCard = ({ match }) => {
       <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, minHeight: 36 }}>
         {match.venue || 'Venue TBA'}
       </Typography>
-      <Button component={Link} to={routePreview(match)} fullWidth sx={limeButtonSx}>
+      <Button component={Link} to={routePreview(match)} fullWidth sx={outlineButtonSx}>
         Match Preview
       </Button>
     </Box>
@@ -477,28 +539,20 @@ const TeamFixtureRow = ({ color, abbr, name }) => (
   </Box>
 );
 
-const chipSx = {
-  color: C.mid,
-  bgcolor: C.muted,
-  px: 0.8,
-  py: 0.45,
-  borderRadius: 1,
-  fontFamily: fonts.mono,
-  fontSize: 11,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  maxWidth: '62%',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+
+// The fixture card's series chip: up to two lines, then an ellipsis, rather than one clipped line.
+const seriesChipSx = {
+  ...chipSx,
+  maxWidth: 'none',
+  flex: '0 1 auto',
+  minWidth: '40%',
+  whiteSpace: 'normal',
+  lineHeight: 1.3,
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
 };
 
-const monoSx = {
-  fontFamily: fonts.mono,
-  fontSize: 11,
-  letterSpacing: '0.04em',
-  whiteSpace: 'nowrap',
-};
 
 const teamLinkSx = {
   color: C.hi,
@@ -506,114 +560,37 @@ const teamLinkSx = {
   fontWeight: 700,
   fontSize: 23,
   lineHeight: 1,
-  // 32px tap target without changing the type size ("SL" alone is 23px wide).
+  // 44px tap target without changing the type size ("SL" alone is 23px wide).
   display: 'inline-flex',
   alignItems: 'center',
-  minHeight: 32,
-  minWidth: 32,
+  minHeight: 44,
+  minWidth: 44,
   textDecoration: 'none',
   '&:hover': { color: C.lime },
 };
 
-const limeButtonSx = {
+// The cards' buttons: lime text on an outline, so they don't compete with the ask box.
+const outlineButtonSx = {
   mt: 1.7,
-  height: 42,
+  height: 44,
   borderRadius: 2,
-  bgcolor: C.lime,
-  color: C.bg,
+  color: C.lime,
+  border: '1px solid rgba(182,242,74,0.35)',
   fontFamily: fonts.mono,
   fontWeight: 700,
-  fontSize: 11,
+  fontSize: 12,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  '&:hover': { bgcolor: C.limeHover },
+  '&:hover': { bgcolor: 'rgba(182,242,74,0.08)', borderColor: C.lime },
 };
 
 
-// The Hindsight MCP connector (mcp_server/): lets Claude / ChatGPT query the data directly.
-const CONNECTOR_URL = 'https://hindsightcricket.com/mcp';
-const CONNECTOR_PROMPTS = [
-  "Kohli's strike rate vs pace and spin by year in T20s",
-  'Top 10 IPL 2026 strike rates, min 100 balls',
-  'Preview South Africa v Australia at Kingsmead in ODIs',
-];
-
-const ConnectorSection = () => {
-  const [copied, setCopied] = useState(false);
-  const ref = useRef(null);
-  // hindsightcricket.com/mcp opened in a browser lands here (vercel.json). The sections above load after this one
-  // renders and push it down, so scroll again as they arrive, for a few seconds, until the reader scrolls themselves.
-  useEffect(() => {
-    if (window.location.hash !== '#connector') return undefined;
-    let stopped = false;
-    const stop = () => { stopped = true; };
-    const go = () => { if (!stopped && ref.current) ref.current.scrollIntoView({ block: 'start' }); };
-    const timers = [0, 400, 1000, 2000, 3500, 5000].map((ms) => setTimeout(go, ms));
-    window.addEventListener('wheel', stop, { passive: true });
-    window.addEventListener('touchstart', stop, { passive: true });
-    window.addEventListener('keydown', stop);
-    return () => {
-      timers.forEach(clearTimeout);
-      window.removeEventListener('wheel', stop);
-      window.removeEventListener('touchstart', stop);
-      window.removeEventListener('keydown', stop);
-    };
-  }, []);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(CONNECTOR_URL);
-      track('connector_copy');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-  const step = (label, text) => (
-    <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 14, lineHeight: 1.5 }}>
-      <Box component="span" sx={{ color: C.hi, fontWeight: 700 }}>{label}</Box> {text}
-    </Typography>
-  );
-  return (
-    <Box component="section" id="connector" ref={ref} sx={{ mb: { xs: 3.75, md: 5.5 }, scrollMarginTop: 72 }}>
-      <SectionHeader
-        kicker="05 / Connect"
-        title="Use Hindsight in Claude or ChatGPT"
-        subtitle="Ask questions in plain English and get tables, charts and a link back here."
-      />
-      <Box sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 3, bgcolor: C.surface, border: `1px solid ${C.hairline}`, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, p: 1, pl: 1.5, borderRadius: 2, bgcolor: C.inset, border: `1px solid ${C.hairlineStrong}` }}>
-          <Typography sx={{ ...monoSx, color: C.lime, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-            {CONNECTOR_URL}
-          </Typography>
-          <Button
-            onClick={copy}
-            startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
-            sx={{ flexShrink: 0, minHeight: 40, px: 1.5, borderRadius: 2, bgcolor: C.lime, color: C.bg, fontFamily: fonts.mono, fontWeight: 700, fontSize: 11, '&:hover': { bgcolor: C.limeHover } }}
-          >
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
-        </Box>
-        {step('Claude:', 'Settings → Connectors → Add custom connector → paste the URL.')}
-        {step('ChatGPT:', 'Settings → Apps & Connectors → turn on Developer mode → Create → paste the URL, no authentication.')}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, pt: 0.5 }}>
-          {CONNECTOR_PROMPTS.map((prompt) => (
-            <Typography key={prompt} sx={{ ...chipSx, maxWidth: '100%', whiteSpace: 'normal', textTransform: 'none', letterSpacing: 0, fontSize: 12 }}>
-              “{prompt}”
-            </Typography>
-          ))}
-        </Box>
-        <Typography sx={{ color: C.low, fontFamily: fonts.body, fontSize: 12 }}>
-          Read-only and free to use; results are aggregated and rate-limited.
-        </Typography>
-      </Box>
-    </Box>
-  );
-};
 
 const RecentMatchesSection = ({
   data,
   loading,
+  error,
+  onRetry,
   activeCompetition,
   setActiveCompetition,
   teamFilter,
@@ -651,7 +628,7 @@ const RecentMatchesSection = ({
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
-        kicker="02 / Browse"
+        kicker="Browse"
         title="Recent Matches"
         subtitle={`${matches.length} matches - filter by team, competition & recency`}
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || matches.length < 2} />}
@@ -698,10 +675,10 @@ const RecentMatchesSection = ({
               color: C.lime,
               border: `1px solid rgba(182,242,74,0.35)`,
               borderRadius: 2,
-              height: 38,
+              height: 44,
               px: 1.3,
               fontFamily: fonts.mono,
-              fontSize: 11,
+              fontSize: 12,
               textTransform: 'uppercase',
             }}
           >
@@ -711,6 +688,8 @@ const RecentMatchesSection = ({
       </Box>
       {loading ? (
         <LoadingCard label="Loading recent matches..." />
+      ) : error ? (
+        <ErrorCard label="Couldn't load recent matches." onRetry={onRetry} />
       ) : matches.length ? (
         <Box ref={trackRef} sx={carouselSx}>
           {matches.map((match) => <RecentMatchTile key={match.match_id} match={match} />)}
@@ -764,7 +743,7 @@ const RecentMatchTile = ({ match }) => {
           display: 'flex',
           alignItems: 'center',
           gap: 0.75,
-          minHeight: 34,
+          minHeight: 44,
           color: C.mid,
           fontFamily: fonts.body,
           fontSize: 13,
@@ -780,7 +759,7 @@ const RecentMatchTile = ({ match }) => {
       <Typography sx={{ color: C.low, fontFamily: fonts.body, fontSize: 12, lineHeight: 1.25, minHeight: 32, mt: 0.4 }}>
         {match.venue || 'Venue unavailable'}
       </Typography>
-      <Button component={Link} to={`/scorecard/${match.match_id}`} fullWidth sx={limeButtonSx}>
+      <Button component={Link} to={`/scorecard/${match.match_id}`} fullWidth sx={outlineButtonSx}>
         Scorecard
       </Button>
     </Box>
@@ -788,7 +767,7 @@ const RecentMatchTile = ({ match }) => {
 };
 
 const ScoreRow = ({ team, score, winner }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.25 }}>
+  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
     <Typography component={Link} to={routeTeam(team)} sx={{
       color: winner ? C.lime : C.mid,
       fontFamily: fonts.display,
@@ -797,7 +776,7 @@ const ScoreRow = ({ team, score, winner }) => (
       lineHeight: 1,
       display: 'inline-flex',
       alignItems: 'center',
-      minHeight: 32,
+      minHeight: 44,
       textDecoration: 'none',
       '&:hover': { color: C.lime },
     }}>
@@ -816,18 +795,20 @@ const ScoreRow = ({ team, score, winner }) => (
   </Box>
 );
 
-const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
+const FeaturedInningsSection = ({ innings, loading, error, onRetry, isMobile }) => {
   const trackRef = useRef(null);
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
       <SectionHeader
-        kicker="03 / Form"
+        kicker="Form"
         title="Recent Standout Innings"
         subtitle="Top hitting from the last 30 days - tap a name for the full profile"
         action={<CarouselButtons trackRef={trackRef} hide={isMobile || loading || innings.length < 2} />}
       />
       {loading ? (
         <LoadingCard label="Loading standout innings..." />
+      ) : error ? (
+        <ErrorCard label="Couldn't load the standout innings." onRetry={onRetry} />
       ) : (
         <Box ref={trackRef} sx={carouselSx}>
           {innings.map((item, index) => (
@@ -859,7 +840,7 @@ const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
                 <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 26, lineHeight: 1, fontVariantNumeric: 'tabular-nums', mt: 0.4 }}>
                   {item.runs} <Box component="span" sx={{ color: C.soft, fontSize: 16 }}>({item.balls})</Box>
                 </Typography>
-                <Typography sx={{ color: C.mid, fontFamily: fonts.mono, fontSize: 11, mt: 0.8 }}>
+                <Typography sx={{ color: C.mid, fontFamily: fonts.mono, fontSize: 12, mt: 0.8 }}>
                   SR {item.strike_rate} - {item.fours}x4 - {item.sixes}x6
                 </Typography>
                 <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, mt: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -878,170 +859,9 @@ const FeaturedInningsSection = ({ innings, loading, isMobile }) => {
   );
 };
 
-const EloSection = ({ isMobile, openDropdown, setOpenDropdown }) => {
-  // Pinned, not the raw selection: ELO is one rating stream per format, so "All formats" has
-  // no meaning here and /teams/elo-rankings cannot resolve it. Falls back to men's T20.
-  const { pinnedFormatParams: formatParams } = useFormat();
-  const [eloComp, setEloComp] = useState('international');
-  const [eloRange, setEloRange] = useState('all');
-  const [rankings, setRankings] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchRankings = async () => {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (eloComp === 'international') {
-        params.set('include_international', 'true');
-        params.set('top_teams', '10');
-      } else {
-        params.set('include_international', 'false');
-        params.set('league', 'Indian Premier League');
-      }
-      const now = new Date();
-      if (eloRange === '24m') {
-        const start = new Date(now);
-        start.setMonth(start.getMonth() - 24);
-        params.set('start_date', dateInput(start));
-        params.set('end_date', dateInput(now));
-      } else if (eloRange === '12m') {
-        const start = new Date(now);
-        start.setMonth(start.getMonth() - 12);
-        params.set('start_date', dateInput(start));
-        params.set('end_date', dateInput(now));
-      } else if (eloRange === 'ytd') {
-        params.set('start_date', `${now.getFullYear()}-01-01`);
-        params.set('end_date', dateInput(now));
-      }
-      // ELO is a separate stream per format, so the ranking must be scoped to the selection.
-      params.set('format', formatParams.format);
-      params.set('gender', formatParams.gender);
-      try {
-        const response = await fetch(
-          `${config.API_URL}/teams/elo-rankings?${params.toString()}`,
-        );
-        const payload = await response.json();
-        if (!cancelled) setRankings(payload.rankings || []);
-      } catch (error) {
-        console.error('Error fetching ELO rankings:', error);
-        if (!cancelled) setRankings([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchRankings();
-    return () => { cancelled = true; };
-  }, [eloComp, eloRange, formatParams.format, formatParams.gender]);
-
-  return (
-    <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <SectionHeader kicker="04 / Rank" kickerColor={C.gold} title="ELO Team Rankings" />
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.7, flexWrap: 'wrap' }}>
-        <LandingDropdown
-          id="elo"
-          label="Competition"
-          value={eloComp}
-          options={[
-            { value: 'international', label: 'International Teams' },
-            { value: 'ipl', label: 'IPL Teams' },
-          ]}
-          onChange={setEloComp}
-          openDropdown={openDropdown}
-          setOpenDropdown={setOpenDropdown}
-          compact={isMobile}
-        />
-        <LandingDropdown
-          id="eloRange"
-          label="Range"
-          value={eloRange}
-          options={ELO_RANGE_OPTIONS}
-          onChange={setEloRange}
-          openDropdown={openDropdown}
-          setOpenDropdown={setOpenDropdown}
-          compact={isMobile}
-        />
-        <Typography sx={{ ml: { md: 'auto' }, color: C.low, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.08em' }}>
-          K-FACTOR 32 - TOP 10
-        </Typography>
-      </Box>
-      {loading ? (
-        <LoadingCard label="Loading ELO rankings..." />
-      ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.15 }}>
-          {rankings.slice(0, 10).map((team) => <EloRow key={team.team_name} team={team} />)}
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const EloRow = ({ team }) => {
-  const color = getTeamColor(team.team_abbreviation || team.team_name) || C.low;
-  const rank = Number(team.rank || 0);
-  const medal = rank === 1 ? C.gold : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : 'transparent';
-  const winPct = Number(team.win_percentage || 0);
-  const winColor = winPct >= 60 ? C.lime : winPct >= 45 ? C.gold : C.red;
-
-  return (
-    <Box
-      component={Link}
-      to={routeTeam(team.team_abbreviation || team.team_name)}
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: '42px minmax(0,1fr) auto',
-        alignItems: 'center',
-        gap: 1.2,
-        p: 1.25,
-        minHeight: 70,
-        bgcolor: C.surface,
-        border: `1px solid ${C.hairline}`,
-        borderRadius: 2.2,
-        textDecoration: 'none',
-        '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' },
-      }}
-    >
-      <Box sx={{
-        width: 34,
-        height: 34,
-        borderRadius: '50%',
-        display: 'grid',
-        placeItems: 'center',
-        bgcolor: color,
-        color: textOn(color),
-        border: rank <= 3 ? `2px solid ${medal}` : '0',
-        fontFamily: fonts.display,
-        fontWeight: 700,
-        fontSize: 15,
-      }}>
-        {rank}
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1 }}>
-          {team.team_abbreviation || team.team_name}
-        </Typography>
-        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', mt: 0.35 }}>
-          {team.team_name}
-        </Typography>
-        <Typography sx={{ color: winColor, fontFamily: fonts.mono, fontSize: 11, mt: 0.45 }}>
-          {team.wins || 0}-{team.losses || 0} - {Math.round(winPct)}%
-        </Typography>
-      </Box>
-      <Box sx={{ textAlign: 'right' }}>
-        <Typography sx={{ color: C.lime, fontFamily: fonts.display, fontWeight: 700, fontSize: 19, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-          {Math.round(Number(team.current_elo || 0))}
-        </Typography>
-        <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.1em' }}>
-          ELO
-        </Typography>
-      </Box>
-    </Box>
-  );
-};
-
 const LEAGUE_COUNTS_PREVIEW = 10;
 
-const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
+const LeagueCountsSection = ({ stats, showLeagueCounts = false }) => {
   // A health check, not a headline: the biggest ten competitions, the other ~50 on request.
   const [showAll, setShowAll] = useState(false);
   if (!showLeagueCounts) return null;
@@ -1051,7 +871,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
 
   return (
     <Box component="section" sx={{ mb: { xs: 3.75, md: 5.5 } }}>
-      <Kicker>06 / Pipeline</Kicker>
+      <Kicker>Pipeline</Kicker>
       <Typography sx={{ ...sectionTitleSx, fontSize: { xs: 17, md: 20 } }}>League Match Counts</Typography>
       <Typography sx={{ color: C.soft, mt: 0.6, mb: 1.8, fontFamily: fonts.body, fontSize: 13 }}>
         Ingested match totals per competition - data-pipeline health check
@@ -1069,7 +889,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
             <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 24, fontVariantNumeric: 'tabular-nums', lineHeight: 1.05, mt: 0.7 }}>
               {(item.match_count || 0).toLocaleString()}
             </Typography>
-            <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, mt: 0.5 }}>
+            <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, mt: 0.5 }}>
               latest {toDateLabel(item.latest_date)}
             </Typography>
           </Box>
@@ -1080,7 +900,7 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
           component="button"
           type="button"
           onClick={() => setShowAll((prev) => !prev)}
-          sx={{ mt: 1.25, minHeight: 40, px: 1.5, bgcolor: 'transparent', color: C.lime, border: `1px solid ${C.hairlineStrong}`, borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, cursor: 'pointer' }}
+          sx={{ mt: 1.25, minHeight: 44, px: 1.5, bgcolor: 'transparent', color: C.lime, border: `1px solid ${C.hairlineStrong}`, borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, cursor: 'pointer' }}
         >
           {showAll ? 'Show fewer' : `Show all ${items.length}`}
         </Box>
@@ -1089,20 +909,41 @@ const LeagueCountsSection = ({ stats, showLeagueCounts = true }) => {
   );
 };
 
+// One line where the connector block used to be: the setup lives on /connect.
+const ConnectRow = () => (
+  <Box
+    component={Link}
+    to="/connect"
+    sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 56, px: 2, py: 1.25, mb: { xs: 3.75, md: 5.5 },
+      borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${C.hairline}`, textDecoration: 'none',
+      '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' } }}
+  >
+    <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17 }}>Ask Hindsight from Claude or ChatGPT</Typography>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13 }}>Add the connector once, then ask in plain words.</Typography>
+    </Box>
+    <ChevronRightIcon sx={{ color: C.lime, flexShrink: 0 }} />
+  </Box>
+);
+
 const CreditsSection = () => {
   const year = new Date().getFullYear();
   return (
     <Box component="section" sx={{ borderTop: `1px solid ${C.hairline}`, pt: { xs: 2.6, md: 3.3 }, pb: 2 }}>
-      <Kicker>06 / Thanks</Kicker>
+      <Kicker>Thanks</Kicker>
       <Typography sx={sectionTitleSx}>Credits & Acknowledgements</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.3, mt: 1.8 }}>
         <CreditCard title="Data sources">
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4 }}>Ball-by-ball tracking</Typography>
+          <CreditLink href="https://x.com/himganj153">Himanish Ganjoo &amp; TechRadar</CreditLink>
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4, mt: 0.6 }}>Scorecards</Typography>
           <CreditLink href="https://cricsheet.org/">Cricsheet.org</CreditLink>
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, mb: 0.4, mt: 0.6 }}>Player information</Typography>
           <CreditLink href="https://cricmetric.com/">Cricmetric</CreditLink>
         </CreditCard>
         <CreditCard title="Inspiration">
-          {['@prasannalara', '@cricketingview', '@IndianMourinho', '@hganjoo_153', '@randomcricstat', '@kaustats', '@cricviz', '@ajarrodkimber'].map((handle) => (
-            <CreditChip key={handle} href={`https://twitter.com/${handle.slice(1)}`}>{handle}</CreditChip>
+          {['@prasannalara', '@cricketingview', '@IndianMourinho', '@himganj153', '@randomcricstat', '@kaustats', '@cricviz', '@ajarrodkimber'].map((handle) => (
+            <CreditChip key={handle} href={`https://x.com/${handle.slice(1)}`}>{handle}</CreditChip>
           ))}
         </CreditCard>
         <CreditCard title="Development">
@@ -1111,9 +952,9 @@ const CreditsSection = () => {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <CreditChip href="https://github.com/adityabalaji97/cricket-data-thing" icon={<GitHubIcon sx={{ fontSize: 14 }} />}>GitHub</CreditChip>
-            <CreditChip href="https://twitter.com/maybe_eybe" icon={<XIcon sx={{ fontSize: 13 }} />}>@maybe_eybe</CreditChip>
+            <CreditChip href="https://x.com/maybe_eybe" icon={<XIcon sx={{ fontSize: 13 }} />}>@maybe_eybe</CreditChip>
           </Box>
-          <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 11, mt: 1.4 }}>
+          <Typography sx={{ color: C.low, fontFamily: fonts.mono, fontSize: 12, mt: 1.4 }}>
             Hindsight (c) {year}
           </Typography>
         </CreditCard>
@@ -1133,13 +974,14 @@ const CreditCard = ({ title, children }) => (
 
 const CreditLink = ({ href, children }) => (
   <Typography component="a" href={href} target="_blank" rel="noopener noreferrer" sx={{
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: 44,
     color: C.lime,
     fontFamily: fonts.body,
     fontWeight: 600,
     fontSize: 14,
     textDecoration: 'none',
-    mb: 0.8,
     '&:hover': { color: C.limeHover },
   }}>
     {children}
@@ -1153,14 +995,14 @@ const CreditChip = ({ href, icon, children }) => (
     gap: 0.5,
     mr: 0.6,
     mb: 0.7,
-    px: 0.75,
-    py: 0.45,
+    minHeight: 44,
+    px: 1,
     color: C.mid,
     bgcolor: C.muted,
     border: `1px solid ${C.hairline}`,
     borderRadius: 1,
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 12,
     textDecoration: 'none',
     '&:hover': { color: C.lime, borderColor: 'rgba(182,242,74,0.35)' },
   }}>
@@ -1169,11 +1011,25 @@ const CreditChip = ({ href, icon, children }) => (
   </Box>
 );
 
-const LoadingCard = ({ label }) => (
-  <Box sx={{ minHeight: 130, display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5 }}>
+const LoadingCard = ({ label, minHeight = 130 }) => (
+  <Box sx={{ minHeight, width: '100%', display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5 }}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, color: C.soft }}>
       <CircularProgress size={18} sx={{ color: C.lime }} />
       <Typography sx={{ fontFamily: fonts.body, fontSize: 14 }}>{label}</Typography>
+    </Box>
+  </Box>
+);
+
+// A failed request says so and offers a retry, rather than rendering nothing.
+const ErrorCard = ({ label, onRetry, minHeight = 130 }) => (
+  <Box role="alert" sx={{ minHeight, width: '100%', display: 'grid', placeItems: 'center', bgcolor: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 2.5, p: 2 }}>
+    <Box sx={{ textAlign: 'center' }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 14 }}>{label}</Typography>
+      {onRetry && (
+        <Button type="button" onClick={onRetry} sx={{ mt: 1, minHeight: 44, px: 2, color: C.lime, border: '1px solid rgba(182,242,74,0.35)', borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, fontWeight: 700, letterSpacing: '0.08em' }}>
+          Try again
+        </Button>
+      )}
     </Box>
   </Box>
 );
@@ -1254,16 +1110,18 @@ export const TodaysGamesSection = () => {
   );
 };
 
-// "Latest notes": the three newest published notes (routers/notes.py). Hidden until there are any.
+// "Latest notes": the three newest published notes (routers/notes.py), dated, without previews of matches that
+// have already been played. Hidden until there are any.
 const NOTE_KIND = { recap: 'Match recap', preview: 'Preview', analysis: 'Analysis', article: 'Article' };
 
 const LatestNotesSection = () => {
   const [notes, setNotes] = useState([]);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${config.API_URL}/notes?limit=3`)
+    // Fetch a few extra so dropping played previews still leaves three.
+    fetch(`${config.API_URL}/notes?limit=8`)
       .then((r) => (r.ok ? r.json() : { notes: [] }))
-      .then((d) => { if (!cancelled) setNotes(d.notes || []); })
+      .then((d) => { if (!cancelled) setNotes((d.notes || []).filter((note) => !previewPassed(note)).slice(0, 3)); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -1273,15 +1131,18 @@ const LatestNotesSection = () => {
       <SectionHeader
         kicker="Notes"
         title="Latest notes"
-        action={<Typography component={Link} to="/notes" sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap' }}>All notes →</Typography>}
+        action={<Typography component={Link} to="/notes" sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>All notes →</Typography>}
       />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.25 }}>
         {notes.map((note) => (
           <Box key={note.id} component={Link} to={`/notes/${note.slug}`}
             sx={{ display: 'flex', gap: 1.5, p: 1.75, borderRadius: 2.5, bgcolor: C.surface, border: `1px solid ${C.hairline}`, textDecoration: 'none', minWidth: 0, '&:hover': { bgcolor: C.raised } }}>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
+              <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5 }}>
                 {NOTE_KIND[note.kind] || 'Note'}
+                {noteDateLabel(note) && (
+                  <Box component="span" sx={{ color: C.soft, letterSpacing: '0.04em' }}> · {noteDateLabel(note)}</Box>
+                )}
               </Typography>
               <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 17, lineHeight: 1.2,
                 display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -1302,7 +1163,8 @@ const LatestNotesSection = () => {
   );
 };
 
-const LandingPage = ({ showLeagueCounts = true }) => {
+// League match counts are a pipeline health check, not a public section: off unless a caller asks for them.
+const LandingPage = ({ showLeagueCounts = false }) => {
   // Match the app-wide breakpoint from App.js rather than a page-specific pixel value;
   // three different mobile thresholds across the hero pages made behaviour inconsistent.
   const theme = useTheme();
@@ -1312,35 +1174,56 @@ const LandingPage = ({ showLeagueCounts = true }) => {
   // FormatSpec to pick strike-rate bands. The landing showcase is single-format by nature.
   const { pinnedFormatParams: formatParams } = useFormat();
   const [navOpen, setNavOpen] = useState(false);
+  const [leadKind, setLeadKind] = useState(null);
+  const navigate = useNavigate();
+  // Other pages set their own titles; coming back home must not keep theirs. Same words as public/index.html.
+  useEffect(() => { document.title = `Hindsight · ${TAGLINE}`; }, []);
+  // The connector block moved to /connect; old links (and hindsightcricket.com/mcp before vercel.json changed)
+  // still arrive as /#connector.
+  useEffect(() => {
+    if (window.location.hash === '#connector') navigate('/connect', { replace: true });
+  }, [navigate]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [fixtures, setFixtures] = useState([]);
   const [fixturesLoading, setFixturesLoading] = useState(true);
+  const [fixturesError, setFixturesError] = useState(false);
+  const [fixturesTry, setFixturesTry] = useState(0);
   const [recentData, setRecentData] = useState(null);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState(false);
+  const [recentTry, setRecentTry] = useState(0);
   const [activeCompetition, setActiveCompetition] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [innings, setInnings] = useState([]);
   const [inningsLoading, setInningsLoading] = useState(true);
+  const [inningsError, setInningsError] = useState(false);
+  const [inningsTry, setInningsTry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const loadFixtures = async () => {
       setFixturesLoading(true);
-      const nextMatches = await fetchUpcomingMatches(20);
-      if (!cancelled) {
-        setFixtures(nextMatches);
-        setFixturesLoading(false);
+      setFixturesError(false);
+      try {
+        const nextMatches = await fetchUpcomingMatches(20);
+        if (!cancelled) setFixtures(nextMatches);
+      } catch (error) {
+        console.error('Error fetching upcoming matches:', error);
+        if (!cancelled) setFixturesError(true);
+      } finally {
+        if (!cancelled) setFixturesLoading(false);
       }
     };
     loadFixtures();
     return () => { cancelled = true; };
-  }, []);
+  }, [fixturesTry]);
 
   useEffect(() => {
     let cancelled = false;
     const loadRecent = async () => {
       setRecentLoading(true);
+      setRecentError(false);
       const params = new URLSearchParams({
         ...formatParams,
         competition: activeCompetition || 'all',
@@ -1356,38 +1239,47 @@ const LandingPage = ({ showLeagueCounts = true }) => {
       if (teamFilter !== 'all') params.set('team', teamFilter);
       try {
         const response = await fetch(`${config.API_URL}/recent-matches/discover?${params.toString()}`);
+        if (!response.ok) throw new Error(`recent matches: ${response.status}`);
         const payload = await response.json();
         if (cancelled) return;
         setRecentData(payload);
       } catch (error) {
         console.error('Error fetching recent matches:', error);
-        if (!cancelled) setRecentData(null);
+        if (!cancelled) {
+          setRecentData(null);
+          setRecentError(true);
+        }
       } finally {
         if (!cancelled) setRecentLoading(false);
       }
     };
     loadRecent();
     return () => { cancelled = true; };
-  }, [activeCompetition, teamFilter, dateFilter]);
+  }, [activeCompetition, teamFilter, dateFilter, recentTry]);
 
   useEffect(() => {
     let cancelled = false;
     const loadInnings = async () => {
       setInningsLoading(true);
+      setInningsError(false);
       try {
         const response = await fetch(`${config.API_URL}/landing/featured-innings`);
+        if (!response.ok) throw new Error(`featured innings: ${response.status}`);
         const payload = await response.json();
         if (!cancelled) setInnings(Array.isArray(payload) ? payload : []);
       } catch (error) {
         console.error('Error fetching featured innings:', error);
-        if (!cancelled) setInnings([]);
+        if (!cancelled) {
+          setInnings([]);
+          setInningsError(true);
+        }
       } finally {
         if (!cancelled) setInningsLoading(false);
       }
     };
     loadInnings();
     return () => { cancelled = true; };
-  }, []);
+  }, [inningsTry]);
 
   return (
     <Box
@@ -1408,12 +1300,17 @@ const LandingPage = ({ showLeagueCounts = true }) => {
       {openDropdown && <Box onClick={() => setOpenDropdown(null)} sx={{ position: 'fixed', inset: 0, zIndex: 35 }} />}
       <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
         <TopBar navOpen={navOpen} setNavOpen={setNavOpen} isMobile={isMobile} hideExplore={isCompactNav} />
-        <TodaySection matches={fixtures} loading={fixturesLoading} isMobile={isMobile} />
-        <TodaysGamesSection />
+        <AskHero />
+        <Box sx={{ mb: { xs: 2, md: 3 } }}><LeadCard onKind={setLeadKind} /></Box>
+        <TodaySection matches={fixtures} loading={fixturesLoading} error={fixturesError}
+          onRetry={() => setFixturesTry((n) => n + 1)} isMobile={isMobile} />
+        <GamesRow />
         <LatestNotesSection />
         <RecentMatchesSection
           data={recentData}
           loading={recentLoading}
+          error={recentError}
+          onRetry={() => setRecentTry((n) => n + 1)}
           activeCompetition={activeCompetition}
           setActiveCompetition={setActiveCompetition}
           teamFilter={teamFilter}
@@ -1424,9 +1321,11 @@ const LandingPage = ({ showLeagueCounts = true }) => {
           setOpenDropdown={setOpenDropdown}
           isMobile={isMobile}
         />
-        <FeaturedInningsSection innings={innings} loading={inningsLoading} isMobile={isMobile} />
-        <EloSection isMobile={isMobile} openDropdown={openDropdown} setOpenDropdown={setOpenDropdown} />
-        <ConnectorSection />
+        <FeaturedInningsSection innings={innings} loading={inningsLoading} error={inningsError}
+          onRetry={() => setInningsTry((n) => n + 1)} isMobile={isMobile} />
+        {/* The ratings lower down only when a post leads; otherwise they are the lead card. */}
+        {leadKind === 'post' && <Box sx={{ mb: { xs: 3.75, md: 5.5 } }}><TeamRatings /></Box>}
+        <ConnectRow />
         <LeagueCountsSection stats={recentData?.competition_stats} showLeagueCounts={showLeagueCounts} />
         <CreditsSection />
       </Box>
