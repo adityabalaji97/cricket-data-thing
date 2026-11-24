@@ -91,7 +91,12 @@ export default async function handler(req, res) {
     // Function replacements: a "$" in a title or article must not be read as a pattern.
     .replace(/<head>/i, () => `<head>\n    ${tags}`);
   const body = botBody(summary);
-  if (body) html = html.replace(/<div id="root"><\/div>/i, () => `<div id="root">${body}</div>`);
+  // #root holds the home page's static first screen (public/index.html, landing plan L6), ending at <!--/shell-->;
+  // a crawler body replaces it. The empty form is matched too, for an older shell.
+  const ROOT = /<div id="root">(?:[\s\S]*?<!--\/shell-->)?<\/div>/i;
+  if (body) html = html.replace(ROOT, () => `<div id="root">${body}</div>`);
+  // The shell is the home page's; elsewhere a crawler would read the home page's heading as this page's.
+  else if (path !== '/') html = html.replace(ROOT, '<div id="root"></div>');
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400');

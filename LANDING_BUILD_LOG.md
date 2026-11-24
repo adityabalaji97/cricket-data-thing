@@ -277,3 +277,26 @@ Files: new `src/components/connect/ConnectorSection.jsx`, new `src/components/la
   15.6 kB. Every route except a few admin/notes pages is in main.
 
 Checked: /connect renders the connector; / renders; tests; build.
+
+## L6 step 2: static shell and fallback head
+
+Files: `public/index.html`, `api/meta.mjs`.
+
+- `public/index.html` draws the home page's first screen inside `#root` before the bundle loads: the top bar (logo +
+  "Hindsight"), "Cricket, ball by ball. Hindsight shows you why.", the promise line and the ask box, with inline CSS
+  (dark background from the first byte, no white flash). React's first render replaces it. Measured against the app:
+  at 390 and 360 the heading (84px) and the ask box (184/205px) sit exactly where the app draws them; at 1440 the
+  heading is at 116px, x 110 in both. So the swap doesn't move anything.
+- The shell's ask box is a plain form (`GET /query?nl=...`), so a question typed before the JS arrives still works.
+- Only `/` shows it: an inline script marks other paths `noshell` (they get the dark background alone, as before).
+- Fonts: the Google Fonts stylesheet is now linked in the head (with preconnects), so it loads with the HTML, not
+  after the bundle (index.css still imports it for the app).
+- `api/meta.mjs` (crawler heads): the note/notes body now replaces `#root` including the shell (matched up to the
+  `<!--/shell-->` marker; the old empty root still matches); on any crawler path other than `/` with no body, the shell
+  is stripped so crawlers don't read the home heading as that page's. Checked the regex against the real file.
+- The fallback head (title/description/og) was done in the L8 fixes.
+
+Checked: JS blocked (`static/js/*`) at 390 and 1440 shows the shell (`l6_shell_390.png`, `l6_shell_1440.png`);
+`/player` with JS blocked hides it; build output contains the shell and the new title.
+Not measured: real slow-4G first paint (the CDP throttle in my script didn't take effect on the dev server); the
+shell is plain HTML+CSS in the first response, so it paints with the document.
