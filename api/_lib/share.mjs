@@ -436,6 +436,14 @@ async function homeSummary() {
 /** Summary for a site path + query string, or null for the site-wide card. */
 export async function summarize(pathname, search) {
   if (pathname === '/' || /^\/links\/?$/.test(pathname)) return homeSummary();
+  if (/^\/connect\/?$/.test(pathname)) {
+    return {
+      kind: 'text',
+      title: `Use Hindsight in Claude or ChatGPT | ${SITE_NAME}`,
+      description: 'Add the Hindsight connector to Claude or ChatGPT and ask ball-by-ball cricket questions in plain words: tables, charts and a link back. Free and read-only.',
+      card: { kicker: 'Connector', headline: 'Ask Hindsight from Claude or ChatGPT', sub: 'Paste one URL, then ask about any player, phase or matchup' },
+    };
+  }
   if (/^\/scorecards\/?$/.test(pathname)) {
     return {
       kind: 'text',

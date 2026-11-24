@@ -58,7 +58,7 @@ const CreditsPage = () => (
             Ball-by-ball tracking (line, length, shot)
           </Typography>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            <Link href="https://twitter.com/himganj153" target="_blank" rel="noopener noreferrer">
+            <Link href="https://x.com/himganj153" target="_blank" rel="noopener noreferrer">
               Himanish Ganjoo &amp; TechRadar
             </Link>
           </Typography>
@@ -87,14 +87,14 @@ const CreditsPage = () => (
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {[
-              ['@prasannalara', 'https://twitter.com/prasannalara'],
-              ['@cricketingview', 'https://twitter.com/cricketingview'],
-              ['@IndianMourinho', 'https://twitter.com/IndianMourinho'],
-              ['@himganj153', 'https://twitter.com/himganj153'],
-              ['@randomcricstat', 'https://twitter.com/randomcricstat'],
-              ['@kaustats', 'https://twitter.com/kaustats'],
-              ['@cricviz', 'https://twitter.com/cricviz'],
-              ['@ajarrodkimber', 'https://twitter.com/ajarrodkimber'],
+              ['@prasannalara', 'https://x.com/prasannalara'],
+              ['@cricketingview', 'https://x.com/cricketingview'],
+              ['@IndianMourinho', 'https://x.com/IndianMourinho'],
+              ['@himganj153', 'https://x.com/himganj153'],
+              ['@randomcricstat', 'https://x.com/randomcricstat'],
+              ['@kaustats', 'https://x.com/kaustats'],
+              ['@cricviz', 'https://x.com/cricviz'],
+              ['@ajarrodkimber', 'https://x.com/ajarrodkimber'],
             ].map(([label, href]) => (
               <Link key={label} href={href} target="_blank" rel="noopener noreferrer" underline="hover">
                 {label}
@@ -117,7 +117,7 @@ const CreditsPage = () => (
         <SectionCard title="Contextual metrics">
           <Typography variant="body2" sx={{ mb: 1.5 }}>
             Impact, RAA, WAA, WPA and leverage follow{' '}
-            <Link href="https://twitter.com/himganj153" target="_blank" rel="noopener noreferrer">Himanish Ganjoo</Link>&apos;s{' '}
+            <Link href="https://x.com/himganj153" target="_blank" rel="noopener noreferrer">Himanish Ganjoo</Link>&apos;s{' '}
             <i>T20 Metrics: A Primer</i> (August 2026), refit on Hindsight&apos;s men&apos;s T20 data (2015 onward, the
             Hundred excluded).
           </Typography>

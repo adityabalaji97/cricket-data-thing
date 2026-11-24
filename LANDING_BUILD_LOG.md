@@ -81,3 +81,37 @@ Files: `src/components/LandingPage.jsx`, new `src/components/pages/ConnectPage.j
 Checked: /#connector lands on /connect; /connect at 390 has no horizontal scroll; landing at 390 went from 5,580px
 to 4,597px tall; build; App.test + noteDates tests.
 Screenshots: `l4_390.png` (full page), `l4_connect_390.png`, `l4_connectrow_390.png`, `l5fix_390.png`.
+
+## Review follow-ups folded into L8's commit
+
+- `/connect` share card: `api/_lib/share.mjs` `summarize()` has a `/connect` text card ("Ask Hindsight from Claude or
+  ChatGPT"), and vercel.json's crawler route list includes `connect`.
+- `CreditsPage.jsx`: all twitter.com links are x.com.
+- Pending (with L6): move `ConnectorSection` + `SectionHeader` into `src/components/connect/ConnectorSection.jsx` so
+  `/connect` stops importing the landing page.
+
+## L8: `/` and `/links` as one idea
+
+Files: `src/components/ig/IgLinks.jsx`, new `src/brand.js`, `src/components/pages/TeamSquad.jsx`.
+
+- One tagline: `src/brand.js` exports `TAGLINE = 'Hindsight shows you why'` and the one-line promise; /links uses
+  them now and L1 will on the home page. /links' old "Ball-by-ball data that settles cricket debates" is gone.
+- One logo: /links now shows the site's logo and wordmark (`/cricket-icon.svg` + "Hindsight", as the home top bar,
+  the app header, the favicon and the mockup do), linking home. **Assumed**: the bat-h mark
+  (`/brand/hindsight-mark.svg`, the Instagram avatar) was the odd one out on the site, so /links joined the site
+  rather than the site joining the avatar. If the owner wants the bat-h mark everywhere, that's a site-wide swap.
+- Current posts: "Latest posts" (the carousels marked posted) now comes first, each with its date. It's still empty
+  until posts are marked posted (OWNER_TODO; locally it's empty too). So the page is never stale without them, a
+  "Latest notes" block follows (dated, played previews hidden, as on the home page). Order: header, posts, next match
+  (India first), notes, then Explore: ask, 19-0, daily games (/games, not guess-innings), "Everything else" (home).
+- The next-match preview link now carries `fmt=mens-odi` for ODIs (it opened ODIs in T20 before).
+- utm tagging keeps a `#hash` at the end (a tagged `/team?team=MI#squad` stays an anchor).
+- Tap targets: Instagram / YouTube links are 44px tall (were 13px text).
+- `#squad`: the squad block on /team has `id="squad"`; since the squad loads after the page (TeamPage's own hash
+  scroll runs too early), TeamSquad scrolls itself once its cards arrive. `/team?team=MI#squad` lands on the squad
+  (checked: block at 72px from the top under the app bar). Nothing generates these links yet: the social builders
+  don't link team pages, so it's for hand-written Reel/X copy.
+
+Checked: /links at 390 (no horizontal scroll, only sub-12px text is the app's bottom nav); #squad; build; tests.
+Screenshots: `l8_links_390.png`, `l8_squad_390.png`.
+Open: the posts grid couldn't be checked with real posts locally (none marked posted).
