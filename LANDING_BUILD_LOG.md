@@ -467,3 +467,13 @@ Files: `src/components/landing/LeadCard.jsx`, `src/components/landing/TeamRating
   auction frame, T20Is read "T20I team ratings" (its claim never used the frame). `lead_t20i_390.png`.
 - Review: the team list's fallback (ratings failed) is now really A-Z, as its scope line says.
 - Review: the header for /team reads "Teams" (navItems title), matching the page heading.
+
+### R2.5 Audit P2: the Jurel v Buttler chip compares like for like
+
+File: `src/components/landing/AskHero.jsx` (`EXAMPLES`).
+
+- Was "Jurel vs Buttler, by phase" over all T20s: ~9,000 balls against ~860, phases out of order, a 6-row table with
+  no comparison claim. Now "Jurel vs Buttler, IPL since 2024": `leagues=IPL&start_date=2024-01-01&group_by=batter`.
+  Locally it answers "Jos Buttler leads: strike rate 153, then Jurel (152)." over 930 and 687 balls, a ranked list of
+  two (`chip_jurel_390.png`). The local DB is a subset of prod: owner, check the live numbers once deployed.
+- Assumed: kept the pairing (the Fable review's pick) rather than swapping the player.

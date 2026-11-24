@@ -17,7 +17,9 @@ import { track } from '../../utils/analytics';
 const q = (label, search) => ({ q: label, to: `/query?${search}&q=${encodeURIComponent(label)}` });
 export const EXAMPLES = [
   q('Rinku Singh vs pace', 'batters=Rinku+Singh&bowl_kind=pace+bowler&group_by=year&fmt=mens-t20'),
-  q('Jurel vs Buttler, by phase', 'batters=Dhruv+Jurel&batters=Jos+Buttler&group_by=batter&group_by=phase&fmt=mens-t20'),
+  // Round 2: was "by phase" over all T20s (Buttler's ~9,000 balls v Jurel's ~860, no comparison claim). Now like for
+  // like: the same league and years, one row each, so the answer is a straight comparison.
+  q('Jurel vs Buttler, IPL since 2024', 'batters=Dhruv+Jurel&batters=Jos+Buttler&leagues=IPL&start_date=2024-01-01&group_by=batter&fmt=mens-t20'),
   q('Sanju Samson vs pace', 'batters=Sanju+Samson&bowl_kind=pace+bowler&group_by=year&fmt=mens-t20'),
   q('Tilak Varma at the death, by length', 'batters=Tilak+Varma&over_min=15&over_max=19&group_by=length&fmt=mens-t20'),
   q('Shubman Gill since 2024, by phase', 'batters=Shubman+Gill&start_date=2024-01-01&group_by=phase&fmt=mens-t20'),
