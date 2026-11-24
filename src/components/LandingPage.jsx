@@ -432,7 +432,7 @@ const TodaySection = ({ matches, loading, error, onRetry, isMobile }) => {
   );
 };
 
-const FIXTURE_CARD_HEIGHT = 280;
+const FIXTURE_CARD_HEIGHT = 306; // measured at 390 with a two-line series chip and 44px team codes
 const FIXTURE_ROW_HEIGHT = 56;
 
 
@@ -512,7 +512,7 @@ const TodayMatchCard = ({ match }) => {
         <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, minWidth: 0, maxWidth: '58%', whiteSpace: 'normal', textAlign: 'right', lineHeight: 1.3, pt: 0.45 }}>{status}</Typography>
       </Box>
       <TeamFixtureRow color={team1Color} abbr={match.team1Abbr || match.team1} name={match.team1} />
-      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 12, lineHeight: 1, textAlign: 'center', my: 0.7 }}>
+      <Typography sx={{ color: C.soft, fontFamily: fonts.mono, fontSize: 12, lineHeight: 1, textAlign: 'center', my: -0.25 }}>
         VS
       </Typography>
       <TeamFixtureRow color={team2Color} abbr={match.team2Abbr || match.team2} name={match.team2} />
@@ -560,11 +560,11 @@ const teamLinkSx = {
   fontWeight: 700,
   fontSize: 23,
   lineHeight: 1,
-  // 32px tap target without changing the type size ("SL" alone is 23px wide).
+  // 44px tap target without changing the type size ("SL" alone is 23px wide).
   display: 'inline-flex',
   alignItems: 'center',
-  minHeight: 32,
-  minWidth: 32,
+  minHeight: 44,
+  minWidth: 44,
   textDecoration: 'none',
   '&:hover': { color: C.lime },
 };

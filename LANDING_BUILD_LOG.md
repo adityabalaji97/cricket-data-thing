@@ -337,3 +337,9 @@ Files: `src/App.js`.
   /venue?venue=Wankhede..., /compare, /search, /scorecard/1535464 all render. Full Jest suite: 169 pass; the only
   failure is `FantasyPlanner.test.jsx`, which fails on main too.
 - Pre-existing eslint warning left alone: `CompetitionFilter` imported but unused in App.js.
+
+## Follow-up: fixture card team codes at 44px
+
+- The team codes on the fixture cards (headline days, or "N more fixtures") were 32px links: now 44px, with the
+  "VS" line tightened. The card grew to 306px at 390 (two-line series chip), so `FIXTURE_CARD_HEIGHT` is 306 (cards and
+  the error card share it). This closes the last tap-target item from L5. Screenshot: `fixture_cards_390.png`.
