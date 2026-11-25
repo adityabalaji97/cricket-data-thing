@@ -535,3 +535,12 @@ File: `src/components/notes/NotesList.jsx`.
   notes, the next page loads by itself. Locally: All shows recap, article, analysis; Previews shows the 2 Oct one,
   marked played (`notes_all_390.png`).
 - Assumed: hide from "All" rather than delete or sink to the bottom (they're still worth reading as an archive).
+
+### R2.11 Audit P3: the collapsed live fixture row shows where the match stands
+
+File: `src/components/LandingPage.jsx` (`FixtureRow`).
+
+- A live match's row adds a second line with the feed's status ("Giants require 60 runs"), as the full card does.
+  Not-live rows are unchanged (one line). The row stays 56px minimum and grows to fit the second line.
+- Not checked live: no match was live locally when this was built (06:20 IST); the pre-match row renders as before
+  (`fixture_row_390.png`). Worth a look on the next live match.

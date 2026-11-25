@@ -446,13 +446,22 @@ const FixtureRow = ({ match }) => {
         bgcolor: C.surface, border: `1px solid ${live ? 'rgba(229,72,77,0.5)' : C.hairline}`, textDecoration: 'none', color: C.mid,
         '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' } }}>
       <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, flexShrink: 0 }}>{when}</Typography>
-      <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: 0.75, overflow: 'hidden' }}>
-        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>
-          {match.team1Abbr || match.team1} v {match.team2Abbr || match.team2}
-        </Typography>
-        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {format}{place ? `, ${place}` : ''}
-        </Typography>
+      <Box sx={{ minWidth: 0, flex: 1, py: 0.75 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, overflow: 'hidden' }}>
+          <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>
+            {match.team1Abbr || match.team1} v {match.team2Abbr || match.team2}
+          </Typography>
+          <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {format}{place ? `, ${place}` : ''}
+          </Typography>
+        </Box>
+        {/* Live: where the match stands ("Giants require 60 runs"), as the full card shows it (round 2 audit). */}
+        {live && match.statusText && (
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden',
+            textOverflow: 'ellipsis' }}>
+            {match.statusText}
+          </Typography>
+        )}
       </Box>
       <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Preview ›</Typography>
     </Box>
