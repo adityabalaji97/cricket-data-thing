@@ -80,6 +80,22 @@ test('the claim and the line round the same value', () => {
   expect(a.sentence.map(([t]) => t).join('')).toContain(`strike rate ${Math.round(y)} in 2025`);
 });
 
+test('a ranking whose top two are close calls them level, not a leader', () => {
+  const close = [
+    { batter: 'Jos Buttler', balls: 930, runs: 1423, strike_rate: 153.0 },
+    { batter: 'Dhruv Jurel', balls: 687, runs: 1043, strike_rate: 151.8 },
+  ];
+  const a = shapeAnswer(close, { batters: ['Dhruv Jurel', 'Jos Buttler'] }, ['batter']);
+  expect(a.sentence.map(([t]) => t).join('')).toBe('Jos Buttler and Dhruv Jurel are level: strike rate 153 and 152.');
+  const apart = [{ ...close[0], strike_rate: 160 }, close[1]];
+  expect(shapeAnswer(apart, {}, ['batter']).sentence.map(([t]) => t).join('')).toContain('Jos Buttler leads');
+});
+
+test('a single year under the floor is "not counted", not "left off the line"', () => {
+  const rows = [{ year: 2020, balls: 1, runs: 1, strike_rate: 100 }, years[0]];
+  expect(shapeAnswer(rows, { batters: ['Rinku Singh'] }, ['year']).note).toMatch(/not counted/);
+});
+
 test('one row states its value with its scope, not "X leads"', () => {
   const rows = [{ batter: 'Virat Kohli', balls: 2697, runs: 3370, strike_rate: 124.95, wickets: 90 }];
   const a = shapeAnswer(rows, { batters: ['Virat Kohli'], leagues: ['IPL'], bowl_kind: ['spin bowler'] }, ['batter']);

@@ -504,3 +504,12 @@ File: `src/components/query2/QueryPage.jsx`.
   centred spinner is gone. A parse error falls back to the normal empty page with the error.
 - The ask box holds the `nl` question while it's read (it showed blank under React's dev double effects).
 - `qb_nl_loading_390.png`, `qb_chip_loading_390.png`.
+
+### R2.8 Review of R2.6: "level" when the top two are close; note wording
+
+File: `src/components/query2/answerShape.js` (+ 2 tests).
+
+- A ranking whose top two are within 3 strike-rate points, 0.3 an over, or 2% of anything else reads
+  "Jos Buttler and Dhruv Jurel are level: strike rate 153 and 152." instead of "Buttler leads … then Jurel (152)".
+  The gap is measured on the same rounded numbers the sentence shows.
+- The year-floor note says "left off the line" only when there is a line; with one year left it says "not counted".

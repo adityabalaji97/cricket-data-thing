@@ -162,7 +162,7 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
         },
       } : null,
       rows: listed.map((r) => ({ label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), row: r })),
-      note: dropped ? `${M.label}${lowerBetter ? ' · lower is better' : ''} · years under ${floor} balls left off the line` : undefined,
+      note: dropped ? `${M.label}${lowerBetter ? ' · lower is better' : ''} · years under ${floor} balls ${rows.length > 1 ? 'left off the line' : 'not counted'}` : undefined,
     };
   }
 
@@ -206,8 +206,15 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
     const how = mKey === 'economy' ? ['is the cheapest', `${val(top)} an over`] : mKey === 'wickets' ? ['has the most wickets', val(top)]
       : mKey === 'runs_per_innings' ? [lowerBetter ? 'concedes fewest' : 'scores most', `${val(top)} an innings`]
       : [lowerBetter ? 'is lowest' : 'leads', `${M.label.toLowerCase()} ${val(top)}`];
-    const sentence = [S(String(top[g[0]]), true), S(` ${how[0]}: ${how[1]}`),
-      S(second ? `, then ${String(second[g[0]]).split(' ').slice(-1)[0]} (${val(second)}).` : '.')];
+    // Too close to call a leader: 3 strike-rate points, 0.3 an over, or about 2% of anything else.
+    const gap = second ? Math.abs(num(top) - num(second)) : Infinity;
+    const level = second && (mKey === 'strike_rate' ? gap <= 3 : mKey === 'economy' ? gap <= 0.3
+      : gap <= 0.02 * Math.max(Math.abs(num(top)), Math.abs(num(second))));
+    const label = mKey === 'economy' ? 'runs an over' : M.label.toLowerCase();
+    const sentence = level
+      ? [S(`${top[g[0]]} and ${second[g[0]]} are level: `), S(`${label} ${val(top)} and ${val(second)}`, true), S('.')]
+      : [S(String(top[g[0]]), true), S(` ${how[0]}: ${how[1]}`),
+        S(second ? `, then ${String(second[g[0]]).split(' ').slice(-1)[0]} (${val(second)}).` : '.')];
     return {
       type: 'ranked', measure: mKey, sentence,
       rows: rows.slice(0, 10).map((r, i) => ({ rank: i + 1, label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), num: metricOf(r, mKey), row: r })),
