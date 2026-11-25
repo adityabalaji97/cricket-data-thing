@@ -22,7 +22,7 @@ const INTL_ABBR = { India: 'IND', Australia: 'AUS', England: 'ENG', 'West Indies
 // The IPL is stored under two names: "Indian Premier League" to 2025 (Cricsheet) and "IPL" from 2026 (the live feed).
 // /teams/elo-rankings filters on one, so asking only for the first left every side at its 2025 rating (Mumbai 4th at
 // 1528 locally, against the team page's 9th at 1456). Both are fetched and each side kept at its latest.
-const SCOPES = {
+export const SCOPES = {
   ipl: { label: 'IPL', queries: ['Indian Premier League', 'IPL'].map((league) => ({ include_international: 'false', league, format: 'T20', gender: 'male' })) },
   intl: { label: 'T20Is', queries: [{ include_international: 'true', format: 'T20', gender: 'male' }] },
 };
@@ -47,8 +47,8 @@ export const currentSides = (rankings, scope) => {
     .map((r, i) => ({ ...r, rank: i + 1 }));
 };
 
-const ordinal = (n) => { const s = ['th', 'st', 'nd', 'rd']; const v = n % 100; return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`; };
-const dayLabel = (iso) => {
+export const ordinal = (n) => { const s = ['th', 'st', 'nd', 'rd']; const v = n % 100; return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`; };
+export const dayLabel = (iso) => {
   const d = new Date(`${iso}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
@@ -62,32 +62,50 @@ export const ratingsClaim = (sides, scope, context = null) => {
   if (sides.length < 2) return '';
   const top = sides[0];
   const last = sides[sides.length - 1];
+  const city = (s) => IPL_CITY[s.abbr] || s.name;
   if (scope === 'ipl' && context === 'auction') {
-    const city = (s) => IPL_CITY[s.abbr] || s.name;
     return `${city(top)} go into the auction as the top-rated side. ${city(last)} are ${ordinal(last.rank)} of ${sides.length}.`;
   }
-  const what = scope === 'ipl' ? 'IPL side' : 'T20I side among the top 12';
+  // IPL sides by city here too: the full names ran the claim to three lines at 390.
+  if (scope === 'ipl') return `${city(top)} are the top-rated IPL side. ${city(last)} are ${ordinal(last.rank)} of ${sides.length}.`;
+  const what = 'T20I side among the top 12';
   return `${top.name} are the top-rated ${what}. ${last.name} are ${ordinal(last.rank)} of ${sides.length}.`;
 };
 
-const routeTeam = (abbr) => `/team?team=${encodeURIComponent(abbr)}&autoload=true`;
+export const routeTeam = (abbr) => `/team?team=${encodeURIComponent(abbr)}&autoload=true`;
 
-const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = null, context = null }) => {
-  const [scope, setScope] = useState(initialScope);
+// One fetch per scope per page load (2 calls for the IPL, 1 for T20Is), shared by the landing card and the /team list,
+// so going from one to the other doesn't ask again. A failed fetch is dropped, so "Try again" asks afresh.
+const fetched = {};
+export const fetchRankings = (scope) => {
+  if (!fetched[scope]) {
+    fetched[scope] = Promise.all(SCOPES[scope].queries.map((query) => fetch(`${config.API_URL}/teams/elo-rankings?${new URLSearchParams(query)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`elo rankings: ${r.status}`))))))
+      .then((all) => all.flatMap((d) => d.rankings || []))
+      .catch((e) => { delete fetched[scope]; throw e; });
+  }
+  return fetched[scope];
+};
+
+// { state: {status, rows}, sides (current sides, ranked), retry }.
+export const useSides = (scope) => {
   const [state, setState] = useState({ status: 'loading', rows: [] });
   const [attempt, setAttempt] = useState(0);
-
   useEffect(() => {
     let cancelled = false;
     setState({ status: 'loading', rows: [] });
-    Promise.all(SCOPES[scope].queries.map((query) => fetch(`${config.API_URL}/teams/elo-rankings?${new URLSearchParams(query)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`elo rankings: ${r.status}`))))))
-      .then((all) => { if (!cancelled) setState({ status: 'ready', rows: all.flatMap((d) => d.rankings || []) }); })
+    fetchRankings(scope)
+      .then((rows) => { if (!cancelled) setState({ status: 'ready', rows }); })
       .catch(() => { if (!cancelled) setState({ status: 'error', rows: [] }); });
     return () => { cancelled = true; };
   }, [scope, attempt]);
-
   const sides = useMemo(() => currentSides(state.rows, scope), [state.rows, scope]);
+  return { state, sides, retry: () => setAttempt((n) => n + 1) };
+};
+
+const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = null, context = null }) => {
+  const [scope, setScope] = useState(initialScope);
+  const { state, sides, retry } = useSides(scope);
   const lo = Math.min(...sides.map((s) => s.rating));
   const hi = Math.max(...sides.map((s) => s.rating));
   const latest = sides.reduce((m, s) => (String(s.last || '') > m ? String(s.last) : m), '');
@@ -99,9 +117,9 @@ const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = n
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
         <Typography sx={{ fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
           color: colors.accent }}>
-          {kicker}
+          {typeof kicker === 'function' ? kicker(scope) : kicker}
         </Typography>
-        {action}
+        {typeof action === 'function' ? action(scope) : action}
       </Box>
       {/* Claim */}
       <Typography component="h2" sx={{ m: 0, mt: 0.75, fontFamily: fonts.display, fontWeight: 700, fontSize: { xs: 20, md: 24 },
@@ -128,7 +146,7 @@ const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = n
         <Box role="alert" sx={{ height: 44 * 6, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
           <Box>
             <Typography sx={{ color: colors.textLo, fontSize: 14 }}>Couldn&apos;t load the ratings.</Typography>
-            <Button type="button" onClick={() => setAttempt((n) => n + 1)} sx={{ mt: 1, minHeight: 44, px: 2, color: colors.accent,
+            <Button type="button" onClick={retry} sx={{ mt: 1, minHeight: 44, px: 2, color: colors.accent,
               border: '1px solid rgba(182,242,74,0.35)', borderRadius: 2, fontFamily: fonts.mono, fontSize: 12, fontWeight: 700 }}>
               Try again
             </Button>
@@ -142,7 +160,7 @@ const TeamRatings = ({ initialScope = 'ipl', kicker = 'Team ratings', action = n
             const pos = hi > lo ? (s.rating - lo) / (hi - lo) : 0.5;
             const dot = readableOnDark(getTeamColor(s.abbr) || getTeamColor(s.name) || colors.textLo);
             return (
-              <Box key={s.abbr} component={Link} to={routeTeam(s.page)} aria-label={`${s.name}: ${s.rating}, ${ordinal(s.rank)}`}
+              <Box key={s.abbr} component={Link} to={routeTeam(s.page)} onClick={() => window.scrollTo(0, 0)} aria-label={`${s.name}: ${s.rating}, ${ordinal(s.rank)}`}
                 sx={{ display: 'flex', alignItems: 'center', gap: 0.9, minWidth: 0, height: 44, textDecoration: 'none',
                   color: colors.textHi, borderBottom: s.rank % perCol === 0 ? 0 : `1px solid ${colors.border}`,
                   '&:hover .abbr': { color: colors.accent } }}>

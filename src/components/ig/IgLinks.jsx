@@ -96,7 +96,7 @@ const IgLinks = () => {
         </Box>
         <Typography component="h1" sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: 22, lineHeight: 1.15,
           color: colors.textHi, mt: 0.75 }}>
-          Cricket, ball by ball. <Box component="span" sx={{ color: colors.accent }}>{TAGLINE}.</Box>
+          Cricket, ball by ball. <Box component="span" sx={{ display: 'block', color: colors.accent }}>{TAGLINE}.</Box>
         </Typography>
         <Typography sx={{ fontSize: 14, color: colors.textMed, mt: 0.5 }}>{PROMISE}</Typography>
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 0.5 }}>

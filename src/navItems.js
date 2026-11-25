@@ -22,7 +22,7 @@ export const NAV_ITEMS = [
   { path: '/venue', label: 'Match Preview', title: 'Match Preview', group: 'primary', short: 'Preview' },
   { path: '/query', label: 'Query Builder', title: 'Query Builder', group: 'primary', short: 'Query' },
   { path: '/player', label: 'Players', title: 'Player Profile', group: 'explore' },
-  { path: '/team', label: 'Teams', title: 'Team', group: 'explore' },
+  { path: '/team', label: 'Teams', title: 'Teams', group: 'explore' },
   { path: '/venues', label: 'Venues', title: 'Venues', group: 'explore' },
   { path: '/scorecards', label: 'Scorecards', title: 'Scorecards', group: 'explore' },
   { path: '/notes', label: 'Notes', title: 'Notes', group: 'explore' },

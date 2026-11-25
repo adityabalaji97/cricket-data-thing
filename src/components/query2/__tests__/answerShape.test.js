@@ -63,3 +63,43 @@ test('scoring zones are a wheel by share of runs, zone 0 left off, overs 1-50 no
   expect(a.sentence.map(([t]) => t).join('')).toContain('most runs through midwicket');
   expect(queryChips({ over_min: 0, over_max: 49 }, []).map((c) => c.key)).not.toContain('overs');
 });
+
+test('a year under 30 balls stays in the list but is left off the line and the claim', () => {
+  const rows = [{ year: 2020, balls: 1, runs: 1, strike_rate: 100 }, ...years];
+  const a = shapeAnswer(rows, { batters: ['Rinku Singh'] }, ['year']);
+  expect(a.chart.payload.series[0].points.map((p) => p.x)).toEqual([2023, 2024]);
+  expect(a.sentence.map(([t]) => t).join('')).toContain('from 113 in 2023');
+  expect(a.rows.map((r) => r.label)).toEqual(['2020', '2023', '2024']);
+  expect(a.note).toMatch(/under 30 balls/);
+});
+
+test('the claim and the line round the same value', () => {
+  const rows = [{ year: 2024, balls: 200, runs: 300, strike_rate: 150.2 }, { year: 2025, balls: 200, runs: 323, strike_rate: 161.4999 }];
+  const a = shapeAnswer(rows, { batters: ['Rinku Singh'] }, ['year']);
+  const y = a.chart.payload.series[0].points[1].y;
+  expect(a.sentence.map(([t]) => t).join('')).toContain(`strike rate ${Math.round(y)} in 2025`);
+});
+
+test('a ranking whose top two are close calls them level, not a leader', () => {
+  const close = [
+    { batter: 'Jos Buttler', balls: 930, runs: 1423, strike_rate: 153.0 },
+    { batter: 'Dhruv Jurel', balls: 687, runs: 1043, strike_rate: 151.8 },
+  ];
+  const a = shapeAnswer(close, { batters: ['Dhruv Jurel', 'Jos Buttler'] }, ['batter']);
+  expect(a.sentence.map(([t]) => t).join('')).toBe('Jos Buttler and Dhruv Jurel are level: strike rate 153 and 152.');
+  const apart = [{ ...close[0], strike_rate: 160 }, close[1]];
+  expect(shapeAnswer(apart, {}, ['batter']).sentence.map(([t]) => t).join('')).toContain('Jos Buttler leads');
+});
+
+test('a single year under the floor is "not counted", not "left off the line"', () => {
+  const rows = [{ year: 2020, balls: 1, runs: 1, strike_rate: 100 }, years[0]];
+  expect(shapeAnswer(rows, { batters: ['Rinku Singh'] }, ['year']).note).toMatch(/not counted/);
+});
+
+test('one row states its value with its scope, not "X leads"', () => {
+  const rows = [{ batter: 'Virat Kohli', balls: 2697, runs: 3370, strike_rate: 124.95, wickets: 90 }];
+  const a = shapeAnswer(rows, { batters: ['Virat Kohli'], leagues: ['IPL'], bowl_kind: ['spin bowler'] }, ['batter']);
+  expect(a.type).toBe('single');
+  expect(a.chart).toBeUndefined();
+  expect(a.sentence.map(([t]) => t).join('')).toBe('Virat Kohli, IPL, v spin: strike rate 125 from 2,697 balls, 3,370 runs.');
+});

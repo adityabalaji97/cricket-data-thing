@@ -19,7 +19,7 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import XIcon from '@mui/icons-material/X';
 import config from '../config';
 import { siteOrigin } from './ui/ChartExportButton';
-import { fetchUpcomingMatches } from '../data/iplSchedule';
+import { fetchUpcomingMatches, localStart, routePreview } from '../data/iplSchedule';
 import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
 import { getTeamColor, readableOnDark } from '../utils/teamColors';
@@ -74,16 +74,6 @@ const toDateLabel = (value) => {
 
 const routeTeam = (team) => `/team?team=${encodeURIComponent(team || '')}&autoload=true`;
 const routePlayer = (player) => `/player?name=${encodeURIComponent(player || '')}&autoload=true`;
-const routePreview = (match) => (
-  `/venue?venue=${encodeURIComponent(match.venue || '')}` +
-  `&team1=${encodeURIComponent(match.team1Abbr || match.team1 || '')}` +
-  `&team2=${encodeURIComponent(match.team2Abbr || match.team2 || '')}` +
-  `&includeInternational=true&topTeams=20&autoload=true` +
-  // The preview is one format's record; ODI fixtures must open in ODI, not the global default.
-  `&fmt=${match.format === 'ODI' ? 'mens-odi' : 'mens-t20'}` +
-  `${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`
-);
-
 const scrollTrack = (ref, direction) => {
   const node = ref.current;
   if (!node) return;
@@ -224,7 +214,6 @@ const LandingDropdown = ({ id, label, value, options, onChange, openDropdown, se
 
 const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
   const navigate = useNavigate();
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const routeEntity = (item) => {
     if (item.type === 'player') {
@@ -234,7 +223,6 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
     } else if (item.type === 'venue') {
       navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
     }
-    setSearchOpen(false);
   };
 
   const searchField = (
@@ -251,7 +239,6 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
         onSelect={routeEntity}
         onFallback={(term) => {
           navigate(`/query?nl=${encodeURIComponent(term)}`);
-          setSearchOpen(false);
         }}
         placeholder="Search players, teams, venues"
         variant="dark"
@@ -270,7 +257,9 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
         </Box>
         {!isMobile && searchField}
         {isMobile && (
-          <IconButton aria-label="Search" onClick={() => setSearchOpen((prev) => !prev)} sx={topIconSx}>
+          // Round 2 audit: on a phone the icon opened a second input above the ask box. It now goes to the Search page
+          // (players, teams, venues), as the bottom nav's Search does.
+          <IconButton aria-label="Search players, teams, venues" component={Link} to="/search" sx={topIconSx}>
             <SearchIcon sx={{ fontSize: 20 }} />
           </IconButton>
         )}
@@ -304,7 +293,6 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
         </Button>
         )}
       </Box>
-      {isMobile && searchOpen && <Box sx={{ mt: 1.3 }}>{searchField}</Box>}
     </Box>
   );
 };
@@ -318,24 +306,6 @@ const topIconSx = {
   border: `1px solid ${C.hairlineStrong}`,
   borderRadius: 2,
   '&:hover': { bgcolor: C.raised },
-};
-
-// Fixture start in the viewer's own time zone. The API's `date`/`time` are UTC, so without
-// `startUtc` (an older cached response) the time is labelled UTC rather than guessed.
-const localStart = (match) => {
-  if (!match.startUtc) {
-    return { date: match.date, label: match.time ? `${match.time} UTC` : null };
-  }
-  const start = new Date(match.startUtc);
-  const date = start.toLocaleDateString('en-CA');
-  let time = start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
-  // en-US browsers in India name the zone "GMT+5:30"; most of our readers know it as IST.
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (zone === 'Asia/Kolkata' || zone === 'Asia/Calcutta') time = time.replace(/GMT\+5:30$/, 'IST');
-  const today = new Date().toLocaleDateString('en-CA');
-  const tomorrow = new Date(Date.now() + 864e5).toLocaleDateString('en-CA');
-  const day = date === today ? '' : date === tomorrow ? 'Tomorrow ' : `${start.toLocaleDateString(undefined, { weekday: 'short' })} `;
-  return { date, label: `${day}${time}` };
 };
 
 // The leagues and events whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.
@@ -447,13 +417,22 @@ const FixtureRow = ({ match }) => {
         bgcolor: C.surface, border: `1px solid ${live ? 'rgba(229,72,77,0.5)' : C.hairline}`, textDecoration: 'none', color: C.mid,
         '&:hover': { bgcolor: C.raised, borderColor: 'rgba(182,242,74,0.25)' } }}>
       <Typography sx={{ ...monoSx, color: live ? C.red : C.soft, flexShrink: 0 }}>{when}</Typography>
-      <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: 0.75, overflow: 'hidden' }}>
-        <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>
-          {match.team1Abbr || match.team1} v {match.team2Abbr || match.team2}
-        </Typography>
-        <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {format}{place ? `, ${place}` : ''}
-        </Typography>
+      <Box sx={{ minWidth: 0, flex: 1, py: 0.75 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, overflow: 'hidden' }}>
+          <Typography sx={{ color: C.hi, fontFamily: fonts.display, fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>
+            {match.team1Abbr || match.team1} v {match.team2Abbr || match.team2}
+          </Typography>
+          <Typography sx={{ color: C.soft, fontFamily: fonts.body, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {format}{place ? `, ${place}` : ''}
+          </Typography>
+        </Box>
+        {/* Live: where the match stands ("Giants require 60 runs"), as the full card shows it (round 2 audit). */}
+        {live && match.statusText && (
+          <Typography sx={{ color: C.mid, fontFamily: fonts.body, fontSize: 13, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden',
+            textOverflow: 'ellipsis' }}>
+            {match.statusText}
+          </Typography>
+        )}
       </Box>
       <Typography sx={{ color: C.lime, fontFamily: fonts.mono, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Preview ›</Typography>
     </Box>

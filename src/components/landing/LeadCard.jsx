@@ -80,10 +80,12 @@ const LeadCard = ({ onKind }) => {
   const frame = ratingsFrame();
   return (
     <TeamRatings
-      kicker={frame.kicker}
+      // The auction frame is the IPL's; the T20Is tab gets its own kicker (its claim never uses the frame).
+      kicker={(scope) => (scope === 'ipl' ? frame.kicker : 'T20I team ratings')}
       context={frame.context}
-      action={(
-        <Box component={Link} to="/team" sx={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: colors.textLo,
+      // "All squads" opens the team list with the tab's group first.
+      action={(scope) => (
+        <Box component={Link} to={scope === 'ipl' ? '/team?league=IPL' : '/team?scope=t20i'} sx={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: colors.textLo,
           fontFamily: fonts.mono, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap', '&:hover': { color: colors.accent } }}>
           All squads ›
         </Box>

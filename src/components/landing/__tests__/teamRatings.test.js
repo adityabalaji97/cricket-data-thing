@@ -27,5 +27,5 @@ test('internationals: the top 12 only, short codes, the country name for the tea
 
 test('the claim names the leader and the last', () => {
   const sides = currentSides([row('Mumbai Indians', 'MI', 1468, '2026-05-20'), row('Royal Challengers Bengaluru', 'RCB', 1626, '2026-05-31')], 'ipl');
-  expect(ratingsClaim(sides, 'ipl')).toBe('Royal Challengers Bengaluru are the top-rated IPL side. Mumbai Indians are 2nd of 2.');
+  expect(ratingsClaim(sides, 'ipl')).toBe('Bengaluru are the top-rated IPL side. Mumbai are 2nd of 2.');
 });

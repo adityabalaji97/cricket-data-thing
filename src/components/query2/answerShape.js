@@ -1,4 +1,4 @@
-import { GROUP_WORDS, LENGTH_WORDS, LINE_WORDS, ZONE_WORDS, valueWords } from './qbWords';
+import { GROUP_WORDS, LENGTH_WORDS, LINE_WORDS, ZONE_WORDS, queryChips, valueWords } from './qbWords';
 
 // Reads a query's result the way a person would (QUERY_BUILDER_PLAN.md Q2): which measure the question is about,
 // which picture fits the result's shape, the one sentence that answers it, and the rows to list under the chart.
@@ -109,24 +109,42 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
   const all = (data || []).filter((r) => r && (r.balls || 0) > 0);
   const subject = subjectOf(filters);
   const S = (t, b = false) => [t, b];
-  const val = (r) => fmtValue(metricOf(r, mKey), M.format);
+  // Rounded to 2 places first, as the charts' points are, so the sentence and a chart's label never differ by one
+  // (Rinku Singh's 161.5 read 161 in the claim and 162 on the line).
+  const num = (r) => { const m = metricOf(r, mKey); return m == null || Number.isNaN(m) ? null : Number(m.toFixed(2)); };
+  const val = (r) => fmtValue(num(r), M.format);
 
   if (!all.length) return { type: 'empty', measure: mKey, sentence: [S('Nothing matched this question. Try widening the dates or removing a filter.')], rows: [] };
 
-  // No grouping: one line of totals.
-  if (!g.length) {
+  // No grouping, or one row of a ranking or a split: the value, stated with its scope ("Virat Kohli, IPL, v spin:
+  // strike rate 125 from 2,697 balls"), not "X leads" over a single bar.
+  if (!g.length || (all.length === 1 && !(g.length === 1 && TIME.includes(g[0])))) {
     const r = all[0];
+    const names = [...(filters?.batters || []), ...(filters?.bowlers || []), ...(filters?.players || [])];
+    // A person or side leads the line; a category (a phase, pace or spin) follows the scope.
+    const ranked = g.length === 1 && RANKED.includes(g[0]);
+    const who = g.length ? (g.length === 1 && g[0] === 'bowl_kind' ? `v ${rowLabel(r, g)}` : rowLabel(r, g)) : subject;
+    const scope = queryChips(filters, []).map((c) => c.label).filter((l) => l !== who && (g.length || !names.includes(l)));
+    const head = (!g.length || ranked ? [who, ...scope] : [...scope, who]).filter(Boolean).join(', ');
+    const what = mKey === 'economy' ? `${val(r)} an over` : mKey === 'wickets' ? `${val(r)} wickets`
+      : `${M.label.toLowerCase()} ${val(r)}`;
     return {
       type: 'single', measure: mKey,
-      sentence: [S(`${subject ? `${subject}: ` : ''}`), S(`${val(r)} ${M.short === 'SR' ? 'strike rate' : M.short}`, true),
-        S(` from ${Number(r.balls).toLocaleString('en-US')} balls${persp === 'bowl' ? `, ${r.wickets} wickets` : `, ${r.runs} runs`}.`)],
+      sentence: [S(head ? `${head}: ` : ''), S(what, true),
+        S(` from ${Number(r.balls).toLocaleString('en-US')} balls${persp === 'bowl' ? `, ${r.wickets} wickets` : `, ${Number(r.runs || 0).toLocaleString('en-US')} runs`}.`)],
       rows: [], tiles: r,
     };
   }
 
   // By year or season, alone: a line.
   if (g.length === 1 && TIME.includes(g[0])) {
-    const rows = [...all].sort((a, b) => Number(a[g[0]]) - Number(b[g[0]]));
+    const listed = [...all].sort((a, b) => Number(a[g[0]]) - Number(b[g[0]]));
+    // A year needs 30 balls to be a point on the line or a word in the claim (Rinku Singh's 2020 was one ball, a dip to
+    // 100). Every year stays in the list below. A query that sets its own minimum keeps it.
+    const floor = filters?.min_balls ? 0 : RANK_FLOOR;
+    const enough = listed.filter((r) => r.balls >= floor);
+    const rows = enough.length ? enough : listed;
+    const dropped = listed.length - rows.length;
     const first = rows[0]; const last = rows[rows.length - 1];
     const peak = rows.reduce((p, r) => ((lowerBetter ? metricOf(r, mKey) < metricOf(p, mKey) : metricOf(r, mKey) > metricOf(p, mKey)) ? r : p), rows[0]);
     const sentence = rows.length === 1
@@ -140,10 +158,11 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
         payload: {
           x: { label: '', ticks: rows.map((r) => Number(r[g[0]])) },
           y: { label: M.label, format: M.format === 'dec2' ? 'dec1' : 'int', zero: false },
-          series: [{ name: subject || M.label, points: rows.map((r) => ({ x: Number(r[g[0]]), y: Number(metricOf(r, mKey).toFixed(2)) })), highlight: true }],
+          series: [{ name: subject || M.label, points: rows.map((r) => ({ x: Number(r[g[0]]), y: num(r) })), highlight: true }],
         },
       } : null,
-      rows: rows.map((r) => ({ label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), row: r })),
+      rows: listed.map((r) => ({ label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), row: r })),
+      note: dropped ? `${M.label}${lowerBetter ? ' · lower is better' : ''} · years under ${floor} balls ${rows.length > 1 ? 'left off the line' : 'not counted'}` : undefined,
     };
   }
 
@@ -187,8 +206,15 @@ export const shapeAnswer = (data, filters, groupBy, measure = null, hand = null)
     const how = mKey === 'economy' ? ['is the cheapest', `${val(top)} an over`] : mKey === 'wickets' ? ['has the most wickets', val(top)]
       : mKey === 'runs_per_innings' ? [lowerBetter ? 'concedes fewest' : 'scores most', `${val(top)} an innings`]
       : [lowerBetter ? 'is lowest' : 'leads', `${M.label.toLowerCase()} ${val(top)}`];
-    const sentence = [S(String(top[g[0]]), true), S(` ${how[0]}: ${how[1]}`),
-      S(second ? `, then ${String(second[g[0]]).split(' ').slice(-1)[0]} (${val(second)}).` : '.')];
+    // Too close to call a leader: 3 strike-rate points, 0.3 an over, or about 2% of anything else.
+    const gap = second ? Math.abs(num(top) - num(second)) : Infinity;
+    const level = second && (mKey === 'strike_rate' ? gap <= 3 : mKey === 'economy' ? gap <= 0.3
+      : gap <= 0.02 * Math.max(Math.abs(num(top)), Math.abs(num(second))));
+    const label = mKey === 'economy' ? 'runs an over' : M.label.toLowerCase();
+    const sentence = level
+      ? [S(`${top[g[0]]} and ${second[g[0]]} are level: `), S(`${label} ${val(top)} and ${val(second)}`, true), S('.')]
+      : [S(String(top[g[0]]), true), S(` ${how[0]}: ${how[1]}`),
+        S(second ? `, then ${String(second[g[0]]).split(' ').slice(-1)[0]} (${val(second)}).` : '.')];
     return {
       type: 'ranked', measure: mKey, sentence,
       rows: rows.slice(0, 10).map((r, i) => ({ rank: i + 1, label: String(r[g[0]]), detail: detailOf(r, persp, mKey), value: val(r), num: metricOf(r, mKey), row: r })),

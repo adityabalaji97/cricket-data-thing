@@ -281,8 +281,8 @@ const hindsightTheme = createTheme({
         },
         label: {
           fontFamily: fonts.body,
-          fontSize: 11,
-          '&.Mui-selected': { fontSize: 11 },
+          fontSize: 12,
+          '&.Mui-selected': { fontSize: 12 },
         },
       },
     },

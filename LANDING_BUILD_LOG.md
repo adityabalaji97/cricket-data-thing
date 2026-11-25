@@ -406,3 +406,182 @@ Files: new `src/utils/lazyWithRetry.js` + `src/utils/__tests__/lazyWithRetry.tes
   never reload; the boundary renders the message and button. Browser check: `/team?team=MI` with the TeamPage chunk
   blocked shows the boundary after one reload (`l6_chunk_error_390.png`). Unblocked, it renders normally.
 - main bundle: 225.2 kB gzip (+0.5 kB).
+
+## Round 2 (24 Nov, evening)
+
+Builder: worktree `agent-afe273a40aee056dd`, branch `worktree-agent-afe273a40aee056dd`, from `2ece6b2` (PR #336).
+Nothing pushed or deployed. Front end on :3002 against the :8000 API through a CORS shim on :8002 (scratchpad, not
+committed). Screenshots in `docs/landing_review/build_r2/` (uncommitted).
+
+### R2.1 The tagline on its own line
+
+Files: `src/components/landing/AskHero.jsx`, `public/index.html`, `src/components/ig/IgLinks.jsx`.
+
+- "Hindsight shows you why." is a block span under "Cricket, ball by ball.", still lime. The text keeps its space, so
+  the heading reads the same to screen readers and crawlers.
+- The static shell's `h1 em` is `display: block` too, so the swap to the app still doesn't move anything.
+- Assumed: /links (IgLinks, the home page's twin) gets the same break, so the two stay alike.
+- Checked at 390 and 360: two lines (h1 59px tall), no horizontal scroll (`hero.png`, `hero_360.png`).
+
+### R2.2 "All squads" leads to a team list, not an empty dropdown
+
+Files: new `src/components/pages/TeamList.jsx` + `src/components/pages/__tests__/teamList.test.js`,
+`src/components/pages/TeamPage.jsx`, `src/components/landing/TeamRatings.jsx`, `src/components/landing/LeadCard.jsx`,
+`src/components/landing/__tests__/teamRatings.test.js`.
+
+- `/team` with no team (the menu's Teams, a bare link, "All squads") now shows two cards: the ten IPL sides and the
+  12 T20I sides the landing card ranks. Each card: kicker, claim (who leads, who is last), one 44px row per side
+  (rank, team-colour bar, full name, rating, ›), scope line (Elo after the latest match, to the date), credit.
+  Each row goes to `/team?team=<code or name>&autoload=true`, the URL the landing rows use.
+- Order: `?scope=t20i` puts T20Is first; `?league=IPL`, no param, or anything else IPL-ish puts the IPL first.
+  "All squads" passes the tab that's open (`action` may now be a function of the scope).
+- Ratings: the landing card's fetch moved into `fetchRankings`/`useSides` in TeamRatings.jsx, memoised per scope
+  for the page load (2 calls for the IPL, 1 for T20Is; a failure is dropped so Try again re-asks). Home -> /team
+  makes no new ratings calls. While loading, or if it fails, the sides still list (A-Z, no ratings) and are tappable.
+- The old dropdown stays as "Search any team" under the cards; it fetches `/teams/` only when opened, not on load.
+- Rows (here and on the landing card) scroll to the top on tap: the app keeps scroll position across routes, so a
+  low row opened its team page half-way down.
+- Assumed: the IPL claim now names sides by city outside the auction frame too ("Bengaluru are the top-rated IPL
+  side. Lucknow are 10th of 10."); the full names ran to three lines at 390. Test updated.
+- Assumed: with no param, the IPL leads (India-first).
+- Desktop: the two cards sit side by side (max 1040px).
+- Checked at 390 and 360: 22 rows, all 44px, no horizontal scroll; T20Is tab -> All squads -> `/team?scope=t20i`
+  with T20Is first; tapping MI opens Mumbai Indians at the top (`teams_ipl.png`, `teams_t20i.png`,
+  `teams_bottom_360.png`, `mi_page_390.png`).
+
+### R2.3 Audit P1: fixture previews open with both teams
+
+File: `src/components/LandingPage.jsx` (`routePreview`).
+
+- The fixture row and the expanded card's Match preview passed short codes (GG, MIE), which the preview can't
+  resolve, so the page opened venue-only. They now pass the full names (`team1`/`team2`, codes only as a fallback)
+  plus `&story=1`, as /links does. Checked: GG v MIE (ILT20, live) opens "Gulf Giants v MI Emirates" with par,
+  chasing and head to head (`fixture_preview_390.png`).
+
+### R2.4 Audit P2: the lead card's kicker follows the tab; review fixes for R2.2
+
+Files: `src/components/landing/LeadCard.jsx`, `src/components/landing/TeamRatings.jsx`, `src/components/pages/TeamList.jsx`,
+`src/navItems.js`.
+
+- The T20Is tab said "IPL 2027 · auction 16 Dec". `kicker` may now be a function of the tab: the IPL keeps the
+  auction frame, T20Is read "T20I team ratings" (its claim never used the frame). `lead_t20i_390.png`.
+- Review: the team list's fallback (ratings failed) is now really A-Z, as its scope line says.
+- Review: the header for /team reads "Teams" (navItems title), matching the page heading.
+
+### R2.5 Audit P2: the Jurel v Buttler chip compares like for like
+
+File: `src/components/landing/AskHero.jsx` (`EXAMPLES`).
+
+- Was "Jurel vs Buttler, by phase" over all T20s: ~9,000 balls against ~860, phases out of order, a 6-row table with
+  no comparison claim. Now "Jurel vs Buttler, IPL since 2024": `leagues=IPL&start_date=2024-01-01&group_by=batter`.
+  Locally it answers "Jos Buttler leads: strike rate 153, then Jurel (152)." over 930 and 687 balls, a ranked list of
+  two (`chip_jurel_390.png`). The local DB is a subset of prod: owner, check the live numbers once deployed.
+- Assumed: kept the pairing (the Fable review's pick) rather than swapping the player.
+
+### R2.6 Audit P2: year lines need 30 balls a point; one-row answers state their value
+
+Files: `src/components/query2/answerShape.js`, `src/components/query2/__tests__/answerShape.test.js`.
+
+- Year/season lines: a year needs 30 balls (`RANK_FLOOR`) to be a point or a word in the claim; every year stays in
+  the list under the chart, and the note says "years under 30 balls left off the line". A query with its own
+  `min_balls` keeps it. (Rinku Singh v pace plotted 2020 from one ball, a dip to 100.)
+- Every value in a sentence is rounded from the same 2-place number the charts plot, so a claim and a label can't
+  differ by one (161 v 162).
+- One row (a ranking of one, or a split with one value) is now a `single` answer: "Virat Kohli, IPL, v spin: strike
+  rate 132 from 805 balls, 1,060 runs." with the totals tiles, not "X leads" over one bar. The scope is the query's
+  chips; a person or side leads, a category (phase, v pace) follows the scope. `single_row_390.png`.
+- Done together (same function); 3 new tests, 17/17 in query2.
+- Not reproducible locally: the local DB has no Rinku 2020, so the fix is shown by the test, not a screenshot.
+
+### R2.7 Audit P2: no empty-page flash while a question is answered
+
+File: `src/components/query2/QueryPage.jsx`.
+
+- Arriving with `?nl=` (the home ask box, site search) showed the empty page for 1-2 s: suggestions and other
+  visitors' "Recently asked". Now, while the question is parsed (`nl` present, no query yet, no parse error) or a
+  query is counted, the page shows an answer-card skeleton ("Reading the question…" / "Counting every ball…": a
+  sentence, a chart block, two rows) and hides the heading, suggestions, recent list and "Or build one". The old
+  centred spinner is gone. A parse error falls back to the normal empty page with the error.
+- The ask box holds the `nl` question while it's read (it showed blank under React's dev double effects).
+- `qb_nl_loading_390.png`, `qb_chip_loading_390.png`.
+
+### R2.8 Review of R2.6: "level" when the top two are close; note wording
+
+File: `src/components/query2/answerShape.js` (+ 2 tests).
+
+- A ranking whose top two are within 3 strike-rate points, 0.3 an over, or 2% of anything else reads
+  "Jos Buttler and Dhruv Jurel are level: strike rate 153 and 152." instead of "Buttler leads … then Jurel (152)".
+  The gap is measured on the same rounded numbers the sentence shows.
+- The year-floor note says "left off the line" only when there is a line; with one year left it says "not counted".
+
+### R2.9 Audit P3 quick ones: scorecard sideways scroll, nav labels, home search icon
+
+Files: `src/components/scorecard/matchScorecard.css`, `src/theme/hindsightTheme.js`, `src/components/LandingPage.jsx`.
+
+- Scorecard: `.scorecard-page` pulled out by -24px (-16px under 420) against a container padded 8px on phones, so
+  the page scrolled 8-16px sideways. Sideways it now cancels the padding exactly (-8px, -16px from 600, -24px from
+  900); the vertical margins are as before. Checked: scrollWidth = viewport at 360 and 650 (`scorecard_360.png`).
+- Bottom-nav labels 11px -> 12px (theme). At 360 all five fit (no label wider than its box).
+- Home search icon (phone): it opened a second input above the ask box. It is now a link to /search (players,
+  teams, venues), as the bottom nav's Search. Assumed: /search rather than focusing the ask box, because the icon's
+  job is finding a player/team/venue page, which the ask box doesn't do. Desktop keeps its inline search field.
+
+### R2.10 Audit P3: /notes doesn't lead with previews of played matches
+
+File: `src/components/notes/NotesList.jsx`.
+
+- "All" leaves out previews whose match is over (`previewPassed` from `utils/noteDates.js`, as the home page and
+  /links do). They stay under the Previews filter, kicker "Preview · played". If a page of 12 leaves fewer than four
+  notes, the next page loads by itself. Locally: All shows recap, article, analysis; Previews shows the 2 Oct one,
+  marked played (`notes_all_390.png`).
+- Assumed: hide from "All" rather than delete or sink to the bottom (they're still worth reading as an archive).
+
+### R2.11 Audit P3: the collapsed live fixture row shows where the match stands
+
+File: `src/components/LandingPage.jsx` (`FixtureRow`).
+
+- A live match's row adds a second line with the feed's status ("Giants require 60 runs"), as the full card does.
+  Not-live rows are unchanged (one line). The row stays 56px minimum and grows to fit the second line.
+- Not checked live: no match was live locally when this was built (06:20 IST); the pre-match row renders as before
+  (`fixture_row_390.png`). Worth a look on the next live match.
+
+### R2.12 Review of R2.7: errors get a card with Try again; skeleton sized like an answer
+
+File: `src/components/query2/QueryPage.jsx`.
+
+- A failed parse and a failed run each show an `ErrorCard` in the answer's place: the message and a 44px
+  "Try again" (the parse re-asks the same text; the run re-runs the same query through a `runAttempt` counter).
+- With `?nl=` in the URL the empty page (suggestions, "Recently asked") stays hidden, a failed parse included.
+- The skeleton's chart block is 220px and it has three row bars (~462px, against Rinku's 467px answer).
+- Checked: `group_by=not_a_column` shows the API's message in the card; Try again re-runs it (`qb_run_error_390.png`).
+  The parse-error card is not reproduced locally (no way to force a parse failure without the model).
+
+### R2.13 Audit: the bottom nav's Preview lists the next fixtures
+
+Files: new `src/components/preview/UpcomingPreviews.jsx`, `src/App.js`, `src/data/iplSchedule.js`,
+`src/components/LandingPage.jsx`.
+
+- `/venue` with no venue (the Preview tab) opened a bare form. It now leads with a "Next fixtures" card: the next six
+  (`/fixtures/upcoming?count=6`, one call), each a 52px row (full team names; time in the viewer's zone or LIVE;
+  format, ground) that opens its story preview. The form stays below ("Or pick any venue and two sides below.").
+  Nothing renders while loading, on error or with no fixtures, so the form never jumps.
+- `routePreview` and `localStart` moved from LandingPage.jsx to `data/iplSchedule.js` so the home row and this list
+  build the same preview URL (full names + `story=1`, R2.3). The component is lazy (its own chunk).
+- Checked at 360: six rows, no horizontal scroll; tapping Dubai Capitals v Desert Vipers opens its preview (par,
+  chasing, head to head) (`preview_tab_390.png` is at 360 despite its name, `preview_from_tab_390.png`).
+
+### Round 2 summary (to 25 Nov, 06:30 IST)
+
+13 commits, `d639dbb`..`03fa60c` on top of `2ece6b2`. Nothing pushed or deployed. The audit queue is done, including
+the "if time" Preview tab item. "Recent Matches" and "Standout Innings" were left alone (owner decisions).
+
+**Assumed (owner to check)**: /links gets the tagline break too; with no param /team puts the IPL first; IPL claims
+name sides by city outside the auction too; the Jurel v Buttler chip kept the pairing (IPL since 2024); the home
+search icon goes to /search rather than focusing the ask box; played previews are hidden from /notes "All" but
+kept under Previews.
+
+**Not checked live**: a live fixture row's status line (no live match locally); the parse-error card; Rinku's
+2020 one-ball year (not in the local DB; covered by a test). The chip numbers come from the local subset DB.
+
+**Noticed, not fixed**: the app keeps scroll position across routes (rows added here scroll to top themselves; a
+global scroll-to-top on route change would fix it everywhere but could fight hash links).
