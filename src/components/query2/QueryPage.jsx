@@ -75,6 +75,22 @@ const Eyebrow = ({ children }) => (
   <Box sx={{ fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textLo }}>{children}</Box>
 );
 
+// The answer card's outline while a question is read or counted: a sentence, a chart, two rows.
+const AnswerSkeleton = ({ text }) => {
+  const bar = (w, h = 14, mt = 0) => <Box sx={{ width: w, height: h, mt, borderRadius: '6px', bgcolor: colors.surface2 }} />;
+  return (
+    <Box component="section" aria-busy="true" aria-label="Answer loading"
+      sx={{ bgcolor: colors.surface1, border: `1px solid ${colors.borderStrong}`, borderRadius: '18px', p: 1.75, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: colors.textLo, fontSize: 14 }}>
+        <CircularProgress size={16} sx={{ color: colors.accent }} /> {text}
+      </Box>
+      <Box>{bar('92%', 18)}{bar('64%', 18, 0.75)}</Box>
+      {bar('100%', 190)}
+      <Box>{bar('100%', 36)}{bar('100%', 36, 0.75)}</Box>
+    </Box>
+  );
+};
+
 const QueryPage = ({ isMobile }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -86,7 +102,7 @@ const QueryPage = ({ isMobile }) => {
   const measure = params.get('m');
   const live = hasQuery(filters, groupBy);
 
-  const [text, setText] = useState(question);
+  const [text, setText] = useState(question || params.get('nl') || '');
   const [follow, setFollow] = useState('');
   const [parsing, setParsing] = useState(null);   // 'ask' | 'follow'
   const [parseError, setParseError] = useState(null);
@@ -99,7 +115,8 @@ const QueryPage = ({ isMobile }) => {
   const [suggest, setSuggest] = useState([]);
   const [recent, setRecent] = useState(readRecent);
   const nlRef = useRef(null);
-  useEffect(() => { setText(question); }, [question]);
+  // While a ?nl= question is read, the box shows it (it was blank under the skeleton in dev's double effects).
+  useEffect(() => { setText(question || params.get('nl') || ''); }, [question]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.title = 'Query · Hindsight'; }, []);
 
   // One format at a time: "All formats" mixes T20s and ODIs and reads wrong, so the page pins T20 unless ODI is chosen.
@@ -218,6 +235,11 @@ const QueryPage = ({ isMobile }) => {
   }, [nlParam]);
 
   const chips = queryChips(filters, groupBy);
+  // Arriving with a question (?nl= from the home ask box, or a stored query from a chip): an answer-shaped skeleton
+  // until it's answered, never the empty page's suggestions and other visitors' recent questions (round 2 audit).
+  const readingNl = Boolean(nlParam) && !live && !parseError;
+  const waiting = readingNl || (live && (run.status === 'idle' || run.status === 'loading'));
+  const empty = !live && !readingNl;
   // A scoring wheel needs the batter's hand to draw the field the right way round: for one named batter, ask the
   // query builder (one row by batting hand).
   const [hand, setHand] = useState(null);
@@ -238,7 +260,7 @@ const QueryPage = ({ isMobile }) => {
 
   return (
     <Box sx={{ maxWidth: 640, mx: 'auto', px: 2, pt: 1.5, pb: 3, display: 'flex', flexDirection: 'column', gap: 1.5, color: colors.textHi }}>
-      {!live && <Box component="h1" sx={{ m: 0, fontFamily: fonts.display, fontWeight: 700, fontSize: 27, lineHeight: 1.1 }}>Ask the ball-by-ball data</Box>}
+      {empty && <Box component="h1" sx={{ m: 0, fontFamily: fonts.display, fontWeight: 700, fontSize: 27, lineHeight: 1.1 }}>Ask the ball-by-ball data</Box>}
 
       <Box component="form" onSubmit={(e) => { e.preventDefault(); ask(text); }}
         sx={{ display: 'flex', alignItems: 'center', gap: 1, border: `1.5px solid ${colors.accent}`, borderRadius: '16px', bgcolor: colors.surface1, pl: 1.5, pr: 1, py: 0.75 }}>
@@ -268,7 +290,7 @@ const QueryPage = ({ isMobile }) => {
         </Box>
       )}
 
-      {!live && (
+      {empty && (
         <>
           {suggest.items?.length > 0 && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -299,11 +321,7 @@ const QueryPage = ({ isMobile }) => {
         </>
       )}
 
-      {live && run.status === 'loading' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, color: colors.textLo, fontSize: 14, py: 3, justifyContent: 'center' }}>
-          <CircularProgress size={20} sx={{ color: colors.accent }} /> Counting every ball…
-        </Box>
-      )}
+      {waiting && <AnswerSkeleton text={readingNl ? 'Reading the question…' : 'Counting every ball…'} />}
       {live && run.status === 'error' && <Box sx={{ color: colors.red, fontSize: 14 }}>{run.error}</Box>}
       {live && answer && notes.length > 0 && (
         <Box role="note" sx={{ border: '1px solid rgba(240,180,41,0.45)', bgcolor: 'rgba(240,180,41,0.08)', borderRadius: '12px', px: 1.5, py: 1, fontSize: 13.5, color: colors.textHi }}>

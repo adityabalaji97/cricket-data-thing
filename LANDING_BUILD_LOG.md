@@ -492,3 +492,15 @@ Files: `src/components/query2/answerShape.js`, `src/components/query2/__tests__/
   chips; a person or side leads, a category (phase, v pace) follows the scope. `single_row_390.png`.
 - Done together (same function); 3 new tests, 17/17 in query2.
 - Not reproducible locally: the local DB has no Rinku 2020, so the fix is shown by the test, not a screenshot.
+
+### R2.7 Audit P2: no empty-page flash while a question is answered
+
+File: `src/components/query2/QueryPage.jsx`.
+
+- Arriving with `?nl=` (the home ask box, site search) showed the empty page for 1-2 s: suggestions and other
+  visitors' "Recently asked". Now, while the question is parsed (`nl` present, no query yet, no parse error) or a
+  query is counted, the page shows an answer-card skeleton ("Reading the question…" / "Counting every ball…": a
+  sentence, a chart block, two rows) and hides the heading, suggestions, recent list and "Or build one". The old
+  centred spinner is gone. A parse error falls back to the normal empty page with the error.
+- The ask box holds the `nl` question while it's read (it showed blank under React's dev double effects).
+- `qb_nl_loading_390.png`, `qb_chip_loading_390.png`.
