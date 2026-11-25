@@ -569,3 +569,19 @@ Files: new `src/components/preview/UpcomingPreviews.jsx`, `src/App.js`, `src/dat
   build the same preview URL (full names + `story=1`, R2.3). The component is lazy (its own chunk).
 - Checked at 360: six rows, no horizontal scroll; tapping Dubai Capitals v Desert Vipers opens its preview (par,
   chasing, head to head) (`preview_tab_390.png` is at 360 despite its name, `preview_from_tab_390.png`).
+
+### Round 2 summary (to 25 Nov, 06:30 IST)
+
+13 commits, `d639dbb`..`03fa60c` on top of `2ece6b2`. Nothing pushed or deployed. The audit queue is done, including
+the "if time" Preview tab item. "Recent Matches" and "Standout Innings" were left alone (owner decisions).
+
+**Assumed (owner to check)**: /links gets the tagline break too; with no param /team puts the IPL first; IPL claims
+name sides by city outside the auction too; the Jurel v Buttler chip kept the pairing (IPL since 2024); the home
+search icon goes to /search rather than focusing the ask box; played previews are hidden from /notes "All" but
+kept under Previews.
+
+**Not checked live**: a live fixture row's status line (no live match locally); the parse-error card; Rinku's
+2020 one-ball year (not in the local DB; covered by a test). The chip numbers come from the local subset DB.
+
+**Noticed, not fixed**: the app keeps scroll position across routes (rows added here scroll to top themselves; a
+global scroll-to-top on route change would fix it everywhere but could fight hash links).
