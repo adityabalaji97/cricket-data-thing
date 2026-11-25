@@ -85,11 +85,25 @@ const AnswerSkeleton = ({ text }) => {
         <CircularProgress size={16} sx={{ color: colors.accent }} /> {text}
       </Box>
       <Box>{bar('92%', 18)}{bar('64%', 18, 0.75)}</Box>
-      {bar('100%', 190)}
-      <Box>{bar('100%', 36)}{bar('100%', 36, 0.75)}</Box>
+      {bar('100%', 220)}
+      <Box>{bar('100%', 36)}{bar('100%', 36, 0.75)}{bar('100%', 36, 0.75)}</Box>
     </Box>
   );
 };
+
+// A failed parse or run: the message and a 44px Try again, in the answer's place.
+const ErrorCard = ({ message, onRetry }) => (
+  <Box component="section" role="alert" sx={{ bgcolor: colors.surface1, border: '1px solid rgba(229,72,77,0.45)', borderRadius: '18px',
+    p: 1.75, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-start' }}>
+    <Box sx={{ color: colors.textHi, fontSize: 14.5, lineHeight: 1.4 }}>{message}</Box>
+    <Box component="button" type="button" onClick={onRetry}
+      sx={{ all: 'unset', cursor: 'pointer', minHeight: 44, px: 2, display: 'inline-flex', alignItems: 'center', borderRadius: '10px',
+        border: '1px solid rgba(182,242,74,0.45)', color: colors.accent, fontFamily: fonts.mono, fontSize: 12, fontWeight: 700,
+        '&:focus-visible': { outline: `2px solid ${colors.accent}` } }}>
+      Try again
+    </Box>
+  </Box>
+);
 
 const QueryPage = ({ isMobile }) => {
   const location = useLocation();
@@ -110,6 +124,7 @@ const QueryPage = ({ isMobile }) => {
   // until the next question (12 Nov 2026: these were returned by the parser and never shown).
   const [notes, setNotes] = useState([]);
   const [run, setRun] = useState({ status: 'idle', data: null, qs: '' });
+  const [runAttempt, setRunAttempt] = useState(0);
   const [options, setOptions] = useState(null);
   const [sheet, setSheet] = useState({ open: false, focus: null });
   const [suggest, setSuggest] = useState([]);
@@ -181,7 +196,7 @@ const QueryPage = ({ isMobile }) => {
       });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search, fmt]);
+  }, [location.search, fmt, runAttempt]);
 
   const go = useCallback((f, g, q, m = null, f2 = null) => {
     const search = toSearch(f, g, q, m, slugFor(f2 || fmt));
@@ -239,7 +254,8 @@ const QueryPage = ({ isMobile }) => {
   // until it's answered, never the empty page's suggestions and other visitors' recent questions (round 2 audit).
   const readingNl = Boolean(nlParam) && !live && !parseError;
   const waiting = readingNl || (live && (run.status === 'idle' || run.status === 'loading'));
-  const empty = !live && !readingNl;
+  // With ?nl= in the URL the empty page stays hidden, a failed parse included (its card offers Try again).
+  const empty = !live && !nlParam;
   // A scoring wheel needs the batter's hand to draw the field the right way round: for one named batter, ask the
   // query builder (one row by batting hand).
   const [hand, setHand] = useState(null);
@@ -276,7 +292,7 @@ const QueryPage = ({ isMobile }) => {
           ))}
         </Box>
       </Box>
-      {parseError && <Box sx={{ color: colors.red, fontSize: 13.5 }}>{parseError}</Box>}
+      {parseError && <ErrorCard message={parseError} onRetry={() => ask(text || nlParam || '')} />}
 
       {live && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
@@ -322,7 +338,7 @@ const QueryPage = ({ isMobile }) => {
       )}
 
       {waiting && <AnswerSkeleton text={readingNl ? 'Reading the question…' : 'Counting every ball…'} />}
-      {live && run.status === 'error' && <Box sx={{ color: colors.red, fontSize: 14 }}>{run.error}</Box>}
+      {live && run.status === 'error' && <ErrorCard message={run.error} onRetry={() => setRunAttempt((n) => n + 1)} />}
       {live && answer && notes.length > 0 && (
         <Box role="note" sx={{ border: '1px solid rgba(240,180,41,0.45)', bgcolor: 'rgba(240,180,41,0.08)', borderRadius: '12px', px: 1.5, py: 1, fontSize: 13.5, color: colors.textHi }}>
           {notes.map((n) => <Box key={n}>{n}</Box>)}

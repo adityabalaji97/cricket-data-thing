@@ -544,3 +544,14 @@ File: `src/components/LandingPage.jsx` (`FixtureRow`).
   Not-live rows are unchanged (one line). The row stays 56px minimum and grows to fit the second line.
 - Not checked live: no match was live locally when this was built (06:20 IST); the pre-match row renders as before
   (`fixture_row_390.png`). Worth a look on the next live match.
+
+### R2.12 Review of R2.7: errors get a card with Try again; skeleton sized like an answer
+
+File: `src/components/query2/QueryPage.jsx`.
+
+- A failed parse and a failed run each show an `ErrorCard` in the answer's place: the message and a 44px
+  "Try again" (the parse re-asks the same text; the run re-runs the same query through a `runAttempt` counter).
+- With `?nl=` in the URL the empty page (suggestions, "Recently asked") stays hidden, a failed parse included.
+- The skeleton's chart block is 220px and it has three row bars (~462px, against Rinku's 467px answer).
+- Checked: `group_by=not_a_column` shows the API's message in the card; Try again re-runs it (`qb_run_error_390.png`).
+  The parse-error card is not reproduced locally (no way to force a parse failure without the model).
