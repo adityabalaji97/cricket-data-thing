@@ -19,7 +19,7 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import XIcon from '@mui/icons-material/X';
 import config from '../config';
 import { siteOrigin } from './ui/ChartExportButton';
-import { fetchUpcomingMatches } from '../data/iplSchedule';
+import { fetchUpcomingMatches, localStart, routePreview } from '../data/iplSchedule';
 import ExploreMenu from './nav/ExploreMenu';
 import MiniWagonWheel from './MiniWagonWheel';
 import { getTeamColor, readableOnDark } from '../utils/teamColors';
@@ -74,17 +74,6 @@ const toDateLabel = (value) => {
 
 const routeTeam = (team) => `/team?team=${encodeURIComponent(team || '')}&autoload=true`;
 const routePlayer = (player) => `/player?name=${encodeURIComponent(player || '')}&autoload=true`;
-const routePreview = (match) => (
-  `/venue?venue=${encodeURIComponent(match.venue || '')}` +
-  // Full names, as /links does: the preview can't resolve every short code (GG, MIE opened a venue-only page).
-  `&team1=${encodeURIComponent(match.team1 || match.team1Abbr || '')}` +
-  `&team2=${encodeURIComponent(match.team2 || match.team2Abbr || '')}` +
-  `&includeInternational=true&topTeams=20&autoload=true&story=1` +
-  // The preview is one format's record; ODI fixtures must open in ODI, not the global default.
-  `&fmt=${match.format === 'ODI' ? 'mens-odi' : 'mens-t20'}` +
-  `${match.matchId ? `&matchId=${encodeURIComponent(match.matchId)}` : ''}`
-);
-
 const scrollTrack = (ref, direction) => {
   const node = ref.current;
   if (!node) return;
@@ -317,24 +306,6 @@ const topIconSx = {
   border: `1px solid ${C.hairlineStrong}`,
   borderRadius: 2,
   '&:hover': { bgcolor: C.raised },
-};
-
-// Fixture start in the viewer's own time zone. The API's `date`/`time` are UTC, so without
-// `startUtc` (an older cached response) the time is labelled UTC rather than guessed.
-const localStart = (match) => {
-  if (!match.startUtc) {
-    return { date: match.date, label: match.time ? `${match.time} UTC` : null };
-  }
-  const start = new Date(match.startUtc);
-  const date = start.toLocaleDateString('en-CA');
-  let time = start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
-  // en-US browsers in India name the zone "GMT+5:30"; most of our readers know it as IST.
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (zone === 'Asia/Kolkata' || zone === 'Asia/Calcutta') time = time.replace(/GMT\+5:30$/, 'IST');
-  const today = new Date().toLocaleDateString('en-CA');
-  const tomorrow = new Date(Date.now() + 864e5).toLocaleDateString('en-CA');
-  const day = date === today ? '' : date === tomorrow ? 'Tomorrow ' : `${start.toLocaleDateString(undefined, { weekday: 'short' })} `;
-  return { date, label: `${day}${time}` };
 };
 
 // The leagues and events whose matches lead the row, so a big game is never pushed off it by a busy day elsewhere.

@@ -36,6 +36,7 @@ import ChunkErrorBoundary from './components/ui/ChunkErrorBoundary';
 // is the most-visited first page and has a static first screen in public/index.html.
 const UnifiedPlayerProfile = lazyWithRetry(() => import('./components/UnifiedPlayerProfile'));
 const TeamPage = lazyWithRetry(() => import('./components/pages/TeamPage'));
+const UpcomingPreviews = lazyWithRetry(() => import('./components/preview/UpcomingPreviews'));
 const IntlXIPage = lazyWithRetry(() => import('./components/pages/IntlXIPage'));
 const XIBuilderPage = lazyWithRetry(() => import('./components/pages/XIBuilderPage'));
 const VenuePage = lazyWithRetry(() => import('./components/pages/VenuePage'));
@@ -784,6 +785,7 @@ const AppContent = () => {
         <Route path="/graphics" element={<GraphicsLanding />} />
         <Route path="/venue" element={venueOnly ? <VenuePage /> : (
           <Box sx={{ my: { xs: 1.5, md: 3 }, bgcolor: 'background.default', color: 'text.primary' }}>
+            {!getQueryParam('venue') && <UpcomingPreviews />}
             <PreviewFilters
               error={error}
               loading={loading}

@@ -555,3 +555,17 @@ File: `src/components/query2/QueryPage.jsx`.
 - The skeleton's chart block is 220px and it has three row bars (~462px, against Rinku's 467px answer).
 - Checked: `group_by=not_a_column` shows the API's message in the card; Try again re-runs it (`qb_run_error_390.png`).
   The parse-error card is not reproduced locally (no way to force a parse failure without the model).
+
+### R2.13 Audit: the bottom nav's Preview lists the next fixtures
+
+Files: new `src/components/preview/UpcomingPreviews.jsx`, `src/App.js`, `src/data/iplSchedule.js`,
+`src/components/LandingPage.jsx`.
+
+- `/venue` with no venue (the Preview tab) opened a bare form. It now leads with a "Next fixtures" card: the next six
+  (`/fixtures/upcoming?count=6`, one call), each a 52px row (full team names; time in the viewer's zone or LIVE;
+  format, ground) that opens its story preview. The form stays below ("Or pick any venue and two sides below.").
+  Nothing renders while loading, on error or with no fixtures, so the form never jumps.
+- `routePreview` and `localStart` moved from LandingPage.jsx to `data/iplSchedule.js` so the home row and this list
+  build the same preview URL (full names + `story=1`, R2.3). The component is lazy (its own chunk).
+- Checked at 360: six rows, no horizontal scroll; tapping Dubai Capitals v Desert Vipers opens its preview (par,
+  chasing, head to head) (`preview_tab_390.png` is at 360 despite its name, `preview_from_tab_390.png`).
