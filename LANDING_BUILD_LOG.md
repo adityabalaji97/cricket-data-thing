@@ -477,3 +477,18 @@ File: `src/components/landing/AskHero.jsx` (`EXAMPLES`).
   Locally it answers "Jos Buttler leads: strike rate 153, then Jurel (152)." over 930 and 687 balls, a ranked list of
   two (`chip_jurel_390.png`). The local DB is a subset of prod: owner, check the live numbers once deployed.
 - Assumed: kept the pairing (the Fable review's pick) rather than swapping the player.
+
+### R2.6 Audit P2: year lines need 30 balls a point; one-row answers state their value
+
+Files: `src/components/query2/answerShape.js`, `src/components/query2/__tests__/answerShape.test.js`.
+
+- Year/season lines: a year needs 30 balls (`RANK_FLOOR`) to be a point or a word in the claim; every year stays in
+  the list under the chart, and the note says "years under 30 balls left off the line". A query with its own
+  `min_balls` keeps it. (Rinku Singh v pace plotted 2020 from one ball, a dip to 100.)
+- Every value in a sentence is rounded from the same 2-place number the charts plot, so a claim and a label can't
+  differ by one (161 v 162).
+- One row (a ranking of one, or a split with one value) is now a `single` answer: "Virat Kohli, IPL, v spin: strike
+  rate 132 from 805 balls, 1,060 runs." with the totals tiles, not "X leads" over one bar. The scope is the query's
+  chips; a person or side leads, a category (phase, v pace) follows the scope. `single_row_390.png`.
+- Done together (same function); 3 new tests, 17/17 in query2.
+- Not reproducible locally: the local DB has no Rinku 2020, so the fix is shown by the test, not a screenshot.
