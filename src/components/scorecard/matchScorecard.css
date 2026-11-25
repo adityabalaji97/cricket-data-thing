@@ -4,7 +4,9 @@
   background: #0a0c11;
   color: #f3f4f6;
   min-height: 100vh;
-  margin: -24px;
+  /* Sideways, the page cancels the app container's padding exactly (8px phone, 16px from 600, 24px from 900):
+     -24px on a phone overflowed by 8-16px and scrolled sideways (round 2 audit). */
+  margin: -24px -8px;
   padding: 0 0 28px;
   font-family: 'Barlow', sans-serif;
 }
@@ -961,9 +963,21 @@
   padding: 18px;
 }
 
+@media (min-width: 600px) {
+  .scorecard-page {
+    margin-inline: -16px;
+  }
+}
+
+@media (min-width: 900px) {
+  .scorecard-page {
+    margin-inline: -24px;
+  }
+}
+
 @media (min-width: 700px) {
   .scorecard-page {
-    margin: -24px;
+    margin-block: -24px;
     padding: 32px 0;
     background: #080a0f;
   }
@@ -978,7 +992,7 @@
 
 @media (max-width: 420px) {
   .scorecard-page {
-    margin: -16px;
+    margin-block: -16px;
   }
 
   .split-grid.three {

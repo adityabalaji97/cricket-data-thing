@@ -513,3 +513,15 @@ File: `src/components/query2/answerShape.js` (+ 2 tests).
   "Jos Buttler and Dhruv Jurel are level: strike rate 153 and 152." instead of "Buttler leads … then Jurel (152)".
   The gap is measured on the same rounded numbers the sentence shows.
 - The year-floor note says "left off the line" only when there is a line; with one year left it says "not counted".
+
+### R2.9 Audit P3 quick ones: scorecard sideways scroll, nav labels, home search icon
+
+Files: `src/components/scorecard/matchScorecard.css`, `src/theme/hindsightTheme.js`, `src/components/LandingPage.jsx`.
+
+- Scorecard: `.scorecard-page` pulled out by -24px (-16px under 420) against a container padded 8px on phones, so
+  the page scrolled 8-16px sideways. Sideways it now cancels the padding exactly (-8px, -16px from 600, -24px from
+  900); the vertical margins are as before. Checked: scrollWidth = viewport at 360 and 650 (`scorecard_360.png`).
+- Bottom-nav labels 11px -> 12px (theme). At 360 all five fit (no label wider than its box).
+- Home search icon (phone): it opened a second input above the ask box. It is now a link to /search (players,
+  teams, venues), as the bottom nav's Search. Assumed: /search rather than focusing the ask box, because the icon's
+  job is finding a player/team/venue page, which the ask box doesn't do. Desktop keeps its inline search field.

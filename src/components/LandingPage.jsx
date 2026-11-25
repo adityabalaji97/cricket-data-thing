@@ -225,7 +225,6 @@ const LandingDropdown = ({ id, label, value, options, onChange, openDropdown, se
 
 const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
   const navigate = useNavigate();
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const routeEntity = (item) => {
     if (item.type === 'player') {
@@ -235,7 +234,6 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
     } else if (item.type === 'venue') {
       navigate(`/venue?venue=${encodeURIComponent(item.name)}&autoload=true`);
     }
-    setSearchOpen(false);
   };
 
   const searchField = (
@@ -252,7 +250,6 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
         onSelect={routeEntity}
         onFallback={(term) => {
           navigate(`/query?nl=${encodeURIComponent(term)}`);
-          setSearchOpen(false);
         }}
         placeholder="Search players, teams, venues"
         variant="dark"
@@ -271,7 +268,9 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
         </Box>
         {!isMobile && searchField}
         {isMobile && (
-          <IconButton aria-label="Search" onClick={() => setSearchOpen((prev) => !prev)} sx={topIconSx}>
+          // Round 2 audit: on a phone the icon opened a second input above the ask box. It now goes to the Search page
+          // (players, teams, venues), as the bottom nav's Search does.
+          <IconButton aria-label="Search players, teams, venues" component={Link} to="/search" sx={topIconSx}>
             <SearchIcon sx={{ fontSize: 20 }} />
           </IconButton>
         )}
@@ -305,7 +304,6 @@ const TopBar = ({ navOpen, setNavOpen, isMobile, hideExplore = false }) => {
         </Button>
         )}
       </Box>
-      {isMobile && searchOpen && <Box sx={{ mt: 1.3 }}>{searchField}</Box>}
     </Box>
   );
 };
