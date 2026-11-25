@@ -525,3 +525,13 @@ Files: `src/components/scorecard/matchScorecard.css`, `src/theme/hindsightTheme.
 - Home search icon (phone): it opened a second input above the ask box. It is now a link to /search (players,
   teams, venues), as the bottom nav's Search. Assumed: /search rather than focusing the ask box, because the icon's
   job is finding a player/team/venue page, which the ask box doesn't do. Desktop keeps its inline search field.
+
+### R2.10 Audit P3: /notes doesn't lead with previews of played matches
+
+File: `src/components/notes/NotesList.jsx`.
+
+- "All" leaves out previews whose match is over (`previewPassed` from `utils/noteDates.js`, as the home page and
+  /links do). They stay under the Previews filter, kicker "Preview · played". If a page of 12 leaves fewer than four
+  notes, the next page loads by itself. Locally: All shows recap, article, analysis; Previews shows the 2 Oct one,
+  marked played (`notes_all_390.png`).
+- Assumed: hide from "All" rather than delete or sink to the bottom (they're still worth reading as an archive).

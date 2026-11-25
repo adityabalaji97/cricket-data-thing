@@ -6,6 +6,7 @@ import config from '../../config';
 import { colors, fonts } from '../../theme/hindsightDark';
 import { embedOrigin } from './NoteBody';
 import { KIND_LABEL, formatNoteDate } from './noteMarkdown.mjs';
+import { previewPassed } from '../../utils/noteDates';
 
 /** /notes: published Hindsight Notes, newest first. Phone-first cards. */
 const PAGE = 12;
@@ -33,7 +34,7 @@ export const NoteCard = ({ note, compact = false }) => (
     }}>
     <Box sx={{ minWidth: 0, flex: 1 }}>
       <Typography sx={{ fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: colors.accent, mb: 0.75 }}>
-        {KIND_LABEL[note.kind] || 'Note'}
+        {KIND_LABEL[note.kind] || 'Note'}{previewPassed(note) ? ' · played' : ''}
       </Typography>
       <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, color: colors.textHi, fontSize: compact ? 17 : { xs: 19, md: 21 }, lineHeight: 1.2 }}>
         {note.title}
@@ -69,6 +70,13 @@ const NotesList = () => {
   }, [kind]);
 
   useEffect(() => { setNotes(null); load(0); }, [load]);
+  // "All" leaves out previews of matches already played (round 2 audit: the list led with 11 Oct previews), as the
+  // home page does; they stay under Previews, marked played. If a page is all played previews, the next one loads.
+  const shown = (notes || []).filter((n) => kind || !previewPassed(n));
+  useEffect(() => {
+    if (!kind && notes && more && shown.length < 4) load(notes.length);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes, more, kind]);
   useEffect(() => { document.title = 'Notes | Hindsight'; }, []);
 
   return (
@@ -83,13 +91,13 @@ const NotesList = () => {
         ))}
       </Box>
       {notes === null && <CircularProgress size={22} sx={{ color: colors.accent }} />}
-      {notes && notes.length === 0 && (
+      {notes && shown.length === 0 && !more && (
         <Typography sx={{ color: colors.textLo, py: 4 }}>
           {error ? 'Notes could not be loaded. Try again in a moment.' : 'Nothing here yet.'}
         </Typography>
       )}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        {(notes || []).map((n) => <NoteCard key={n.id} note={n} />)}
+        {shown.map((n) => <NoteCard key={n.id} note={n} />)}
       </Box>
       {more && (
         <Button onClick={() => load(notes.length)} sx={{ mt: 2, color: colors.accent, fontWeight: 700 }}>Load more</Button>
